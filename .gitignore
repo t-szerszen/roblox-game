@@ -1,0 +1,36 @@
+# macOS
+.DS_Store
+
+# Editors
+.vscode/settings.json
+.idea/
+
+# Node
+node_modules/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Blender temporary/backup files
+*.blend1
+*.blend2
+*.blend3
+
+# Logs / temporary files
+*.log
+*.tmp
+*.temp
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Roblox Studio place files
+# Rojo project is the source of truth
+*.rbxl
+*.rbxlx
+*.rbxlx.lock
