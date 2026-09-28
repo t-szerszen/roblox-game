@@ -29,6 +29,9 @@ venv/
 .env.*
 !.env.example
 
+# Luau LSP
+sourcemap.json
+
 # Roblox Studio place files
 # Rojo project is the source of truth
 *.rbxl
