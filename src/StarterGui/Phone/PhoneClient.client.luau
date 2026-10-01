@@ -153,11 +153,77 @@ gui.ResetOnSpawn = false
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = playerGui
 
-local openButton = makeButton(gui, "TEL", Color3.fromRGB(30, 30, 30))
-openButton.Name = "OpenPhone"
-openButton.AnchorPoint = Vector2.new(0, 1)
-openButton.Position = UDim2.new(0, 24, 1, -24)
-openButton.Size = UDim2.fromOffset(52, 48)
+local hudGui = playerGui:FindFirstChild("ActionHUD")
+if not hudGui then
+	hudGui = Instance.new("ScreenGui")
+	hudGui.Name = "ActionHUD"
+	hudGui.DisplayOrder = 100
+	hudGui.ResetOnSpawn = false
+	hudGui.IgnoreGuiInset = true
+	hudGui.Parent = playerGui
+	
+	local container = Instance.new("Frame")
+	container.Name = "Container"
+	container.Position = UDim2.new(0, 16, 0, 60)
+	container.Size = UDim2.fromOffset(150, 300)
+	container.BackgroundTransparency = 1
+	container.Parent = hudGui
+	
+	local layout = Instance.new("UIListLayout")
+	layout.Padding = UDim.new(0, 10)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = container
+end
+local hudContainer = hudGui:WaitForChild("Container")
+
+local openButton = Instance.new("TextButton")
+openButton.Name = "PhoneBtn"
+openButton.Size = UDim2.fromOffset(120, 44)
+openButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+openButton.AutoButtonColor = false
+openButton.Text = ""
+openButton.LayoutOrder = 2
+openButton.Parent = hudContainer
+corner(openButton, 12)
+local openBtnGradient = createGradient(openButton, Color3.fromRGB(24, 26, 32), Color3.fromRGB(16, 18, 22))
+local openBtnStroke = stroke(openButton, Color3.fromRGB(0, 180, 255), 1.5)
+openBtnStroke.Transparency = 0.5
+
+local openBtnIcon = makeLabel(openButton, "TELEFON", 14, Color3.fromRGB(250, 250, 255), true)
+openBtnIcon.Position = UDim2.fromOffset(14, 0)
+openBtnIcon.Size = UDim2.new(1, -50, 1, 0)
+openBtnIcon.TextXAlignment = Enum.TextXAlignment.Left
+
+local phoneBadge = Instance.new("Frame")
+phoneBadge.Size = UDim2.fromOffset(26, 26)
+phoneBadge.AnchorPoint = Vector2.new(1, 0.5)
+phoneBadge.Position = UDim2.new(1, -8, 0.5, 0)
+phoneBadge.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+phoneBadge.Parent = openButton
+corner(phoneBadge, 6)
+createGradient(phoneBadge, Color3.fromRGB(50, 50, 55), Color3.fromRGB(30, 30, 35))
+local phoneBadgeLabel = makeLabel(phoneBadge, "M", 14, Color3.fromRGB(255, 255, 255), true)
+phoneBadgeLabel.Size = UDim2.new(1, 0, 1, 0)
+phoneBadgeLabel.TextXAlignment = Enum.TextXAlignment.Center
+
+local isPhoneOpen = false
+
+globalMaid:Give(openButton.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement then
+		TweenService:Create(openButton, TweenInfo.new(0.2), {Size = UDim2.fromOffset(126, 46)}):Play()
+		TweenService:Create(openBtnStroke, TweenInfo.new(0.2), {Transparency = 0.1}):Play()
+	elseif input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		TweenService:Create(openButton, TweenInfo.new(0.1), {Size = UDim2.fromOffset(116, 42)}):Play()
+	end
+end))
+globalMaid:Give(openButton.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement then
+		TweenService:Create(openButton, TweenInfo.new(0.2), {Size = UDim2.fromOffset(120, 44)}):Play()
+		TweenService:Create(openBtnStroke, TweenInfo.new(0.2), {Transparency = if isPhoneOpen then 0.1 else 0.5}):Play()
+	elseif input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		TweenService:Create(openButton, TweenInfo.new(0.1), {Size = UDim2.fromOffset(126, 46)}):Play()
+	end
+end))
 
 local phone = Instance.new("Frame")
 phone.Name = "Phone"
@@ -639,18 +705,21 @@ local function refresh()
 end
 
 local function setOpen(open: boolean)
+	isPhoneOpen = open
 	phone.Visible = open
-	openButton.Visible = not open
 	if open then
+		TweenService:Create(openBtnStroke, TweenInfo.new(0.2), {Transparency = 0}):Play()
 		phone.Position = UDim2.new(1, -24, 1, 30)
 		TweenService:Create(phone, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 			Position = UDim2.new(1, -24, 1, -24)
 		}):Play()
 		refresh()
+	else
+		TweenService:Create(openBtnStroke, TweenInfo.new(0.2), {Transparency = 0.5}):Play()
 	end
 end
 
-globalMaid:Give(openButton.Activated:Connect(function() setOpen(true) end))
+globalMaid:Give(openButton.Activated:Connect(function() setOpen(not isPhoneOpen) end))
 globalMaid:Give(homeBar.Activated:Connect(goHome))
 globalMaid:Give(UserInputService.InputBegan:Connect(function(input, processed)
 	if not processed and input.KeyCode == Enum.KeyCode.M then
