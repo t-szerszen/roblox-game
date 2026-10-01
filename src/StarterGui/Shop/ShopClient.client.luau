@@ -107,38 +107,22 @@ local function label(parent: Instance, text: string, size: number, color: Color3
 end
 
 -- Shared Action HUD logic
-local hudGui = playerGui:FindFirstChild("ActionHUD")
-if not hudGui then
-	hudGui = Instance.new("ScreenGui")
-	hudGui.Name = "ActionHUD"
-	hudGui.DisplayOrder = 100
-	hudGui.ResetOnSpawn = false
-	hudGui.IgnoreGuiInset = true
-	hudGui.Parent = playerGui
-	
-	local container = Instance.new("Frame")
-	container.Name = "Container"
-	container.Position = UDim2.new(0, 16, 0, 60)
-	container.Size = UDim2.fromOffset(150, 300)
-	container.BackgroundTransparency = 1
-	container.Parent = hudGui
-	
-	local layout = Instance.new("UIListLayout")
-	layout.Padding = UDim.new(0, 10)
-	layout.SortOrder = Enum.SortOrder.LayoutOrder
-	layout.Parent = container
-end
-local hudContainer = hudGui:WaitForChild("Container")
+local hudGui = Instance.new("ScreenGui")
+hudGui.Name = "ShopHUD"
+hudGui.DisplayOrder = 100
+hudGui.ResetOnSpawn = false
+hudGui.IgnoreGuiInset = true
+hudGui.Parent = playerGui
 
 -- HUD Shop Button
 local shopBtn = Instance.new("TextButton")
 shopBtn.Name = "ShopBtn"
+shopBtn.Position = UDim2.new(0, 16, 0, 16)
 shopBtn.Size = UDim2.fromOffset(120, 44)
 shopBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 shopBtn.AutoButtonColor = false
 shopBtn.Text = ""
-shopBtn.LayoutOrder = 1
-shopBtn.Parent = hudContainer
+shopBtn.Parent = hudGui
 corner(shopBtn, 12)
 local shopBtnGradient = createGradient(shopBtn, Color3.fromRGB(24, 26, 32), Color3.fromRGB(16, 18, 22))
 local shopBtnStroke = stroke(shopBtn, COLORS.coin, 1.5)
@@ -180,7 +164,7 @@ end))
 -- Shop Main UI
 local gui = Instance.new("ScreenGui")
 gui.Name = "ShopGui"
-gui.DisplayOrder = 20
+gui.DisplayOrder = 200
 gui.IgnoreGuiInset = true
 gui.ResetOnSpawn = false
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
@@ -203,6 +187,7 @@ window.Position = UDim2.fromScale(0.5, 0.5)
 window.Size = UDim2.new(0.85, 0, 0.8, 0)
 window.BackgroundColor3 = COLORS.panel
 window.ClipsDescendants = true
+window.Active = true
 window.Parent = overlay
 corner(window, 16)
 stroke(window, Color3.fromRGB(40, 45, 55), 1)
@@ -475,7 +460,8 @@ globalMaid:Give(robuxTab.Activated:Connect(function() currentTab = "Robux"; rend
 globalMaid:Give(boostsTab.Activated:Connect(function() currentTab = "Boosts"; renderProducts() end))
 
 globalMaid:Give(UserInputService.InputBegan:Connect(function(input, processed)
-	if not processed and input.KeyCode == Enum.KeyCode.B then
+	if UserInputService:GetFocusedTextBox() then return end
+	if input.KeyCode == Enum.KeyCode.B then
 		setOpen(not isShopOpen)
 	elseif input.KeyCode == Enum.KeyCode.Escape and isShopOpen then
 		setOpen(false)

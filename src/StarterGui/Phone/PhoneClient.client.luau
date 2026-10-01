@@ -147,43 +147,27 @@ end
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "PhoneGui"
-gui.DisplayOrder = 15
+gui.DisplayOrder = 200
 gui.IgnoreGuiInset = true
 gui.ResetOnSpawn = false
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = playerGui
 
-local hudGui = playerGui:FindFirstChild("ActionHUD")
-if not hudGui then
-	hudGui = Instance.new("ScreenGui")
-	hudGui.Name = "ActionHUD"
-	hudGui.DisplayOrder = 100
-	hudGui.ResetOnSpawn = false
-	hudGui.IgnoreGuiInset = true
-	hudGui.Parent = playerGui
-	
-	local container = Instance.new("Frame")
-	container.Name = "Container"
-	container.Position = UDim2.new(0, 16, 0, 60)
-	container.Size = UDim2.fromOffset(150, 300)
-	container.BackgroundTransparency = 1
-	container.Parent = hudGui
-	
-	local layout = Instance.new("UIListLayout")
-	layout.Padding = UDim.new(0, 10)
-	layout.SortOrder = Enum.SortOrder.LayoutOrder
-	layout.Parent = container
-end
-local hudContainer = hudGui:WaitForChild("Container")
+local hudGui = Instance.new("ScreenGui")
+hudGui.Name = "PhoneHUD"
+hudGui.DisplayOrder = 100
+hudGui.ResetOnSpawn = false
+hudGui.IgnoreGuiInset = true
+hudGui.Parent = playerGui
 
 local openButton = Instance.new("TextButton")
 openButton.Name = "PhoneBtn"
+openButton.Position = UDim2.new(0, 16, 0, 72)
 openButton.Size = UDim2.fromOffset(120, 44)
 openButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 openButton.AutoButtonColor = false
 openButton.Text = ""
-openButton.LayoutOrder = 2
-openButton.Parent = hudContainer
+openButton.Parent = hudGui
 corner(openButton, 12)
 local openBtnGradient = createGradient(openButton, Color3.fromRGB(24, 26, 32), Color3.fromRGB(16, 18, 22))
 local openBtnStroke = stroke(openButton, Color3.fromRGB(0, 180, 255), 1.5)
@@ -722,9 +706,10 @@ end
 globalMaid:Give(openButton.Activated:Connect(function() setOpen(not isPhoneOpen) end))
 globalMaid:Give(homeBar.Activated:Connect(goHome))
 globalMaid:Give(UserInputService.InputBegan:Connect(function(input, processed)
-	if not processed and input.KeyCode == Enum.KeyCode.M then
-		setOpen(not phone.Visible)
-	elseif input.KeyCode == Enum.KeyCode.Escape and phone.Visible then
+	if UserInputService:GetFocusedTextBox() then return end
+	if input.KeyCode == Enum.KeyCode.M then
+		setOpen(not isPhoneOpen)
+	elseif input.KeyCode == Enum.KeyCode.Escape and isPhoneOpen then
 		if currentPage ~= "Home" then goHome() else setOpen(false) end
 	end
 end))
