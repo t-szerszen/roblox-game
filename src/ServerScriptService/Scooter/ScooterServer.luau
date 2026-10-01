@@ -354,9 +354,6 @@ local function sanitizeScooterPhysics(model: Model, root: BasePart, seat: Vehicl
 			descendant.CanTouch = false
 			descendant.CanQuery = false
 			descendant.Massless = descendant ~= root
-			if descendant:IsA("MeshPart") then
-				descendant.CollisionFidelity = Enum.CollisionFidelity.Box
-			end
 		end
 	end
 
