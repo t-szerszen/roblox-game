@@ -40,17 +40,17 @@ local request = ReplicatedStorage:WaitForChild(PhoneConfig.RemoteFolderName):Wai
 local stateChanged = ReplicatedStorage:WaitForChild(PhoneConfig.RemoteFolderName):WaitForChild(PhoneConfig.StateChangedEventName) :: RemoteEvent
 
 local C = {
-	phone = Color3.fromRGB(14, 16, 19),
-	screen = Color3.fromRGB(238, 241, 244),
-	ink = Color3.fromRGB(25, 29, 34),
-	muted = Color3.fromRGB(104, 112, 122),
-	line = Color3.fromRGB(211, 216, 222),
-	white = Color3.fromRGB(255, 255, 255),
-	green = Color3.fromRGB(35, 174, 105),
-	red = Color3.fromRGB(218, 78, 69),
-	yellow = Color3.fromRGB(235, 185, 42),
-	blue = Color3.fromRGB(53, 128, 219),
-	purple = Color3.fromRGB(142, 83, 201),
+	phone = Color3.fromRGB(230, 115, 50), -- iPhone 17 Pro Orange Titanium
+	screen = Color3.fromRGB(0, 0, 0), -- OLED Black
+	ink = Color3.fromRGB(255, 255, 255), -- White text for OLED
+	muted = Color3.fromRGB(152, 152, 157), -- iOS Gray
+	line = Color3.fromRGB(44, 44, 46), -- iOS Dark Separator
+	white = Color3.fromRGB(28, 28, 30), -- iOS Dark Card Background
+	green = Color3.fromRGB(48, 209, 88), -- iOS Green
+	red = Color3.fromRGB(255, 69, 58), -- iOS Red
+	yellow = Color3.fromRGB(255, 159, 10), -- iOS Orange
+	blue = Color3.fromRGB(10, 132, 255), -- iOS Blue
+	purple = Color3.fromRGB(191, 90, 242), -- iOS Purple
 }
 
 local emptyState: PhoneState = {
@@ -148,8 +148,8 @@ phone.BackgroundColor3 = C.phone
 phone.Visible = false
 phone.ClipsDescendants = true
 phone.Parent = gui
-corner(phone, 24)
-stroke(phone, Color3.fromRGB(69, 74, 81), 0.1)
+corner(phone, 44)
+stroke(phone, Color3.fromRGB(255, 160, 90), 0)
 
 local phoneSize = Instance.new("UISizeConstraint")
 phoneSize.MinSize = Vector2.new(320, 520)
@@ -163,38 +163,54 @@ screen.Size = UDim2.new(1, -16, 1, -16)
 screen.BackgroundColor3 = C.screen
 screen.ClipsDescendants = true
 screen.Parent = phone
-corner(screen, 18)
+corner(screen, 38)
+
+local dynamicIsland = Instance.new("Frame")
+dynamicIsland.Size = UDim2.fromOffset(110, 32)
+dynamicIsland.Position = UDim2.new(0.5, 0, 0, 8)
+dynamicIsland.AnchorPoint = Vector2.new(0.5, 0)
+dynamicIsland.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
+dynamicIsland.Parent = screen
+corner(dynamicIsland, 16)
+stroke(dynamicIsland, Color3.fromRGB(30, 30, 30), 0)
 
 local topBar = Instance.new("Frame")
 topBar.Name = "TopBar"
-topBar.Size = UDim2.new(1, 0, 0, 58)
-topBar.BackgroundColor3 = C.white
+topBar.Size = UDim2.new(1, 0, 0, 88)
+topBar.BackgroundTransparency = 1
 topBar.BorderSizePixel = 0
 topBar.Parent = screen
 
-local backButton = makeButton(topBar, "<", C.ink)
+local backButton = makeButton(topBar, "<", C.white)
 backButton.Name = "Back"
-backButton.Position = UDim2.fromOffset(12, 13)
+backButton.Position = UDim2.fromOffset(16, 44)
 backButton.Size = UDim2.fromOffset(34, 34)
 backButton.Visible = false
 
-local pageTitle = makeLabel(topBar, "Telefon", 18, C.ink, true)
-pageTitle.Position = UDim2.fromOffset(18, 10)
-pageTitle.Size = UDim2.new(1, -92, 0, 24)
+local pageTitle = makeLabel(topBar, "Telefon", 24, C.ink, true)
+pageTitle.Position = UDim2.fromOffset(24, 46)
+pageTitle.Size = UDim2.new(1, -100, 0, 30)
 
-local clock = makeLabel(topBar, "", 11, C.muted, true)
-clock.Position = UDim2.fromOffset(18, 33)
-clock.Size = UDim2.new(1, -92, 0, 16)
+local clock = makeLabel(screen, "", 13, C.ink, true)
+clock.Position = UDim2.fromOffset(24, 15)
+clock.Size = UDim2.fromOffset(60, 20)
+clock.TextXAlignment = Enum.TextXAlignment.Center
 
-local closeButton = makeButton(topBar, "X", Color3.fromRGB(67, 72, 80))
+local battery = makeLabel(screen, "100%", 12, C.ink, true)
+battery.AnchorPoint = Vector2.new(1, 0)
+battery.Position = UDim2.new(1, -24, 0, 15)
+battery.Size = UDim2.fromOffset(60, 20)
+battery.TextXAlignment = Enum.TextXAlignment.Center
+
+local closeButton = makeButton(topBar, "X", C.white)
 closeButton.AnchorPoint = Vector2.new(1, 0)
-closeButton.Position = UDim2.new(1, -12, 0, 13)
+closeButton.Position = UDim2.new(1, -16, 0, 44)
 closeButton.Size = UDim2.fromOffset(34, 34)
 
 local content = Instance.new("ScrollingFrame")
 content.Name = "Content"
-content.Position = UDim2.fromOffset(0, 58)
-content.Size = UDim2.new(1, 0, 1, -82)
+content.Position = UDim2.fromOffset(0, 88)
+content.Size = UDim2.new(1, 0, 1, -112)
 content.BackgroundTransparency = 1
 content.BorderSizePixel = 0
 content.ScrollBarThickness = 3
@@ -214,7 +230,7 @@ local homeBar = Instance.new("Frame")
 homeBar.AnchorPoint = Vector2.new(0.5, 1)
 homeBar.Position = UDim2.new(0.5, 0, 1, -9)
 homeBar.Size = UDim2.fromOffset(112, 4)
-homeBar.BackgroundColor3 = Color3.fromRGB(92, 97, 105)
+homeBar.BackgroundColor3 = C.ink
 homeBar.Parent = screen
 corner(homeBar, 2)
 
@@ -582,7 +598,7 @@ renderPage = function()
 	clearContent()
 	verticalLayout(content, 10)
 	backButton.Visible = currentPage ~= "Home"
-	pageTitle.Position = if currentPage == "Home" then UDim2.fromOffset(18, 10) else UDim2.fromOffset(56, 10)
+	pageTitle.Position = if currentPage == "Home" then UDim2.fromOffset(24, 46) else UDim2.fromOffset(64, 46)
 	pageTitle.Text = currentPage
 
 	if currentPage == "Home" then
