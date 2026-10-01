@@ -61,11 +61,20 @@ Stack: Roblox Studio, Rojo, Rokit, GitHub, Codex. Git is the source of truth.
 - Don't duplicate assets. Use existing reusable assets or generators.
 - Blender/Python asset generation belongs in the pipeline, not gameplay code.
 
-### 9. Documentation
+### 9. Map workflow
+
+- The production map is authored manually in Roblox Studio under `Workspace.Map`.
+- Do not enable automatic map generation at server startup or overwrite the manually authored `Workspace.Map`.
+- Preserve `MapBuilder`, `AssetRegistry`, `MapData`, `DevMapTool`, and `MapWorkflow` as explicit development, recovery, and versioning tools.
+- Periodically serialize `Workspace.Map` into `src/ServerScriptService/Map/MapData.luau` and commit that snapshot so the map layout is versioned in Git.
+- Logical folders such as `Workspace.Map.Roads` and `Workspace.Map.Trees` are allowed and should reflect the organization used in Studio.
+- Treat Studio as the active map-authoring environment between snapshots. Do not assume that `MapData` should rebuild the production map unless the user explicitly requests it.
+
+### 10. Documentation
 
 - Document architectural decisions in `docs/` and update them when making changes.
 
-### 10. Git Workflow
+### 11. Git Workflow
 
 - Never commit directly to `main`.
 - Use consistent branch and commit naming:
@@ -75,26 +84,26 @@ Stack: Roblox Studio, Rojo, Rokit, GitHub, Codex. Git is the source of truth.
   - `chore/<name>` -> `chore: <description>`
 - Keep commits focused. Avoid giant commits.
 
-### 11. Pull Requests
+### 12. Pull Requests
 
 - PRs are required for `main`.
 - Verify builds, test gameplay, and review your diff before opening a PR.
 
-### 12. Do not destroy work
+### 13. Do not destroy work
 
 - Never delete systems without checking dependencies or overwrite unrelated files just to "clean up".
 
-### 13. Secrets
+### 14. Secrets
 
 - Never commit API keys, tokens, passwords, or `.env` files.
 
-### 14. Agent behavior
+### 15. Agent behavior
 
 - Check the repo, read docs, and identify systems BEFORE writing code.
 - Do not invent non-existent APIs, files, or modules.
 - Make the smallest reasonable change.
 
-### 15. Product decisions
+### 16. Product decisions
 
 - Implement documented product decisions.
 - Do NOT silently change core loops, economy, progression, or architecture. Flag missing product decisions instead of making them up.
