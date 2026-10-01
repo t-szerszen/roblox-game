@@ -18,7 +18,9 @@ type VisualState = {
 	frontWheel: Motor6D?,
 	rearWheel: Motor6D?,
 	steering: Motor6D?,
-	spin: number,
+	frontSpin: number,
+	rearSpin: number,
+	displayedSteering: number,
 }
 
 local localPlayer = Players.LocalPlayer
@@ -118,18 +120,6 @@ local function findControlledScooter(): Model?
 	return nil
 end
 
-local function isGrounded(root: BasePart): boolean
-	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Exclude
-	local scooter = activeScooter
-	if scooter then
-		params.FilterDescendantsInstances = { scooter }
-	end
-
-	local result = workspace:Raycast(root.Position, Vector3.new(0, -3.2, 0), params)
-	return result ~= nil
-end
-
 local function setLocalBurnout(active: boolean)
 	if burnoutActive == active then
 		return
@@ -162,6 +152,9 @@ local function startController(scooter: Model, seat: VehicleSeat, root: BasePart
 	activeMaid = maid
 
 	local lastInputSentAt = 0
+	local lastSentThrottle: number? = nil
+	local lastSentSteering: number? = nil
+	local smoothedSteering = 0
 
 	maid:Give(UserInputService.InputBegan:Connect(function(input: InputObject, gameProcessed: boolean)
 		if gameProcessed and UserInputService:GetFocusedTextBox() ~= nil then
@@ -184,7 +177,7 @@ local function startController(scooter: Model, seat: VehicleSeat, root: BasePart
 		cleanupController()
 	end))
 
-	maid:Give(RunService.Heartbeat:Connect(function(_deltaTime: number)
+	maid:Give(RunService.Heartbeat:Connect(function(deltaTime: number)
 		if activeScooter ~= scooter or activeSeat ~= seat or seat.Occupant == nil then
 			cleanupController()
 			return
@@ -194,22 +187,37 @@ local function startController(scooter: Model, seat: VehicleSeat, root: BasePart
 		local flatVelocity = Vector3.new(velocity.X, 0, velocity.Z)
 		local speed = flatVelocity.Magnitude
 
-		local grounded = isGrounded(root)
+		local grounded = scooter:GetAttribute("FrontGrounded") == true
+			or scooter:GetAttribute("RearGrounded") == true
 
 		local seatThrottle = seat.ThrottleFloat
 		local throttleHeld = seatThrottle > 0.1 or inputState.throttle
 		local brakeHeld = seatThrottle < -0.1 or inputState.brake
 		local keyboardSteering = (if inputState.right then 1 else 0) - (if inputState.left then 1 else 0)
-		local steering = if math.abs(seat.SteerFloat) > 0.1 then seat.SteerFloat else keyboardSteering
+		local targetSteering = if math.abs(seat.SteerFloat) > 0.1 then seat.SteerFloat else keyboardSteering
+		targetSteering = math.clamp(targetSteering, -1, 1)
+		local steeringAlpha = 1 - math.exp(-ScooterConfig.SteerSmoothSpeed * math.min(deltaTime, 0.1))
+		smoothedSteering += (targetSteering - smoothedSteering) * steeringAlpha
+		if math.abs(smoothedSteering) < 0.001 and targetSteering == 0 then
+			smoothedSteering = 0
+		end
 		local wantsBurnout = throttleHeld and brakeHeld and speed <= ScooterConfig.BurnoutMaxSpeed and grounded
 		local driveThrottle = if throttleHeld == brakeHeld then 0 else if throttleHeld then 1 else -1
 		local sendJump = jumpQueued
 		local sendWheelie = wheelieQueued
 		jumpQueued = false
 		wheelieQueued = false
-		if os.clock() - lastInputSentAt >= 0.05 or sendJump or sendWheelie then
-			lastInputSentAt = os.clock()
-			driveInputRemote:FireServer(driveThrottle, steering, sendWheelie, sendJump)
+		local now = os.clock()
+		local elapsed = now - lastInputSentAt
+		local throttleChanged = driveThrottle ~= lastSentThrottle
+		local steeringChanged = lastSentSteering == nil
+			or math.abs(smoothedSteering - lastSentSteering) >= ScooterConfig.SteeringSendThreshold
+		local shouldSendSteering = steeringChanged and elapsed >= ScooterConfig.DriveInputSendInterval
+		if elapsed >= ScooterConfig.DriveInputKeepalive or throttleChanged or shouldSendSteering or sendJump or sendWheelie then
+			lastInputSentAt = now
+			lastSentThrottle = driveThrottle
+			lastSentSteering = smoothedSteering
+			driveInputRemote:FireServer(driveThrottle, smoothedSteering, sendWheelie, sendJump)
 		end
 
 		if wantsBurnout then
@@ -259,19 +267,7 @@ local function hookCharacter(character: Model)
 	end)
 end
 
-trickRemote.OnClientEvent:Connect(function(_owner: Player, scooter: Model, trickName: string, active: boolean, smokeColor: Color3)
-	if trickName ~= "Burnout" then
-		return
-	end
-
-	local smoke = scooter:FindFirstChild("BurnoutSmoke", true)
-	if smoke and smoke:IsA("ParticleEmitter") then
-		smoke.Enabled = active
-		smoke.Color = ColorSequence.new(smokeColor)
-	end
-end)
-
-localPlayer.CharacterAdded:Connect(hookCharacter)
+local characterAddedConnection = localPlayer.CharacterAdded:Connect(hookCharacter)
 if localPlayer.Character then
 	hookCharacter(localPlayer.Character)
 end
@@ -287,65 +283,119 @@ local function findMotor(scooter: Model, name: string): Motor6D?
 	return if instance and instance:IsA("Motor6D") then instance else nil
 end
 
-local visualConnection = RunService.RenderStepped:Connect(function(deltaTime: number)
-	local folder = workspace:FindFirstChild(ScooterConfig.ScooterFolderName)
-	if not folder then
-		table.clear(visualStates)
+local scooterFolderInstance = workspace:WaitForChild(ScooterConfig.ScooterFolderName)
+assert(scooterFolderInstance:IsA("Folder"), "Workspace scooter container must be a Folder")
+local scooterFolder = scooterFolderInstance
+
+local function registerVisual(instance: Instance)
+	if not instance:IsA("Model") or visualStates[instance] then
 		return
 	end
+	visualStates[instance] = {
+		frontWheel = findMotor(instance, "FrontWheelMotor"),
+		rearWheel = findMotor(instance, "RearWheelMotor"),
+		steering = findMotor(instance, "SteeringMotor"),
+		frontSpin = 0,
+		rearSpin = 0,
+		displayedSteering = 0,
+	}
+end
 
-	for scooter, _state in visualStates do
-		if scooter.Parent ~= folder then
-			visualStates[scooter] = nil
-		end
+local function unregisterVisual(instance: Instance)
+	if instance:IsA("Model") then
+		visualStates[instance] = nil
 	end
+end
 
-	for _, child in folder:GetChildren() do
-		if not child:IsA("Model") then
-			continue
-		end
+for _, scooter in scooterFolder:GetChildren() do
+	registerVisual(scooter)
+end
+local scooterAddedConnection = scooterFolder.ChildAdded:Connect(registerVisual)
+local scooterRemovedConnection = scooterFolder.ChildRemoved:Connect(unregisterVisual)
+local motorAddedConnection = scooterFolder.DescendantAdded:Connect(function(instance: Instance)
+	if not instance:IsA("Motor6D") then
+		return
+	end
+	local scooter = instance:FindFirstAncestorOfClass("Model")
+	local state = if scooter then visualStates[scooter] else nil
+	if not state then
+		return
+	end
+	if instance.Name == "FrontWheelMotor" then
+		state.frontWheel = instance
+	elseif instance.Name == "RearWheelMotor" then
+		state.rearWheel = instance
+	elseif instance.Name == "SteeringMotor" then
+		state.steering = instance
+	end
+end)
+local motorRemovingConnection = scooterFolder.DescendantRemoving:Connect(function(instance: Instance)
+	if not instance:IsA("Motor6D") then
+		return
+	end
+	local scooter = instance:FindFirstAncestorOfClass("Model")
+	local state = if scooter then visualStates[scooter] else nil
+	if not state then
+		return
+	end
+	if state.frontWheel == instance then
+		state.frontWheel = nil
+	elseif state.rearWheel == instance then
+		state.rearWheel = nil
+	elseif state.steering == instance then
+		state.steering = nil
+	end
+end)
 
-		local state = visualStates[child]
-		if not state then
-			state = {
-				frontWheel = findMotor(child, "FrontWheelMotor"),
-				rearWheel = findMotor(child, "RearWheelMotor"),
-				steering = findMotor(child, "SteeringMotor"),
-				spin = 0,
-			}
-			visualStates[child] = state
-		end
-		-- Descendants of a freshly replicated model can arrive after its folder child.
-		state.frontWheel = state.frontWheel or findMotor(child, "FrontWheelMotor")
-		state.rearWheel = state.rearWheel or findMotor(child, "RearWheelMotor")
-		state.steering = state.steering or findMotor(child, "SteeringMotor")
-
-		local root = child.PrimaryPart
+local visualConnection = RunService.RenderStepped:Connect(function(deltaTime: number)
+	for scooter, state in visualStates do
+		local root = scooter.PrimaryPart
 		if not root then
 			continue
 		end
 
 		local forwardSpeed = root.AssemblyLinearVelocity:Dot(root.CFrame.LookVector)
-		local wheelRadiusAttribute = child:GetAttribute("WheelRadius")
+		local wheelRadiusAttribute = scooter:GetAttribute("WheelRadius")
 		local wheelRadius = if typeof(wheelRadiusAttribute) == "number"
 			then math.clamp(wheelRadiusAttribute, 0.2, 3)
 			else ScooterConfig.WheelRadius
-		state.spin = (state.spin - forwardSpeed * deltaTime / wheelRadius) % (math.pi * 2)
+		local travelAngularSpeed = -forwardSpeed / wheelRadius
+		local rearAngularSpeed = if scooter:GetAttribute("BurnoutActive") == true
+			then -ScooterConfig.BurnoutWheelAngularSpeed
+			else travelAngularSpeed
+		state.frontSpin = (state.frontSpin + travelAngularSpeed * deltaTime) % (math.pi * 2)
+		state.rearSpin = (state.rearSpin + rearAngularSpeed * deltaTime) % (math.pi * 2)
 		if state.frontWheel then
-			state.frontWheel.Transform = CFrame.Angles(state.spin, 0, 0)
+			state.frontWheel.Transform = CFrame.Angles(state.frontSpin, 0, 0)
 		end
 		if state.rearWheel then
-			state.rearWheel.Transform = CFrame.Angles(state.spin, 0, 0)
+			state.rearWheel.Transform = CFrame.Angles(state.rearSpin, 0, 0)
 		end
 		if state.steering then
-			local steering = child:GetAttribute("Steering")
+			local steering = scooter:GetAttribute("Steering")
 			local steeringInput = if typeof(steering) == "number" then math.clamp(steering, -1, 1) else 0
-			state.steering.Transform = CFrame.Angles(0, -steeringInput * ScooterConfig.MaxHandlebarAngle, 0)
+			local steeringAlpha = 1 - math.exp(-ScooterConfig.SteerSmoothSpeed * math.min(deltaTime, 0.1))
+			state.displayedSteering += (steeringInput - state.displayedSteering) * steeringAlpha
+			state.steering.Transform = CFrame.Angles(
+				0,
+				-state.displayedSteering * ScooterConfig.MaxHandlebarAngle,
+				0
+			)
 		end
 	end
 end)
 
 script.Destroying:Connect(function()
+	cleanupController()
+	if characterSeatConnection then
+		characterSeatConnection:Disconnect()
+		characterSeatConnection = nil
+	end
+	characterAddedConnection:Disconnect()
 	visualConnection:Disconnect()
+	scooterAddedConnection:Disconnect()
+	scooterRemovedConnection:Disconnect()
+	motorAddedConnection:Disconnect()
+	motorRemovingConnection:Disconnect()
 	table.clear(visualStates)
 end)
