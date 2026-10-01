@@ -87,15 +87,21 @@ function DevMapTool.DevSerializeMap(): string
 	local folder = mapFolder(false)
 	local snapshots: { ModelSnapshot } = {}
 
-	for _, child in ipairs(folder:GetChildren()) do
-		if not child:IsA("Model") then
-			error(string.format("Workspace.Map child %q is not a Model", child.Name))
+	local function collectModels(container: Instance): ()
+		for _, child in ipairs(container:GetChildren()) do
+			if child:IsA("Folder") then
+				collectModels(child)
+			elseif child:IsA("Model") then
+				table.insert(snapshots, {
+					model = child,
+					pivot = child:GetPivot(),
+				})
+			else
+				error(string.format("%s child %q is not a Model or Folder", container:GetFullName(), child.Name))
+			end
 		end
-		table.insert(snapshots, {
-			model = child,
-			pivot = child:GetPivot(),
-		})
 	end
+	collectModels(folder)
 
 	table.sort(snapshots, function(left: ModelSnapshot, right: ModelSnapshot): boolean
 		if left.model.Name ~= right.model.Name then
