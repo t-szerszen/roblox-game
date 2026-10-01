@@ -41,7 +41,7 @@ local stateChanged = ReplicatedStorage:WaitForChild(PhoneConfig.RemoteFolderName
 
 local C = {
 	phone = Color3.fromRGB(230, 115, 50), -- iPhone 17 Pro Orange Titanium
-	screen = Color3.fromRGB(0, 0, 0), -- OLED Black
+	screen = Color3.fromRGB(255, 255, 255), -- Base for wallpaper gradient
 	ink = Color3.fromRGB(255, 255, 255), -- White text for OLED
 	muted = Color3.fromRGB(152, 152, 157), -- iOS Gray
 	line = Color3.fromRGB(44, 44, 46), -- iOS Dark Separator
@@ -165,20 +165,39 @@ screen.ClipsDescendants = true
 screen.Parent = phone
 corner(screen, 38)
 
+local wallpaper = Instance.new("UIGradient")
+wallpaper.Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(110, 75, 140)),
+	ColorSequenceKeypoint.new(0.5, Color3.fromRGB(60, 35, 100)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 10, 30))
+})
+wallpaper.Rotation = 45
+wallpaper.Parent = screen
+
 local dynamicIsland = Instance.new("Frame")
-dynamicIsland.Size = UDim2.fromOffset(110, 32)
-dynamicIsland.Position = UDim2.new(0.5, 0, 0, 8)
+dynamicIsland.Size = UDim2.fromOffset(120, 34)
+dynamicIsland.Position = UDim2.new(0.5, 0, 0, 10)
 dynamicIsland.AnchorPoint = Vector2.new(0.5, 0)
-dynamicIsland.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
+dynamicIsland.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+dynamicIsland.ZIndex = 10
 dynamicIsland.Parent = screen
-corner(dynamicIsland, 16)
-stroke(dynamicIsland, Color3.fromRGB(30, 30, 30), 0)
+corner(dynamicIsland, 17)
+
+local islandCamera = Instance.new("Frame")
+islandCamera.Size = UDim2.fromOffset(14, 14)
+islandCamera.Position = UDim2.new(1, -24, 0.5, 0)
+islandCamera.AnchorPoint = Vector2.new(0, 0.5)
+islandCamera.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+islandCamera.ZIndex = 11
+islandCamera.Parent = dynamicIsland
+corner(islandCamera, 7)
 
 local topBar = Instance.new("Frame")
 topBar.Name = "TopBar"
 topBar.Size = UDim2.new(1, 0, 0, 88)
 topBar.BackgroundTransparency = 1
 topBar.BorderSizePixel = 0
+topBar.ZIndex = 5
 topBar.Parent = screen
 
 local backButton = makeButton(topBar, "<", C.white)
