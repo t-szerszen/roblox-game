@@ -6,7 +6,7 @@ The production map is authored manually in Roblox Studio. Automatic runtime gene
 MapData -> AssetRegistry -> MapBuilder -> Workspace.Map
 ```
 
-- `src/ServerScriptService/Map/MapData.luau` contains placements with an asset ID, world position, Euler rotation in degrees, and uniform scale.
+- `src/ServerScriptService/Map/MapData.luau` is the latest version-controlled snapshot. It contains placements with an asset ID, world position, Euler rotation in degrees, and uniform scale.
 - `AssetRegistry.luau` creates anchored low-poly Roblox models for the mock asset IDs, including an explicit `Spawn` pad. This procedural registry proves the pipeline; production assets can replace its factories without changing the placement schema or builder.
 - `MapBuilder.luau` validates each placement, creates and transforms its model, then publishes the completed folder as `Workspace.Map`. It stages the build so a failed generation does not replace the current map.
 - `MapInit.server.luau` leaves the manually authored Studio map untouched when the server starts.

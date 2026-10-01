@@ -15,10 +15,12 @@
 
 ### Etap 2: System Mapy (Szacowany czas: ~4-6 dni)
 
-- [ ] Implementacja modułu `MapData` wykorzystującego parametry rozmieszczenia obiektów, takie jak ID zasobu, pozycja, rotacja i skala[cite: 2].
-- [ ] Implementacja modułu `AssetRegistry` obsługującego wyłącznie fizyczne zasoby wyeksportowane w formacie `.fbx`[cite: 2].
-- [ ] Implementacja modułu `MapBuilder` do pobierania danych z `MapData`, klonowania modeli i generowania mapy wewnątrz folderu `Workspace.Map`[cite: 2].
-- [ ] Stworzenie logiki transformacji oraz napisanie podstawowych testów modułowych dla generowania mapy[cite: 2].
+- [x] Zachowanie `MapData`, `AssetRegistry` i `MapBuilder` jako jawnie uruchamianych narzędzi podglądu, odbudowy i wersjonowania mapy.
+- [x] Wyłączenie automatycznego generowania mapy przy starcie serwera, aby nie nadpisywać ręcznie zbudowanego `Workspace.Map`.
+- [x] Dodanie serializacji modeli z `Workspace.Map`, włącznie z obsługą logicznych podfolderów.
+- [ ] Ręczne zbudowanie i uporządkowanie produkcyjnej mapy w Roblox Studio pod `Workspace.Map`.
+- [ ] Okresowe serializowanie mapy do `src/ServerScriptService/Map/MapData.luau` i commitowanie snapshotów układu do Git.
+- [ ] Zweryfikowanie procesu odbudowy mapy ze snapshotu i zarejestrowanych zasobów.
 
 ### Etap 3: Rdzeń Rozgrywki (Core Gameplay)
 
@@ -33,4 +35,4 @@
 ### Etap 5: Rozwój Narzędzi (Poza zakresem MVP)
 
 - [ ] Tworzenie opcjonalnych narzędzi deweloperskich usprawniających przepływ pracy[cite: 2].
-- [ ] Ewentualne zbudowanie niestandardowego pluginu do edytora wewnątrz Roblox Studio wspierającego automatyczną wizualizację `MapData`[cite: 2].
+- [ ] Ewentualne zbudowanie pluginu do Roblox Studio usprawniającego wykonywanie snapshotów, walidację tagów i kontrolę zasobów bez zastępowania ręcznej edycji mapy[cite: 2].

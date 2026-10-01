@@ -6,7 +6,7 @@ Ten dokument definiuje logikę i mechaniki gry. Agenty AI modyfikujące kod musz
 
 - **Autorytet Serwera (Server Authority):** Serwer jest absolutnym autorytetem w grze[cite: 4]. Klientowi (graczowi) nigdy nie wolno ufać w kwestiach waluty, zakupów, ekwipunku, zadawania obrażeń, nagród, progresji ani egzekwowania czasów odnowienia (cooldownów)[cite: 4]. Wszelkie dane z RemoteEvents muszą być ściśle walidowane na serwerze[cite: 4].
 - **Potok Zasobów (Assets):** Wszystkie modele 3D muszą być generowane, przetwarzane i eksportowane wyłącznie w formacie `.fbx`[cite: 2].
-- **Budowa Mapy:** Środowisko opiera się na kodzie i przepływie danych[cite: 2]. Moduł `MapData` definiuje układ, `AssetRegistry` mapuje zasoby `.fbx`, a `MapBuilder` buduje mapę w `Workspace.Map`[cite: 2]. Na etapie MVP nie tworzymy niestandardowego pluginu do edycji map[cite: 2].
+- **Budowa Mapy:** Mapa produkcyjna jest budowana ręcznie w Roblox Studio wewnątrz `Workspace.Map`. Można dzielić ją na logiczne podfoldery, np. `Roads`, `Trees` i `Buildings`. Automatyczne generowanie mapy przy uruchomieniu serwera jest wyłączone. Zachowujemy `MapBuilder`, `AssetRegistry`, `MapData`, `DevMapTool` i `MapWorkflow` jako narzędzia deweloperskie oraz awaryjne. Co pewien czas ręcznie zbudowana mapa jest serializowana ze Studio do `src/ServerScriptService/Map/MapData.luau` i zapisywana w Git jako wersjonowany snapshot układu mapy. Na etapie MVP nie tworzymy niestandardowego pluginu do edycji map[cite: 2].
 - **Wydajność i Pamięć:** Zawsze należy czyścić połączenia eventów (np. używając Maid, Janitor lub explicit disconnect) po zniszczeniu instancji, aby zapobiegać wyciekom pamięci[cite: 4].
 - **Zarządzanie Kodem:** Głównym i ostatecznym źródłem prawdy dla kodu jest repozytorium Git[cite: 4]. Kod jest synchronizowany do Roblox Studio za pomocą narzędzia Rojo, a narzędziami zarządza Rokit[cite: 4, 5].
 
@@ -16,7 +16,7 @@ Ten dokument definiuje logikę i mechaniki gry. Agenty AI modyfikujące kod musz
 
 - **Wymiary i Siatka:** Mapa podzielona jest na 9 dystryktów w formacie siatki 3x3.
 - **Skala Dystryktów:** Pojedynczy dystrykt ma stałe wymiary **500x500 studów**. Całkowity rozmiar siatki mapy wynosi **1500x1500 studów**.
-- **Centrum Mapy (Środek Siatki):** Inspirowane centrum Warszawy z Pałacem Kultury (odwzorowanie w proporcjach bliskich 1:1). Większość budynków na mapie to zamknięte makiety (optymalizacja). Otaczające dystrykty to proceduralnie/kodowo rozstawiona zabudowa urbanistyczna z plików `.fbx`.
+- **Centrum Mapy (Środek Siatki):** Inspirowane centrum Warszawy z Pałacem Kultury (odwzorowanie w proporcjach bliskich 1:1). Większość budynków na mapie to zamknięte makiety (optymalizacja). Otaczające dystrykty są ręcznie komponowane w Roblox Studio z zaimportowanych modeli, w tym zasobów `.fbx`.
 - **SafeZone (Spawn):** Zlokalizowany pod Pałacem Kultury. Obejmuje strefę o promieniu ok. **100 studów**. W tej strefie zablokowane są obrażenia (PvP) oraz pościgi policji.
 - **Cykl Dnia i Nocy:** Gra posiada dynamiczny czas. W nocy serwer spawnuje o **30% mniej** patroli policyjnych (NPC).
 - **Rogatki (Toll Gates - Misja Poboczna):** Interaktywne szlabany/przejazdy kolejowe, pojawiające się losowo kilka razy dziennie w różnych częściach mapy. Ich zniszczenie (taranowaniem) to misja – nie niszczy to mapy permanentnie, ale natychmiast nadaje graczowi **1 gwiazdkę poszukiwań**.
@@ -59,6 +59,10 @@ Główna pętla PvE pozwalająca graczom zarabiać walutę (Coins) oraz Doświad
 ## 5. Ekonomia Sklepu, Hulajnogi i Ulepszenia (Garaż)
 
 Wszelkie transakcje potrącające walutę (Coins) muszą być wykonywane i walidowane na serwerze[cite: 4]. Zręcznościowy model jazdy: brak fizycznych uszkodzeń sprzętu (brak mechaniki napraw).
+
+- **Wsiadanie:** Gracz wsiada na własną hulajnogę wyłącznie przez interakcję `E`; dotknięcie siedzenia nie może automatycznie posadzić postaci.
+- **Skręcanie:** Zmiana kierunku jest możliwa dopiero po rozpoczęciu jazdy; hulajnoga nie obraca się wokół własnej osi na postoju.
+- **Wheelie:** `Shift` lub `C` wykonuje jednorazowe wyrwanie przedniego koła podczas jazdy do przodu. Po rozpoczęciu wheelie gaz `W` podnosi przód, a hamulec `S` go opuszcza. Wheelie nie może rozpocząć się podczas cofania.
 
 ### Cennik i Parametry Hulajnóg (Cel: 200 dostaw do End-game)
 
