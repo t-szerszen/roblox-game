@@ -164,33 +164,38 @@ local function ensureRiderAttachments(model: Model)
 	createWorldAttachment(root, "RightHandGrip", handlebarPosition + right * 0.58)
 end
 
-local function ensureChassisCollider(model: Model, root: BasePart): BasePart
+local function ensureChassisCollider(
+	model: Model,
+	root: BasePart,
+	frontPoint: Attachment,
+	rearPoint: Attachment,
+	wheelRadius: number
+): BasePart
 	local existing = model:FindFirstChild("ChassisCollider")
-	local collider: BasePart
-	if existing and existing:IsA("Part") then
-		collider = existing
-	else
-		local leftFoot = findAttachment(model, "LeftFootPlant")
-		local rightFoot = findAttachment(model, "RightFootPlant")
-		local deckPosition = if leftFoot and rightFoot
-			then (leftFoot.WorldPosition + rightFoot.WorldPosition) * 0.5
-			else root.Position + root.CFrame.UpVector * 0.7
-		local newCollider = Instance.new("Part")
-		newCollider.Name = "ChassisCollider"
-		newCollider.Size = Vector3.new(1.35, 0.2, 2.2)
-		newCollider.CFrame = root.CFrame
-			* CFrame.new(root.CFrame:PointToObjectSpace(deckPosition) - Vector3.yAxis * 0.05)
-		newCollider.Parent = model
-		weld(root, newCollider)
-		collider = newCollider
+	if existing and existing:IsA("BasePart") then
+		existing.Name = "LegacyChassisCollider"
+		existing.CanCollide = false
+		existing.CanTouch = false
+		existing.CanQuery = false
 	end
 
+	local collider = Instance.new("Part")
+	collider.Name = "ChassisCollider"
+	collider:SetAttribute("RuntimeCollisionProxy", true)
+	collider.Size = ScooterConfig.ChassisColliderSize
+	local axleCenter = (frontPoint.WorldPosition + rearPoint.WorldPosition) * 0.5
+	local centerAboveTireBottom = ScooterConfig.ChassisGroundClearance + collider.Size.Y * 0.5
+	local colliderPosition = axleCenter
+		- root.CFrame.UpVector * (wheelRadius - centerAboveTireBottom)
+	collider.CFrame = CFrame.new(colliderPosition) * root.CFrame.Rotation
 	collider.Transparency = 1
 	collider.CanCollide = true
 	collider.CanQuery = true
 	collider.CanTouch = false
 	collider.Massless = true
 	collider.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0.05, 0, 10, 10)
+	collider.Parent = model
+	weld(root, collider)
 	return collider
 end
 
@@ -521,7 +526,23 @@ local function spawnForPlayer(player: Player, requestedModel: string?): Model
 	assert(smoke and smoke:IsA("ParticleEmitter"), "Scooter requires BurnoutSmoke")
 	root.Size = Vector3.new(math.min(root.Size.X, 1.6), math.min(root.Size.Y, 0.24), math.min(root.Size.Z, 1.5))
 	sanitizeScooterPhysics(scooter, root, seat, smoke)
-	local chassisCollider = ensureChassisCollider(scooter, root)
+	local wheelRadius = math.clamp(
+		if typeof(scooter:GetAttribute("WheelRadius")) == "number"
+			then scooter:GetAttribute("WheelRadius") :: number
+			else ScooterConfig.WheelRadius,
+		0.2,
+		3
+	)
+	local halfWheelBase = ScooterConfig.WheelBase * 0.5
+	local frontSuspensionPoint = ensureSuspensionPoint(root, "FrontSuspensionPoint", -halfWheelBase)
+	local rearSuspensionPoint = ensureSuspensionPoint(root, "RearSuspensionPoint", halfWheelBase)
+	local chassisCollider = ensureChassisCollider(
+		scooter,
+		root,
+		frontSuspensionPoint,
+		rearSuspensionPoint,
+		wheelRadius
+	)
 	chassisCollider.Anchored = false
 	chassisCollider.CanCollide = true
 	chassisCollider.CanQuery = true
@@ -544,9 +565,6 @@ local function spawnForPlayer(player: Player, requestedModel: string?): Model
 	driveForce.Force = Vector3.zero
 	driveForce.Parent = root
 
-	local halfWheelBase = ScooterConfig.WheelBase * 0.5
-	local frontSuspensionPoint = ensureSuspensionPoint(root, "FrontSuspensionPoint", -halfWheelBase)
-	local rearSuspensionPoint = ensureSuspensionPoint(root, "RearSuspensionPoint", halfWheelBase)
 	local frontSuspensionForce = createWorldVectorForce(
 		root,
 		"FrontSuspensionForce",
@@ -599,13 +617,7 @@ local function spawnForPlayer(player: Player, requestedModel: string?): Model
 		raycastParams = RaycastParams.new(),
 		frontSuspensionPoint = frontSuspensionPoint,
 		rearSuspensionPoint = rearSuspensionPoint,
-		wheelRadius = math.clamp(
-			if typeof(scooter:GetAttribute("WheelRadius")) == "number"
-				then scooter:GetAttribute("WheelRadius") :: number
-				else ScooterConfig.WheelRadius,
-			0.2,
-			3
-		),
+		wheelRadius = wheelRadius,
 		connections = {},
 		lastTrickAt = 0,
 		lastDriveInputAt = 0,
@@ -791,17 +803,23 @@ local function applySuspension(
 		return nil, false, 0
 	end
 
-	local origin = point.WorldPosition
+	local up = root.CFrame.UpVector
+	local origin = point.WorldPosition + up * ScooterConfig.SuspensionProbeLift
 	local rayLength = record.wheelRadius
 		+ ScooterConfig.SuspensionRestLength
 		+ ScooterConfig.SuspensionTravel
-	local result = Workspace:Raycast(origin, -root.CFrame.UpVector * rayLength, record.raycastParams)
+	local result = Workspace:Raycast(
+		origin,
+		-up * (ScooterConfig.SuspensionProbeLift + rayLength),
+		record.raycastParams
+	)
 	if not result then
 		force.Force = Vector3.zero
 		return nil, false, 0
 	end
 
-	local springLength = math.max(0, result.Distance - record.wheelRadius)
+	local axleToGroundDistance = result.Distance - ScooterConfig.SuspensionProbeLift
+	local springLength = math.max(0, axleToGroundDistance - record.wheelRadius)
 	local compression = math.clamp(
 		ScooterConfig.SuspensionRestLength - springLength,
 		0,
