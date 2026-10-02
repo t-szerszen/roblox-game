@@ -164,36 +164,26 @@ local function ensureRiderAttachments(model: Model)
 	createWorldAttachment(root, "RightHandGrip", handlebarPosition + right * 0.58)
 end
 
-local function ensureChassisCollider(
+local function createWheelCollider(
 	model: Model,
 	root: BasePart,
-	frontPoint: Attachment,
-	rearPoint: Attachment,
+	point: Attachment,
+	name: string,
 	wheelRadius: number
 ): BasePart
-	local existing = model:FindFirstChild("ChassisCollider")
-	if existing and existing:IsA("BasePart") then
-		existing.Name = "LegacyChassisCollider"
-		existing.CanCollide = false
-		existing.CanTouch = false
-		existing.CanQuery = false
-	end
-
 	local collider = Instance.new("Part")
-	collider.Name = "ChassisCollider"
+	collider.Name = name
 	collider:SetAttribute("RuntimeCollisionProxy", true)
-	collider.Size = ScooterConfig.ChassisColliderSize
-	local axleCenter = (frontPoint.WorldPosition + rearPoint.WorldPosition) * 0.5
-	local centerAboveTireBottom = ScooterConfig.ChassisGroundClearance + collider.Size.Y * 0.5
-	local colliderPosition = axleCenter
-		- root.CFrame.UpVector * (wheelRadius - centerAboveTireBottom)
-	collider.CFrame = CFrame.new(colliderPosition) * root.CFrame.Rotation
+	local collisionRadius = math.max(0.1, wheelRadius - ScooterConfig.WheelColliderClearance)
+	collider.Shape = Enum.PartType.Ball
+	collider.Size = Vector3.one * collisionRadius * 2
+	collider.CFrame = CFrame.new(point.WorldPosition)
 	collider.Transparency = 1
 	collider.CanCollide = true
-	collider.CanQuery = true
+	collider.CanQuery = false
 	collider.CanTouch = false
 	collider.Massless = true
-	collider.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0.05, 0, 10, 10)
+	collider.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0.02, 0, 10, 10)
 	collider.Parent = model
 	weld(root, collider)
 	return collider
@@ -536,16 +526,29 @@ local function spawnForPlayer(player: Player, requestedModel: string?): Model
 	local halfWheelBase = ScooterConfig.WheelBase * 0.5
 	local frontSuspensionPoint = ensureSuspensionPoint(root, "FrontSuspensionPoint", -halfWheelBase)
 	local rearSuspensionPoint = ensureSuspensionPoint(root, "RearSuspensionPoint", halfWheelBase)
-	local chassisCollider = ensureChassisCollider(
+	local oldChassisCollider = scooter:FindFirstChild("ChassisCollider")
+	if oldChassisCollider and oldChassisCollider:IsA("BasePart") then
+		oldChassisCollider.CanCollide = false
+		oldChassisCollider.CanTouch = false
+		oldChassisCollider.CanQuery = false
+	end
+	local frontWheelCollider = createWheelCollider(
 		scooter,
 		root,
 		frontSuspensionPoint,
-		rearSuspensionPoint,
+		"FrontWheelCollider",
 		wheelRadius
 	)
-	chassisCollider.Anchored = false
-	chassisCollider.CanCollide = true
-	chassisCollider.CanQuery = true
+	local rearWheelCollider = createWheelCollider(
+		scooter,
+		root,
+		rearSuspensionPoint,
+		"RearWheelCollider",
+		wheelRadius
+	)
+	frontWheelCollider.Anchored = false
+	rearWheelCollider.Anchored = false
+	scooter:SetAttribute("CollisionProxyMode", "WheelSpheres")
 
 	local existingDriveAttachment = root:FindFirstChild("ScooterDriveAttachment")
 	local driveAttachment: Attachment
