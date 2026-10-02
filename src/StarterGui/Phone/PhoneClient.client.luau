@@ -147,83 +147,37 @@ end
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "PhoneGui"
-gui.DisplayOrder = 200
+gui.DisplayOrder = 15
 gui.IgnoreGuiInset = true
 gui.ResetOnSpawn = false
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = playerGui
 
-local hudGui = Instance.new("ScreenGui")
-hudGui.Name = "PhoneHUD"
-hudGui.DisplayOrder = 100
-hudGui.ResetOnSpawn = false
-hudGui.IgnoreGuiInset = true
-hudGui.Parent = playerGui
-
-local openButton = Instance.new("TextButton")
-openButton.Name = "PhoneBtn"
-openButton.Position = UDim2.new(0, 16, 0, 72)
-openButton.Size = UDim2.fromOffset(120, 44)
-openButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-openButton.AutoButtonColor = false
-openButton.Text = ""
-openButton.Parent = hudGui
-corner(openButton, 12)
-local openBtnGradient = createGradient(openButton, Color3.fromRGB(24, 26, 32), Color3.fromRGB(16, 18, 22))
-local openBtnStroke = stroke(openButton, Color3.fromRGB(0, 180, 255), 1.5)
-openBtnStroke.Transparency = 0.5
-
-local openBtnIcon = makeLabel(openButton, "TELEFON", 14, Color3.fromRGB(250, 250, 255), true)
-openBtnIcon.Position = UDim2.fromOffset(14, 0)
-openBtnIcon.Size = UDim2.new(1, -50, 1, 0)
-openBtnIcon.TextXAlignment = Enum.TextXAlignment.Left
-
-local phoneBadge = Instance.new("Frame")
-phoneBadge.Size = UDim2.fromOffset(26, 26)
-phoneBadge.AnchorPoint = Vector2.new(1, 0.5)
-phoneBadge.Position = UDim2.new(1, -8, 0.5, 0)
-phoneBadge.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-phoneBadge.Parent = openButton
-corner(phoneBadge, 6)
-createGradient(phoneBadge, Color3.fromRGB(50, 50, 55), Color3.fromRGB(30, 30, 35))
-local phoneBadgeLabel = makeLabel(phoneBadge, "M", 14, Color3.fromRGB(255, 255, 255), true)
-phoneBadgeLabel.Size = UDim2.new(1, 0, 1, 0)
-phoneBadgeLabel.TextXAlignment = Enum.TextXAlignment.Center
-
-local isPhoneOpen = false
-
-globalMaid:Give(openButton.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseMovement then
-		TweenService:Create(openButton, TweenInfo.new(0.2), {Size = UDim2.fromOffset(126, 46)}):Play()
-		TweenService:Create(openBtnStroke, TweenInfo.new(0.2), {Transparency = 0.1}):Play()
-	elseif input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-		TweenService:Create(openButton, TweenInfo.new(0.1), {Size = UDim2.fromOffset(116, 42)}):Play()
-	end
-end))
-globalMaid:Give(openButton.InputEnded:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseMovement then
-		TweenService:Create(openButton, TweenInfo.new(0.2), {Size = UDim2.fromOffset(120, 44)}):Play()
-		TweenService:Create(openBtnStroke, TweenInfo.new(0.2), {Transparency = if isPhoneOpen then 0.1 else 0.5}):Play()
-	elseif input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-		TweenService:Create(openButton, TweenInfo.new(0.1), {Size = UDim2.fromOffset(126, 46)}):Play()
-	end
-end))
+-- Toggle event: fired by the ActionHUD to open/close the phone
+local toggleEvent = Instance.new("BindableEvent")
+toggleEvent.Name = "TogglePhone"
+toggleEvent.Parent = gui
+gui:SetAttribute("PhoneOpen", false)
 
 local phone = Instance.new("Frame")
 phone.Name = "Phone"
 phone.AnchorPoint = Vector2.new(1, 1)
-phone.Position = UDim2.new(1, -24, 1, 30)
-phone.Size = UDim2.fromOffset(280, 600)
+phone.Position = UDim2.new(1, -18, 1, 30)
+phone.Size = UDim2.fromOffset(250, 530)
 phone.BackgroundColor3 = Color3.fromRGB(20, 20, 22) -- Titanium body
 phone.Visible = false
 phone.ClipsDescendants = false
 phone.Parent = gui
-corner(phone, 34)
+corner(phone, 28)
 stroke(phone, Color3.fromRGB(26, 26, 26), 3)
 
 local aspect = Instance.new("UIAspectRatioConstraint")
-aspect.AspectRatio = 280 / 600
+aspect.AspectRatio = 250 / 530
 aspect.Parent = phone
+
+local phoneScale = Instance.new("UIScale")
+phoneScale.Scale = 0.75
+phoneScale.Parent = phone
 
 local screen = Instance.new("Frame")
 screen.Name = "Screen"
@@ -233,7 +187,7 @@ screen.Size = UDim2.new(1, -12, 1, -12)
 screen.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 screen.ClipsDescendants = true
 screen.Parent = phone
-corner(screen, 30)
+corner(screen, 26)
 
 local wallpaper = createGradient(screen, Color3.fromRGB(10, 14, 23), Color3.fromRGB(60, 20, 90))
 
@@ -249,11 +203,35 @@ local clock = makeLabel(topBar, "12:00", 12, Color3.fromRGB(255, 255, 255), true
 clock.Position = UDim2.new(0, 18, 0, 12)
 clock.Size = UDim2.fromOffset(40, 20)
 
-local statusIcons = makeLabel(topBar, "WIFI 100%", 10, Color3.fromRGB(255, 255, 255), true)
-statusIcons.AnchorPoint = Vector2.new(1, 0)
-statusIcons.Position = UDim2.new(1, -18, 0, 12)
-statusIcons.Size = UDim2.fromOffset(60, 20)
+local statusIcons = makeLabel(topBar, "LTE", 10, Color3.fromRGB(255, 255, 255), true)
+statusIcons.AnchorPoint = Vector2.new(1, 0.5)
+statusIcons.Position = UDim2.new(1, -42, 0, 22)
+statusIcons.Size = UDim2.fromOffset(40, 20)
 statusIcons.TextXAlignment = Enum.TextXAlignment.Right
+
+local batteryBody = Instance.new("Frame")
+batteryBody.Size = UDim2.fromOffset(18, 10)
+batteryBody.AnchorPoint = Vector2.new(1, 0.5)
+batteryBody.Position = UDim2.new(1, -18, 0, 22)
+batteryBody.BackgroundTransparency = 1
+batteryBody.Parent = topBar
+corner(batteryBody, 3)
+stroke(batteryBody, Color3.fromRGB(255, 255, 255), 1.5)
+
+local batteryFill = Instance.new("Frame")
+batteryFill.Size = UDim2.new(1, -4, 1, -4)
+batteryFill.Position = UDim2.fromOffset(2, 2)
+batteryFill.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+batteryFill.Parent = batteryBody
+corner(batteryFill, 1)
+
+local batteryTip = Instance.new("Frame")
+batteryTip.Size = UDim2.fromOffset(2, 4)
+batteryTip.Position = UDim2.new(1, 1, 0.5, 0)
+batteryTip.AnchorPoint = Vector2.new(0, 0.5)
+batteryTip.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+batteryTip.Parent = batteryBody
+corner(batteryTip, 1)
 
 local dynamicIsland = Instance.new("Frame")
 dynamicIsland.Size = UDim2.fromOffset(90, 26)
@@ -281,14 +259,14 @@ homeScreen.BackgroundTransparency = 1
 homeScreen.Parent = screen
 
 local appGrid = Instance.new("Frame")
-appGrid.Size = UDim2.new(1, -32, 1, -120)
-appGrid.Position = UDim2.new(0, 16, 0, 60)
+appGrid.Size = UDim2.new(1, -28, 1, -110)
+appGrid.Position = UDim2.new(0, 14, 0, 52)
 appGrid.BackgroundTransparency = 1
 appGrid.Parent = homeScreen
 
 local gridLayout = Instance.new("UIGridLayout")
-gridLayout.CellPadding = UDim2.fromOffset(20, 20)
-gridLayout.CellSize = UDim2.fromOffset(56, 76)
+gridLayout.CellPadding = UDim2.fromOffset(14, 16)
+gridLayout.CellSize = UDim2.fromOffset(64, 86)
 gridLayout.SortOrder = Enum.SortOrder.LayoutOrder
 gridLayout.Parent = appGrid
 
@@ -474,29 +452,29 @@ local function renderHomeGrid()
 		container.Parent = appGrid
 
 		local btn = Instance.new("TextButton")
-		btn.Size = UDim2.fromOffset(56, 56)
+		btn.Size = UDim2.fromOffset(64, 64)
 		btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 		btn.AutoButtonColor = false
 		btn.Text = ""
 		btn.Parent = container
-		corner(btn, 14)
+		corner(btn, 16)
 		createGradient(btn, app.c1, app.c2)
 
-		local glyph = makeLabel(btn, app.icon, 24, Color3.fromRGB(255, 255, 255), true)
+		local glyph = makeLabel(btn, app.icon, 28, Color3.fromRGB(255, 255, 255), true)
 		glyph.Size = UDim2.new(1, 0, 1, 0)
 		
-		local label = makeLabel(container, app.name, 11, Color3.fromRGB(240, 240, 240))
-		label.Position = UDim2.new(0, -10, 0, 60)
+		local label = makeLabel(container, app.name, 12, Color3.fromRGB(240, 240, 240))
+		label.Position = UDim2.new(0, -10, 0, 68)
 		label.Size = UDim2.new(1, 20, 0, 16)
 		
 		globalMaid:Give(btn.InputBegan:Connect(function(input)
 			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-				TweenService:Create(btn, TweenInfo.new(0.1), {Size = UDim2.fromOffset(50, 50), Position = UDim2.fromOffset(3, 3)}):Play()
+				TweenService:Create(btn, TweenInfo.new(0.1), {Size = UDim2.fromOffset(56, 56), Position = UDim2.fromOffset(4, 4)}):Play()
 			end
 		end))
 		globalMaid:Give(btn.InputEnded:Connect(function(input)
 			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-				TweenService:Create(btn, TweenInfo.new(0.1), {Size = UDim2.fromOffset(56, 56), Position = UDim2.new()}):Play()
+				TweenService:Create(btn, TweenInfo.new(0.1), {Size = UDim2.fromOffset(64, 64), Position = UDim2.new()}):Play()
 			end
 		end))
 		globalMaid:Give(btn.Activated:Connect(function()
@@ -689,27 +667,24 @@ local function refresh()
 end
 
 local function setOpen(open: boolean)
-	isPhoneOpen = open
 	phone.Visible = open
+	gui:SetAttribute("PhoneOpen", open)
 	if open then
-		TweenService:Create(openBtnStroke, TweenInfo.new(0.2), {Transparency = 0}):Play()
-		phone.Position = UDim2.new(1, -24, 1, 30)
+		phone.Position = UDim2.new(1, -18, 1, 30)
 		TweenService:Create(phone, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-			Position = UDim2.new(1, -24, 1, -24)
+			Position = UDim2.new(1, -18, 1, -18)
 		}):Play()
 		refresh()
-	else
-		TweenService:Create(openBtnStroke, TweenInfo.new(0.2), {Transparency = 0.5}):Play()
 	end
 end
 
-globalMaid:Give(openButton.Activated:Connect(function() setOpen(not isPhoneOpen) end))
+globalMaid:Give(toggleEvent.Event:Connect(function()
+	setOpen(not phone.Visible)
+end))
 globalMaid:Give(homeBar.Activated:Connect(goHome))
-globalMaid:Give(UserInputService.InputBegan:Connect(function(input, processed)
-	if UserInputService:GetFocusedTextBox() then return end
-	if input.KeyCode == Enum.KeyCode.M then
-		setOpen(not isPhoneOpen)
-	elseif input.KeyCode == Enum.KeyCode.Escape and isPhoneOpen then
+-- Escape navigates home or closes phone (M key toggle is handled by ActionHUD)
+globalMaid:Give(UserInputService.InputBegan:Connect(function(input: InputObject, _processed: boolean)
+	if input.KeyCode == Enum.KeyCode.Escape and phone.Visible then
 		if currentPage ~= "Home" then goHome() else setOpen(false) end
 	end
 end))
