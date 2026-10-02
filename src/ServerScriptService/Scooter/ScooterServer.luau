@@ -18,10 +18,12 @@ type ScooterRecord = {
 	smoke: ParticleEmitter,
 	upright: AlignOrientation,
 	driveForce: VectorForce,
+	frontSuspensionForce: VectorForce,
+	rearSuspensionForce: VectorForce,
 	ridePrompt: ProximityPrompt,
 	raycastParams: RaycastParams,
-	frontSuspensionPoint: Attachment?,
-	rearSuspensionPoint: Attachment?,
+	frontSuspensionPoint: Attachment,
+	rearSuspensionPoint: Attachment,
 	wheelRadius: number,
 	connections: { Connection },
 	lastTrickAt: number,
@@ -34,11 +36,11 @@ type ScooterRecord = {
 	wheelieActive: boolean,
 	jumpQueued: boolean,
 	desiredForward: Vector3,
+	groundUp: Vector3,
 	wheeliePitch: number,
 	fallen: boolean,
 	fallenAt: number,
 	lastStepAt: number,
-	lastGroundRecoveryAt: number,
 	crashToken: number,
 	displaySpeedKmh: number,
 	displayFrontCompression: number,
@@ -164,28 +166,60 @@ end
 
 local function ensureChassisCollider(model: Model, root: BasePart): BasePart
 	local existing = model:FindFirstChild("ChassisCollider")
-	if existing and existing:IsA("BasePart") then
-		return existing
+	local collider: BasePart
+	if existing and existing:IsA("Part") then
+		collider = existing
+	else
+		local leftFoot = findAttachment(model, "LeftFootPlant")
+		local rightFoot = findAttachment(model, "RightFootPlant")
+		local deckPosition = if leftFoot and rightFoot
+			then (leftFoot.WorldPosition + rightFoot.WorldPosition) * 0.5
+			else root.Position + root.CFrame.UpVector * 0.7
+		local newCollider = Instance.new("Part")
+		newCollider.Name = "ChassisCollider"
+		newCollider.Size = Vector3.new(1.35, 0.2, 2.2)
+		newCollider.CFrame = root.CFrame
+			* CFrame.new(root.CFrame:PointToObjectSpace(deckPosition) - Vector3.yAxis * 0.05)
+		newCollider.Parent = model
+		weld(root, newCollider)
+		collider = newCollider
 	end
 
-	local leftFoot = findAttachment(model, "LeftFootPlant")
-	local rightFoot = findAttachment(model, "RightFootPlant")
-	local deckPosition = if leftFoot and rightFoot
-		then (leftFoot.WorldPosition + rightFoot.WorldPosition) * 0.5
-		else root.Position + root.CFrame.UpVector * 0.7
-	local collider = Instance.new("Part")
-	collider.Name = "ChassisCollider"
-	collider.Size = Vector3.new(1.35, 0.2, 2.2)
-	collider.CFrame = root.CFrame * CFrame.new(root.CFrame:PointToObjectSpace(deckPosition) - Vector3.yAxis * 0.05)
 	collider.Transparency = 1
 	collider.CanCollide = true
 	collider.CanQuery = true
 	collider.CanTouch = false
 	collider.Massless = true
 	collider.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0.05, 0, 10, 10)
-	collider.Parent = model
-	weld(root, collider)
 	return collider
+end
+
+local function ensureSuspensionPoint(root: BasePart, name: string, localZ: number): Attachment
+	local existing = root:FindFirstChild(name)
+	if existing and existing:IsA("Attachment") then
+		return existing
+	end
+	return createAttachment(root, name, Vector3.new(0, 0, localZ))
+end
+
+local function createWorldVectorForce(root: BasePart, name: string, attachment: Attachment): VectorForce
+	local force = Instance.new("VectorForce")
+	force.Name = name
+	force.Attachment0 = attachment
+	force.RelativeTo = Enum.ActuatorRelativeTo.World
+	force.ApplyAtCenterOfMass = false
+	force.Force = Vector3.zero
+	force.Parent = root
+	return force
+end
+
+local function assignNetworkOwner(root: BasePart, owner: Player?)
+	local canSet, reason = root:CanSetNetworkOwnership()
+	if not canSet then
+		warn(string.format("ScooterServer: cannot assign network ownership: %s", reason))
+		return
+	end
+	root:SetNetworkOwner(owner)
 end
 
 local function createFallbackScooter(owner: Player, modelName: string): Model
@@ -510,6 +544,16 @@ local function spawnForPlayer(player: Player, requestedModel: string?): Model
 	driveForce.Force = Vector3.zero
 	driveForce.Parent = root
 
+	local halfWheelBase = ScooterConfig.WheelBase * 0.5
+	local frontSuspensionPoint = ensureSuspensionPoint(root, "FrontSuspensionPoint", -halfWheelBase)
+	local rearSuspensionPoint = ensureSuspensionPoint(root, "RearSuspensionPoint", halfWheelBase)
+	local frontSuspensionForce = createWorldVectorForce(
+		root,
+		"FrontSuspensionForce",
+		frontSuspensionPoint
+	)
+	local rearSuspensionForce = createWorldVectorForce(root, "RearSuspensionForce", rearSuspensionPoint)
+
 	local upright = Instance.new("AlignOrientation")
 	upright.Name = "ScooterUpright"
 	upright.Mode = Enum.OrientationAlignmentMode.OneAttachment
@@ -529,7 +573,7 @@ local function spawnForPlayer(player: Player, requestedModel: string?): Model
 	ridePrompt.RequiresLineOfSight = false
 	ridePrompt.Parent = root
 
-	root:SetNetworkOwner(nil)
+	assignNetworkOwner(root, nil)
 	if root.AssemblyMass == math.huge then
 		warn(string.format("ScooterServer: %s scooter assembly contains an anchored part", player.Name))
 	end
@@ -549,10 +593,12 @@ local function spawnForPlayer(player: Player, requestedModel: string?): Model
 		smoke = smoke,
 		upright = upright,
 		driveForce = driveForce,
+		frontSuspensionForce = frontSuspensionForce,
+		rearSuspensionForce = rearSuspensionForce,
 		ridePrompt = ridePrompt,
 		raycastParams = RaycastParams.new(),
-		frontSuspensionPoint = findAttachment(scooter, "FrontSuspensionPoint"),
-		rearSuspensionPoint = findAttachment(scooter, "RearSuspensionPoint"),
+		frontSuspensionPoint = frontSuspensionPoint,
+		rearSuspensionPoint = rearSuspensionPoint,
 		wheelRadius = math.clamp(
 			if typeof(scooter:GetAttribute("WheelRadius")) == "number"
 				then scooter:GetAttribute("WheelRadius") :: number
@@ -571,11 +617,11 @@ local function spawnForPlayer(player: Player, requestedModel: string?): Model
 		wheelieActive = false,
 		jumpQueued = false,
 		desiredForward = desiredForward,
+		groundUp = Vector3.yAxis,
 		wheeliePitch = 0,
 		fallen = false,
 		fallenAt = 0,
 		lastStepAt = 0,
-		lastGroundRecoveryAt = 0,
 		crashToken = 0,
 		displaySpeedKmh = 0,
 		displayFrontCompression = 0,
@@ -607,7 +653,8 @@ local function spawnForPlayer(player: Player, requestedModel: string?): Model
 				record.raycastParams.FilterDescendantsInstances = if character
 					then { scooter, character }
 					else { scooter }
-				root:SetNetworkOwner(nil)
+				local networkOwner = if character == player.Character then player else nil
+				assignNetworkOwner(root, networkOwner)
 				suppressRiderCollisions(record, occupant)
 				task.defer(function()
 					if not record.cleaning and seat.Occupant == occupant then
@@ -616,6 +663,7 @@ local function spawnForPlayer(player: Player, requestedModel: string?): Model
 				end)
 			else
 				record.raycastParams.FilterDescendantsInstances = { scooter }
+				assignNetworkOwner(root, nil)
 				restoreRiderCollisions(record)
 			end
 			ridePrompt.Enabled = occupant == nil and not seat.Disabled
@@ -734,22 +782,22 @@ end
 
 local function applySuspension(
 	record: ScooterRecord,
-	localZ: number,
-	deltaTime: number
+	point: Attachment,
+	force: VectorForce
 ): (RaycastResult?, boolean, number)
 	local root = record.root
 	if root.CFrame.UpVector.Y < 0.25 then
+		force.Force = Vector3.zero
 		return nil, false, 0
 	end
 
-	local suspensionPoint = if localZ < 0 then record.frontSuspensionPoint else record.rearSuspensionPoint
-	local origin = if suspensionPoint then suspensionPoint.WorldPosition
-		else root.CFrame:PointToWorldSpace(Vector3.new(0, 0, localZ))
+	local origin = point.WorldPosition
 	local rayLength = record.wheelRadius
 		+ ScooterConfig.SuspensionRestLength
 		+ ScooterConfig.SuspensionTravel
 	local result = Workspace:Raycast(origin, -root.CFrame.UpVector * rayLength, record.raycastParams)
 	if not result then
+		force.Force = Vector3.zero
 		return nil, false, 0
 	end
 
@@ -765,48 +813,8 @@ local function applySuspension(
 		- normalVelocity * ScooterConfig.SuspensionDamping
 	suspensionAcceleration = math.clamp(suspensionAcceleration, 0, ScooterConfig.MaxSuspensionAcceleration)
 
-	local impulse = result.Normal * suspensionAcceleration * root.AssemblyMass * 0.5 * deltaTime
-	root:ApplyImpulseAtPosition(impulse, origin)
+	force.Force = result.Normal * suspensionAcceleration * root.AssemblyMass * 0.5
 	return result, true, compression
-end
-
-local function recoverGroundPenetration(record: ScooterRecord)
-	local root = record.root
-	local now = os.clock()
-	if
-		root.CFrame.UpVector.Y < 0.5
-		or now - record.lastGroundRecoveryAt < ScooterConfig.GroundRecoveryInterval
-	then
-		return
-	end
-	record.lastGroundRecoveryAt = now
-
-	local correction = 0
-	for _, point in { record.frontSuspensionPoint, record.rearSuspensionPoint } do
-		if point then
-			local probeHeight = ScooterConfig.GroundRecoveryProbeHeight
-			local origin = point.WorldPosition + Vector3.yAxis * probeHeight
-			local result = Workspace:Raycast(
-				origin,
-				-Vector3.yAxis * (probeHeight + record.wheelRadius + ScooterConfig.SuspensionTravel + 1),
-				record.raycastParams
-			)
-			if result and result.Normal.Y > 0.5 then
-				local axleHeight = point.WorldPosition.Y - result.Position.Y
-				local penetration = record.wheelRadius + ScooterConfig.GroundClearance - axleHeight
-				correction = math.max(correction, penetration)
-			end
-		end
-	end
-
-	if correction <= ScooterConfig.GroundRecoveryThreshold then
-		return
-	end
-	root.CFrame += Vector3.yAxis * correction
-	local velocity = root.AssemblyLinearVelocity
-	if velocity.Y < 0 then
-		root.AssemblyLinearVelocity = Vector3.new(velocity.X, 0, velocity.Z)
-	end
 end
 
 local function tryStepAssist(record: ScooterRecord, speed: number)
@@ -923,7 +931,7 @@ function ScooterServer.Start()
 		record.lastTrickAt = now
 
 		local speed = record.root.AssemblyLinearVelocity.Magnitude
-		if active and speed > ScooterConfig.BurnoutMaxSpeed then
+		if active and speed > ScooterConfig.BurnoutSmokeMaxSpeed then
 			return
 		end
 
@@ -972,14 +980,23 @@ function ScooterServer.Start()
 				then modelName
 				else ScooterConfig.DefaultModel] or ScooterConfig.Models[ScooterConfig.DefaultModel]
 			local root = record.root
-			recoverGroundPenetration(record)
 			local velocity = root.AssemblyLinearVelocity
 			local flatVelocity = Vector3.new(velocity.X, 0, velocity.Z)
 			local speed = flatVelocity.Magnitude
+			if record.burnoutActive and speed > ScooterConfig.BurnoutSmokeMaxSpeed then
+				setBurnout(record, false, nil)
+			end
 			local maxSpeed = tuning.maxSpeed * ScooterConfig.StudsPerKmH
-			local halfWheelBase = ScooterConfig.WheelBase * 0.5
-			local frontHit, frontGrounded, frontCompression = applySuspension(record, -halfWheelBase, deltaTime)
-			local rearHit, rearGrounded, rearCompression = applySuspension(record, halfWheelBase, deltaTime)
+			local frontHit, frontGrounded, frontCompression = applySuspension(
+				record,
+				record.frontSuspensionPoint,
+				record.frontSuspensionForce
+			)
+			local rearHit, rearGrounded, rearCompression = applySuspension(
+				record,
+				record.rearSuspensionPoint,
+				record.rearSuspensionForce
+			)
 			local visualFrontCompression = math.floor(frontCompression * 100 + 0.5) / 100
 			local visualRearCompression = math.floor(rearCompression * 100 + 0.5) / 100
 			if visualFrontCompression ~= record.displayFrontCompression then
@@ -999,14 +1016,18 @@ function ScooterServer.Start()
 				record.model:SetAttribute("RearGrounded", rearGrounded)
 			end
 
-			local groundUp = Vector3.yAxis
+			local targetGroundUp = Vector3.yAxis
 			if frontHit and rearHit then
-				groundUp = (frontHit.Normal + rearHit.Normal).Unit
+				targetGroundUp = (frontHit.Normal + rearHit.Normal).Unit
 			elseif frontHit then
-				groundUp = frontHit.Normal
+				targetGroundUp = frontHit.Normal
 			elseif rearHit then
-				groundUp = rearHit.Normal
+				targetGroundUp = rearHit.Normal
 			end
+			local groundAlpha = 1 - math.exp(-ScooterConfig.GroundNormalSmoothSpeed * math.min(deltaTime, 0.1))
+			local blendedGroundUp = record.groundUp:Lerp(targetGroundUp, groundAlpha)
+			record.groundUp = if blendedGroundUp.Magnitude > 0.01 then blendedGroundUp.Unit else Vector3.yAxis
+			local groundUp = record.groundUp
 			local motionAlongScooter = math.abs(flatVelocity:Dot(record.desiredForward))
 			local displaySpeedKmh = if motionAlongScooter < ScooterConfig.StopSpeed
 				then 0
@@ -1079,14 +1100,17 @@ function ScooterServer.Start()
 			local grounded = frontGrounded or rearGrounded
 			if grounded and not record.fallen then
 				local safeDeltaTime = math.max(deltaTime, 1 / 240)
-				local forwardAcceleration = math.clamp(
-					(targetForwardSpeed - forwardSpeed) / safeDeltaTime,
-					-speedChangeRate,
-					speedChangeRate
-				)
+				local forwardAcceleration = 0
+				if targetForwardSpeed ~= 0 or math.abs(forwardSpeed) > ScooterConfig.StopSpeed then
+					forwardAcceleration = math.clamp(
+						(targetForwardSpeed - forwardSpeed) / safeDeltaTime,
+						-speedChangeRate,
+						speedChangeRate
+					)
+				end
 				local lateralVelocity = flatVelocity - driveForward * flatVelocity:Dot(driveForward)
 				local lateralAcceleration = Vector3.zero
-				if lateralVelocity.Magnitude > 0.001 then
+				if lateralVelocity.Magnitude > ScooterConfig.StopSpeed then
 					lateralAcceleration = -lateralVelocity.Unit
 						* math.min(lateralVelocity.Magnitude / safeDeltaTime, ScooterConfig.LateralGripDeceleration)
 				end

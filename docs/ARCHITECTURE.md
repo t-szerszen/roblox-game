@@ -10,6 +10,7 @@ MapData -> AssetRegistry -> MapBuilder -> Workspace.Map
 - `AssetRegistry.luau` creates anchored low-poly Roblox models for the mock asset IDs, including an explicit `Spawn` pad. This procedural registry proves the pipeline; production assets can replace its factories without changing the placement schema or builder.
 - `MapBuilder.luau` validates each placement, creates and transforms its model, then publishes the completed folder as `Workspace.Map`. It stages the build so a failed generation does not replace the current map.
 - `MapInit.server.luau` leaves the manually authored Studio map untouched when the server starts.
+- `Environment/RoadPhysicsSanitizer.server.luau` keeps authored road visuals separate from physics. Raised lane markings are non-colliding, regular road parts use a low-friction material, and collidable road `MeshPart` instances are replaced at runtime by slightly overlapping invisible box proxies. This avoids precise mesh collision seams without attempting the restricted runtime write to `CollisionFidelity`.
 
 The MVP does not include a Studio GUI map editor. For Edit Mode placement, `DevMapTool.luau` exposes `DevBuildMap()` and `DevSerializeMap()`. Use `MapWorkflow.luau` from the Command Bar to reload fresh copies of the tool and its dependencies on every invocation:
 

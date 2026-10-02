@@ -201,7 +201,10 @@ local function startController(scooter: Model, seat: VehicleSeat, root: BasePart
 		if math.abs(smoothedSteering) < 0.001 and targetSteering == 0 then
 			smoothedSteering = 0
 		end
-		local wantsBurnout = throttleHeld and brakeHeld and speed <= ScooterConfig.BurnoutMaxSpeed and grounded
+		local wantsBurnout = throttleHeld
+			and brakeHeld
+			and speed <= ScooterConfig.BurnoutSmokeMaxSpeed
+			and grounded
 		local driveThrottle = if throttleHeld == brakeHeld then 0 else if throttleHeld then 1 else -1
 		local sendJump = jumpQueued
 		local sendWheelie = wheelieQueued

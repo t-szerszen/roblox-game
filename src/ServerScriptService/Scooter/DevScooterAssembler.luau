@@ -85,6 +85,12 @@ local function configureVisual(part: BasePart)
 	part.CanQuery = false
 	part.CanTouch = false
 	part.Massless = true
+	if part:IsA("MeshPart") then
+		-- Command Bar/plugin contexts may author this property; runtime scripts cannot.
+		pcall(function()
+			part.CollisionFidelity = Enum.CollisionFidelity.Box
+		end)
+	end
 end
 
 local function createSmoke(rearWheel: BasePart)
