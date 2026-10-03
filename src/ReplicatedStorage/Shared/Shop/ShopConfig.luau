@@ -44,7 +44,7 @@ ShopConfig.CoinProducts = {
 		stat = "Owned_KuKirinG2Pro",
 		accent = Color3.fromRGB(235, 196, 45),
 		tab = "Hulajnogi" :: TabId,
-		speed = 45,
+		speed = 55,
 	},
 	{
 		id = "kukirin_g2_max",
@@ -56,7 +56,7 @@ ShopConfig.CoinProducts = {
 		stat = "Owned_KuKirinG2Max",
 		accent = Color3.fromRGB(54, 190, 129),
 		tab = "Hulajnogi" :: TabId,
-		speed = 55,
+		speed = 65,
 	},
 	{
 		id = "kukirin_g2_master",
@@ -68,7 +68,7 @@ ShopConfig.CoinProducts = {
 		stat = "Owned_KuKirinG2Master",
 		accent = Color3.fromRGB(62, 150, 224),
 		tab = "Hulajnogi" :: TabId,
-		speed = 60,
+		speed = 72,
 	},
 	{
 		id = "kukirin_g3_pro",
@@ -80,7 +80,7 @@ ShopConfig.CoinProducts = {
 		stat = "Owned_KuKirinG3Pro",
 		accent = Color3.fromRGB(224, 91, 80),
 		tab = "Hulajnogi" :: TabId,
-		speed = 65,
+		speed = 80,
 	},
 	{
 		id = "kukirin_g4",
@@ -92,7 +92,7 @@ ShopConfig.CoinProducts = {
 		stat = "Owned_KuKirinG4",
 		accent = Color3.fromRGB(194, 91, 217),
 		tab = "Hulajnogi" :: TabId,
-		speed = 70,
+		speed = 90,
 		featured = true,
 	},
 } :: { Product }
@@ -175,7 +175,7 @@ ShopConfig.RobuxProducts = {
 		kind = "GamePass",
 		productId = 0,
 		accent = Color3.fromRGB(235, 196, 45),
-		tab = "Dopalacze" :: TabId,
+		tab = "Premium" :: TabId,
 		featured = true,
 	},
 } :: { Product }
