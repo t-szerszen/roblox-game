@@ -85,6 +85,12 @@ local function configureVisual(part: BasePart)
 	part.CanQuery = false
 	part.CanTouch = false
 	part.Massless = true
+	if part:IsA("MeshPart") then
+		-- Command Bar/plugin contexts may author this property; runtime scripts cannot.
+		pcall(function()
+			part.CollisionFidelity = Enum.CollisionFidelity.Box
+		end)
+	end
 end
 
 local function createSmoke(rearWheel: BasePart)
@@ -96,9 +102,10 @@ local function createSmoke(rearWheel: BasePart)
 	local smoke = Instance.new("ParticleEmitter")
 	smoke.Name = "BurnoutSmoke"
 	smoke.Enabled = false
+	smoke.LightEmission = 0
 	smoke.Color = ColorSequence.new(Color3.fromRGB(235, 235, 235))
-	smoke.Lifetime = NumberRange.new(0.6, 1.15)
-	smoke.Rate = 95
+	smoke.Lifetime = ScooterConfig.BurnoutSmokeLifetime
+	smoke.Rate = ScooterConfig.BurnoutSmokeRate
 	smoke.Speed = NumberRange.new(4, 8)
 	smoke.SpreadAngle = Vector2.new(24, 24)
 	smoke.Texture = "rbxasset://textures/particles/smoke_main.dds"
@@ -133,6 +140,10 @@ function DevScooterAssembler.AssembleFromSelection(): Model
 	local wheelBottomY = math.min(parts.FrontWheel.Position.Y, parts.RearWheel.Position.Y) - visualWheelRadius
 	local rootPosition = Vector3.new(bodyPosition.X, wheelBottomY + rootHeight * 0.5, bodyPosition.Z)
 	local rootCFrame = CFrame.lookAt(rootPosition, rootPosition + flatForward, Vector3.yAxis)
+	local bodyHalfHeight = math.abs(parts.ScooterBody.CFrame.RightVector.Y) * bodySize.X * 0.5
+		+ math.abs(parts.ScooterBody.CFrame.UpVector.Y) * bodySize.Y * 0.5
+		+ math.abs(parts.ScooterBody.CFrame.LookVector.Y) * bodySize.Z * 0.5
+	local deckY = bodyPosition.Y + bodyHalfHeight
 	local root = Instance.new("Part")
 	root.Name = "Root"
 	-- A short safety foot cannot dig a long chassis corner into the road during wheelies.
@@ -177,14 +188,17 @@ function DevScooterAssembler.AssembleFromSelection(): Model
 	driveAttachment.Parent = root
 	attachmentAt(root, parts.FrontWheel.Position, "FrontSuspensionPoint")
 	attachmentAt(root, parts.RearWheel.Position, "RearSuspensionPoint")
+	local right = rootCFrame.RightVector
+	attachmentAt(root, Vector3.new(bodyPosition.X, deckY + 2.8, bodyPosition.Z) - flatForward * 0.25, "RiderRootAttachment")
+	attachmentAt(root, Vector3.new(bodyPosition.X, deckY + 0.08, bodyPosition.Z) + flatForward * 0.45 - right * 0.32, "LeftFootPlant")
+	attachmentAt(root, Vector3.new(bodyPosition.X, deckY + 0.08, bodyPosition.Z) - flatForward * 0.55 + right * 0.32, "RightFootPlant")
+	attachmentAt(root, parts.Handlebar.Position - right * 0.58, "LeftHandGrip")
+	attachmentAt(root, parts.Handlebar.Position + right * 0.58, "RightHandGrip")
 	createSmoke(parts.RearWheel)
 
 	local seat = Instance.new("VehicleSeat")
 	seat.Name = "DriverSeat"
 	seat.Size = Vector3.new(math.max(1.2, bodyWidth * 0.75), 0.35, math.max(1.1, wheelBase * 0.28))
-	local bodyHalfHeight = math.abs(parts.ScooterBody.CFrame.RightVector.Y) * bodySize.X * 0.5
-		+ math.abs(parts.ScooterBody.CFrame.UpVector.Y) * bodySize.Y * 0.5
-		+ math.abs(parts.ScooterBody.CFrame.LookVector.Y) * bodySize.Z * 0.5
 	local seatPosition = Vector3.new(bodyPosition.X, bodyPosition.Y + bodyHalfHeight + 0.35, bodyPosition.Z)
 		+ flatForward * (-wheelBase * 0.12)
 	seat.CFrame = CFrame.lookAt(seatPosition, seatPosition + flatForward, Vector3.yAxis)
@@ -203,6 +217,7 @@ function DevScooterAssembler.AssembleFromSelection(): Model
 	model:SetAttribute("BurnoutActive", false)
 	model:SetAttribute("WheelieActive", false)
 	model:SetAttribute("Fallen", false)
+	model:SetAttribute("RiderMounted", false)
 	model:SetAttribute("Steering", 0)
 	model:SetAttribute("SpeedKmh", 0)
 	model:SetAttribute("FrontSuspensionCompression", 0)
