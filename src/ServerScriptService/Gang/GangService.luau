@@ -205,7 +205,7 @@ function GangService.GetState(player: Player): GangState
 	end
 
 	local inviteState: InviteState? = nil
-	local invite = invitesByPlayer[player]
+	local invite: PendingInvite? = invitesByPlayer[player]
 	if invite and invite.expiresAt <= os.clock() then
 		invitesByPlayer[player] = nil
 		invite = nil
