@@ -74,7 +74,7 @@ local function createRoad(): Model
 		Enum.Material.Slate
 	)
 	asphalt.CanTouch = false
-	asphalt.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0.05, 0, 10, 10)
+	asphalt.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0.25, 0, 10, 10)
 	local centerLine = makePart(
 		model,
 		"CenterLine",

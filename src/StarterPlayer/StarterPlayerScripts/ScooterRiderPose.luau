@@ -8,6 +8,7 @@ type LimbDefinition = {
 	chainRoot: string,
 	endEffector: string,
 	target: string,
+	poleSide: number?,
 }
 
 export type Controller = {
@@ -20,11 +21,13 @@ local LIMBS: { [string]: LimbDefinition } = {
 		chainRoot = "LeftUpperLeg",
 		endEffector = "LeftFoot",
 		target = "LeftFootPlant",
+		poleSide = -1,
 	},
 	RightFoot = {
 		chainRoot = "RightUpperLeg",
 		endEffector = "RightFoot",
 		target = "RightFootPlant",
+		poleSide = 1,
 	},
 	LeftHand = {
 		chainRoot = "LeftUpperArm",
@@ -85,7 +88,10 @@ function ScooterRiderPose.Start(character: Model, scooter: Model): Controller?
 
 			local target = Instance.new("Attachment")
 			target.Name = string.format("Local%sTarget", limbName)
-			local endEffectorOffset = if string.find(limbName, "Foot") then endEffector.Size.Y * 0.5 else 0
+			-- FootPlant marks the sole contact point; IK targets the foot center.
+			local endEffectorOffset = if string.find(limbName, "Foot")
+				then endEffector.Size.Y * 0.5 - ScooterConfig.RiderPose.FootTargetSink
+				else 0
 			target.CFrame = root.CFrame:ToObjectSpace(source.WorldCFrame) * CFrame.new(0, endEffectorOffset, 0)
 			target.Parent = root
 			targets[limbName] = target
@@ -93,13 +99,29 @@ function ScooterRiderPose.Start(character: Model, scooter: Model): Controller?
 
 			local control = Instance.new("IKControl")
 			control.Name = string.format("Scooter%sIK", limbName)
-			control.Type = Enum.IKControlType.Position
+			local isFoot = definition.poleSide ~= nil
+			control.Type = if isFoot then Enum.IKControlType.Transform else Enum.IKControlType.Position
 			control.ChainRoot = chainRoot
 			control.EndEffector = endEffector
 			control.Target = target
 			control.Priority = 100
-			control.SmoothTime = 0.06
+			control.SmoothTime = 0
 			control.Weight = 1
+			local poleSide = definition.poleSide
+			if poleSide then
+				local lowerLeg = findPart(character, if poleSide < 0 then "LeftLowerLeg" else "RightLowerLeg")
+				if lowerLeg then
+					local pole = Instance.new("Attachment")
+					pole.Name = string.format("Local%sPole", limbName)
+					local poleWorldPosition = lowerLeg.Position
+						+ root.CFrame.RightVector * poleSide * 0.25
+						+ root.CFrame.LookVector * 2
+					pole.Position = root.CFrame:PointToObjectSpace(poleWorldPosition)
+					pole.Parent = root
+					control.Pole = pole
+					table.insert(created, pole)
+				end
+			end
 			control.Parent = humanoid
 			table.insert(created, control)
 		end

@@ -10,7 +10,7 @@ MapData -> AssetRegistry -> MapBuilder -> Workspace.Map
 - `AssetRegistry.luau` creates anchored low-poly Roblox models for the mock asset IDs, including an explicit `Spawn` pad. This procedural registry proves the pipeline; production assets can replace its factories without changing the placement schema or builder.
 - `MapBuilder.luau` validates each placement, creates and transforms its model, then publishes the completed folder as `Workspace.Map`. It stages the build so a failed generation does not replace the current map.
 - `MapInit.server.luau` leaves the manually authored Studio map untouched when the server starts.
-- `Environment/RoadPhysicsSanitizer.server.luau` keeps authored road visuals separate from physics. Raised lane markings are non-colliding, regular road parts use a low-friction material, and collidable road `MeshPart` instances are replaced at runtime by slightly overlapping invisible box proxies. This avoids precise mesh collision seams without attempting the restricted runtime write to `CollisionFidelity`.
+- `Environment/RoadPhysicsSanitizer.server.luau` keeps authored road visuals separate from physics. Raised lane markings are non-colliding, regular road parts use a moderate-grip material, and collidable road `MeshPart` instances are replaced at runtime by slightly overlapping invisible box proxies. This avoids precise mesh collision seams without attempting the restricted runtime write to `CollisionFidelity`.
 
 The MVP does not include a Studio GUI map editor. For Edit Mode placement, `DevMapTool.luau` exposes `DevBuildMap()` and `DevSerializeMap()`. Use `MapWorkflow.luau` from the Command Bar to reload fresh copies of the tool and its dependencies on every invocation:
 
@@ -29,13 +29,12 @@ Run `tools/blender/generate_warsaw_city.py` from Blender's Scripting workspace. 
 
 The generated root `MapData.luau` is kept separate from `src/ServerScriptService/Map/MapData.luau`: the current mock `AssetRegistry` does not load imported FBX assets or recognize all generated IDs. Import the FBX files into Roblox Studio, register those models in the runtime asset registry, and then move the generated placements into the runtime module as an integration step. The script header lists Roblox Studio's FBX import settings for matching scale and axes, based on the [Roblox Blender and Studio guidance](https://create.roblox.com/docs/art/blender).
 
-# Scooter MVP
+# Drivable scooter MVP
 
-The MVP scooter system is split between authoritative server ownership, local input, and client-side rider presentation:
+`ScooterServer` owns the canonical assembly, validates rider input, and applies ground-aligned `VectorForce` propulsion with Roblox `AlignOrientation` stabilization. `ScooterClient.client.luau` sends bounded input intent and cleans its mounted input/simulation connections on dismount, death, focus loss, or destruction. Native stabilization replaces the experimental torque controller; local prediction clones and camera offsets are not started.
 
-- `src/ServerScriptService/Scooter/ScooterServer.luau` creates scooter remotes, validates spawn and trick requests, owns scooter records, clones a matching `ServerStorage/ScooterModels` template when available, and otherwise spawns the temporary KuKirin-style fallback beside the active `SpawnLocation`.
-- `src/StarterPlayer/StarterPlayerScripts/ScooterClient.client.luau` reads controls only for the local player's occupied scooter and sends rate-limited drive intent to the server.
-- `src/StarterPlayer/StarterPlayerScripts/ScooterRiderVisualizer.client.luau` applies the R15 rider pose for every visible occupied scooter. Its `ScooterRiderPose` module pins hands and feet to authored attachments and blends the wheelie balance pose from replicated scooter state.
-- `src/ReplicatedStorage/Shared/Scooter/ScooterConfig.luau` contains shared model tuning, suspension and obstacle-assist values, mount distance, cooldowns, and procedural rider-pose constants.
+Visual parts are unanchored, massless and non-colliding. Two invisible low-friction spherical proxies at the wheel axles supply ground contact and match the authored tire radius. Root and seat remain non-colliding. The server retains network ownership and checks grounded state, speed, cooldowns and living ownership before accepting tricks. White burnout smoke replicates from the server.
 
-Clients may request a spawn and send drive or burnout intent, but the server owns the scooter assembly, mounting, and locomotion. It rejects invalid model names, spawn spam, malformed or excessive drive input, unoccupied scooter input, mounting by non-owners, tricks from non-owners, and burnout activation above the low-speed threshold. The server publishes rider, steering, wheelie, and speed attributes for presentation systems. Locomotion uses a server-owned `VectorForce` plus `AlignOrientation`; clients never set scooter CFrames. Visual parts are sanitized out of collision, touch, and query simulation at spawn, and burnout smoke state replicates directly from its server-owned emitter.
+The scooter uses base tuning without waiting for profiles, garage purchases or premium checks. Garage UI is parked with `ScooterConfig.GarageEnabled = false`; the scooter does not start GarageService or premium effects. Existing secondary files are retained for later work. Existing shop systems remain separate from the vehicle. No audio/race challenge is triggered by the MVP controller.
+
+Model preparation and exact Play-mode controls are in [SCOOTER_SYSTEMS.md](SCOOTER_SYSTEMS.md). The standing rider pose and Studio assembly tools remain in place. `Workspace.Map` is never rebuilt by this system.
