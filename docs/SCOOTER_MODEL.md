@@ -1,101 +1,191 @@
-# Scooter model contract
+# Articulated scooter model contract
 
-Place production templates in `ServerStorage/ScooterModels`. A template name must match a key in `ScooterConfig.Models`, for example `KuKirin G2 Pro`. The server clones a matching template and uses the generated fallback only when no template exists.
+The only visual/physical template is `ServerStorage.ScooterModels.scooter`. Catalog model names still select existing tuning and ownership rules; they all use this rig. The old five-part KuKirin template and procedural fallback are retired.
 
-## Required hierarchy
+## Install the authored Studio model
 
-```text
-KuKirin G2 Pro (Model, PrimaryPart = Root)
-├── Root (BasePart)
-│   └── ScooterDriveAttachment (Attachment, optional)
-├── DriverSeat (VehicleSeat)
-├── FrontSuspensionPoint (Attachment)
-├── RearSuspensionPoint (Attachment)
-├── RiderRootAttachment (Attachment)
-├── LeftFootPlant (Attachment)
-├── RightFootPlant (Attachment)
-├── LeftHandGrip (Attachment)
-├── RightHandGrip (Attachment)
-├── FrontWheelMotor (Motor6D)
-├── RearWheelMotor (Motor6D)
-├── SteeringMotor (Motor6D)
-└── BurnoutSmokeAttachment (Attachment)
-    └── BurnoutSmoke (ParticleEmitter)
-```
-
-`Root`, `DriverSeat`, `BurnoutSmoke`, and the five rider attachments are required. Ground-probe attachments and visual motors are optional but strongly recommended. `Root` is the invisible assembly root and does not collide with the map. At spawn, the server creates two invisible low-friction spherical collision proxies centered on the wheel axles. Their radii match the resolved tire radius with a small clearance. The runtime reads a `WheelRadius` attribute from either wheel, then the template, when provided; otherwise it derives the tire radius from the smaller local Y/Z wheel dimension so a fender or swingarm does not enlarge it. Vertical raycasts report wheel contact but do not apply fake suspension forces because the production model has no articulated suspension. The server sanitizes every visual part to be unanchored, massless, non-collidable, non-touchable, and non-queryable. Only the two wheel proxies contact the map; `Root` supplies assembly mass.
-
-`DriverSeat` is an invisible control and ownership mechanism, not a visible saddle. It must have `Transparency = 1`, `CanCollide = false`, and `CanTouch = false`; the server mounts the owner through the `E` proximity prompt. `RiderRootAttachment` defines the horizontal pelvis location, while runtime derives its height from the avatar's `HipHeight` and the two foot targets so scaled avatars stand instead of folding their legs. Put both foot targets at the sole contact points on the deck and both hand targets at the grip centers. R15 feet use transform IK with forward knee poles; a small centralized sole sink prevents a visible gap above the deck. During a wheelie, feet make only a small horizontal balance adjustment and stay near the deck.
-
-The server publishes `RiderMounted`, `WheelieActive`, `Steering`, and `SpeedKmh` attributes on every spawned scooter. Rider posing and future authored animation blending must consume these replicated values instead of inferring authoritative trick state locally. R15 characters use four IK chains; R6 characters use a procedural standing pose so neither rig falls back to Roblox's seated animation.
-
-Place `FrontSuspensionPoint` and `RearSuspensionPoint` at the wheel axle centers. At runtime, the server repositions existing attachment points from the `FrontWheel` and `RearWheel` part centers so stale template offsets cannot lower the contact proxies. The wheelbase fallback is used only when those wheel parts are absent.
-
-## Blender separation
-
-Export these visual assemblies separately:
-
-- body/deck and fixed frame;
-- front wheel;
-- rear wheel;
-- steering assembly, including the handlebar and front fork;
-- rear swingarm if rear suspension travel should be visible;
-- front suspension body if fork compression should be visible.
-
-Small fixed details may stay joined to the body. Brake discs, calipers, fenders, and cables may stay joined to the wheel, steering assembly, or swingarm they move with. Wheel origins must be centered on their axles. The steering assembly origin must be on the steering axis.
-
-## Visual joints
-
-The client animates optional motors by name:
-
-- `FrontWheelMotor` rotates the front wheel around local X;
-- `RearWheelMotor` rotates the rear wheel around local X;
-- `SteeringMotor` rotates the steering assembly around local Y.
-
-Configure each motor's `Part0`, `Part1`, `C0`, and `C1` in Studio. The controller writes only `Motor6D.Transform`, preserving the authored offsets.
-
-Front and rear wheel angles are tracked independently. Normal travel rotates both from authoritative assembly velocity; while `BurnoutActive` is true, the rear wheel uses `ScooterConfig.BurnoutWheelAngularSpeed` even when the scooter is stationary. Motor discovery is event-driven so missing optional visual motors do not cause repeated hierarchy scans every rendered frame.
-
-A speedometer should read the replicated integer `SpeedKmh` attribute from the scooter model. The server derives it from horizontal movement along the scooter and forces it to zero inside the stopping deadzone, avoiding false speed caused by vertical movement.
-
-## Physics behavior
-
-The authoritative server controller provides two-point vertical ground probes, ground-aligned `VectorForce` propulsion, speed-dependent steering lean, adaptive low-step assistance, and progressive wheelies. Throttle and braking never add artificial chassis pitch; outside an active wheelie the scooter follows the filtered road normal. Step assistance measures the obstacle and scales its lift, so a raised road marking receives only a small correction while a valid curb receives more lift. Ground normals are exponentially filtered before reaching `AlignOrientation`, preventing road-tile seams from changing the target attitude abruptly. Releasing throttle applies gradual rolling drag, while reverse input first applies stronger braking and only engages low-speed reverse after the scooter stops. Reverse travel inverts chassis yaw while leaving handlebar animation aligned with player input. Exponential input smoothing and speed-sensitive steering retain low-speed maneuverability while limiting high-speed yaw. The server retains network ownership on spawn, mount, and dismount. The client sends input only; prediction clones and camera offsets are paused for the MVP. The server disables touch seating and creates an owner-only `E` proximity prompt. Steering is ignored only at near-zero speed. Press `Shift` or `C` once to trigger a wheelie while moving forward; afterward `W` raises the front and maintains momentum while `S` brakes and lowers it quickly. Neutral holds the angle only above the low-speed balance threshold; loss of momentum progressively drops the front, and a complete stop ends the wheelie rapidly. `Space` is intentionally inert while mounted, and `E` dismounts. Exceeding the wheelie balance angle releases the scooter stabilizer, removes the rider from the seat, applies a short eject impulse, and puts the humanoid into a two-second ragdoll stun before recovery. A fallen or unoccupied scooter near the ground receives linear and angular parking damping, preventing repeated bounces and long uncontrolled travel without weakening gravity while it is airborne. Wheel meshes are visual and do not collide with the world.
-
-`BurnoutSmoke` is server-controlled and disabled outside an accepted stationary burnout. Runtime setup reparents it to `RearWheelAttachment` on the stable chassis at the rear axle, so wheel animation does not rotate its emission. Existing `BurnoutSmokeAttachment` templates remain compatible. Premium underglow is paused for the MVP; only white burnout smoke is active. Runtime setup forces zero light emission, a bounded rate, a short lifetime, and automatic shutdown as soon as movement exceeds the configured deadzone.
-
-## Five-part Studio assembly
-
-For a scooter imported as five separate `MeshPart` objects, first arrange the meshes into the final resting pose in Workspace. The scooter must face along its local negative Z axis, both wheel axle centers must line up, and every wheel must rotate correctly around its local X axis. Rename and select exactly these five parts:
-
-```text
-ScooterBody
-FrontWheel
-RearWheel
-Fork
-Handlebar
-```
-
-Select all five parts or select their single parent `Folder`/`Model`. Run this in Studio's Server Command Bar while not playing:
+Sync Rojo, stop Play, select the complete new `scooter` Folder, and run in Studio's Server Command Bar:
 
 ```lua
-require(game.ServerScriptService.Scooter.DevScooterAssembler).AssembleFromSelection()
+require(game.ServerScriptService.Scooter.ScooterWorkflow).Assemble()
 ```
 
-The assembler preserves the current mesh positions and derives forward from `RearWheel -> FrontWheel`, avoiding dependence on imported mesh axes. It creates `ServerStorage.ScooterModels.KuKirin G2 Pro` with an invisible physical `Root`, `DriverSeat`, rider and suspension attachments, burnout smoke, fixed welds, and the three visual `Motor6D` joints expected by the client. It refuses to overwrite an existing production template.
+The assembler validates the complete hierarchy, constraint endpoints and mechanical geometry before replacing either the previous `scooter` template or legacy `KuKirin G2 Pro` template. It clones the authored assembly into a Model with the same direct child names, preserving mesh assets, SurfaceAppearances, attachments and suspension welds. The front linkage rest pose is aligned to the working rear geometry as described below. Calibrated spring tuning retains the original parameter values in diagnostic attributes. The original selected source is moved from Workspace to ServerStorage after successful installation so it does not collide with spawned scooters. Save the place. Studio-authored MeshParts and constraint settings are not supplied by Rojo source files; running this command is required to install the actual asset.
 
-The assembler uses `ScooterConfig.WheelRadius` (`0.7` studs) for ride height. Do not derive the radius from the complete wheel mesh bounds when that mesh also contains a fender or swingarm. If the actual tire radius differs, add a numeric `WheelRadius` attribute to the selected `FrontWheel` before assembly; the assembler copies that value to the final template.
+`ScooterWorkflow.Assemble()` loads fresh clones of the assembler, rig and canonical configuration on every invocation, and destroys temporary modules on success or failure. This follows the existing MapWorkflow pattern and avoids Studio's cached `require()` result. It validates the articulated assembler version before installing a template.
 
-The invisible `Root` is deliberately non-colliding. Runtime setup caps its dimensions and creates spherical proxies at both wheel axles, so an older template cannot catch a low chassis corner on road markings. The two vertical ground probes exclude both the scooter and its rider. A directional low obstacle probe starts near the bottom of the leading wheel, measures the contacted ledge and assists over valid curbs from rest or at speed in both forward and reverse. Runtime code never changes `MeshPart.CollisionFidelity`, because Roblox restricts that property to Studio/plugin contexts; the assembler attempts to author `Box`, while spawned visual meshes are removed from collision entirely.
+If Output mentions `Missing selected BasePart named Fork`, `collectSelectedParts`, or the old assembler's line 117, Studio executed the retired assembler. First connect the Rojo plugin to `rojo serve default.project.json` in this repository and sync. Confirm `ServerScriptService.Scooter` contains both `ScooterRig` and `ScooterWorkflow`, then select the new `scooter` Folder and use the workflow command above. Missing modules or an old version produce a sync error; the workflow cannot update unsynchronized Studio source files. If the workflow itself was previously required and then edited, reopen Studio or require a fresh clone of that wrapper. [ModuleScript results are cached per Luau environment](https://create.roblox.com/docs/reference/engine/classes/ModuleScript).
 
-To recover the five visual parts from an incorrectly assembled template, run:
+## Diagnose or repair a collapsing scooter
+
+Sync the current Rojo project first. Select the complete scooter Folder/Model in Explorer, then run this read-only command in the Studio Server Command Bar (Edit mode or Play):
 
 ```lua
-require(game.ServerScriptService.Scooter.DevScooterAssembler).DisassembleTemplateToWorkspace()
+require(game.ServerScriptService.Scooter.DevScooterRepair).DiagnoseSelection()
 ```
 
-This removes generated joints and moves the five anchored visual parts back to `Workspace.kukurinNieruszac`, ready for repositioning and another assembly pass.
+Output reports joint position gaps and world X-axis alignment, incompatible welds between moving assemblies, coaxial suspension pivots, spring length/free length/stiffness/damping/maximum force, part masses, collision flags/groups and wheel radius sources. For a live scooter it also tests enabled wheel contacts and samples the collidable floor using each collider's collision group. Missing authored components and endpoints are reported without inventing paths.
 
-After assembly, temporarily set `Root.Transparency` and `DriverSeat.Transparency` to `0.5` and enable attachment visibility in Studio. Adjust the root so it covers the deck without reaching the ground, place the seat over the rear-middle portion of the deck, and fine-tune the five rider attachments against a representative R15 rig. Return both transparencies to `1` before testing. If a wheel spins around the wrong axis, correct the mesh orientation before assembly; the runtime controller rotates wheel motors around local X.
+For repair, **stop Play**, select the original authored Folder or the installed ServerStorage.ScooterModels.scooter template in its Edit-mode pose, and run:
 
-Garage speed tiers and premium effects are detailed in [SCOOTER_SYSTEMS.md](SCOOTER_SYSTEMS.md). The invisible wheel proxies use moderate contact friction while the controller supplies stronger lateral grip, preventing ice-like sliding without making propulsion depend entirely on native friction.
+```lua
+require(game.ServerScriptService.Scooter.DevScooterRepair).RepairSelection()
+```
+
+Repair stages a clone and loads fresh copies of rig, geometry, collision and configuration modules. Front pivot endpoint repair uses the arm's original local mounting positions, retained as AuthoredPivotCFrame attributes. The subsequent rest alignment moves the entire front linkage and its fixed pivots to the deck-side mount derived from the working rear, then rotates the arm/axle/wheel together to align tire ground levels. Rear pivot repair continues to use its two authored base positions. The repair aligns each hinge pair in world space, centers wheel AxlePivot attachments on WheelCenter and makes suspension pivots passive. Wheel hinges become unlimited/passive until the existing burnout controller activates the rear motor. Incompatible extra welds are disabled on the staged clone. A valid authored steering axis is preserved; if nearly horizontal, its direction is estimated from SteerBase toward HandleBar and reported for manual inspection.
+
+Only a replacement passing structural and geometry validation is installed. The original selection and previous templates are moved into ServerStorage.ScooterRepairBackups with unique names; none are deleted. Originals stay outside Workspace and do not participate in gameplay. On a validation failure, the selected source and installed template remain unchanged. Save the place, then start a **new Play session** so the server loads current module code. Regular ScooterWorkflow.Assemble remains the installer for already-correct rigs.
+
+The [HingeConstraint contract](https://create.roblox.com/docs/reference/engine/classes/HingeConstraint) requires coincident attachment positions and matching world X axes. Because each end's arms are welded to one virtual axle, its two chassis pivots must additionally describe one shared axis; two incompatible hinge axes overconstrain the same rigid assembly. Geometry validation rejects these conflicts before spawning a scooter.
+
+Repair preserves spring mounting locations. Zero stiffness/maximum force, zero spring length or a rest pose outside hard spring length limits blocks installation with an actionable report. The prepared replacement now calibrates passive suspension as described below; original spring values are retained in diagnostic attributes. Preload, leverage, damping, force limits and masses still need a Studio test. See the [SpringConstraint contract](https://create.roblox.com/docs/reference/engine/classes/SpringConstraint).
+
+## Suspension stroke and calibration
+
+After synchronizing Rojo and stopping Play, select the installed template (or complete original Folder) and run:
+
+```lua
+require(game.ServerScriptService.Scooter.DevScooterSuspension).Apply()
+```
+
+This entry point reloads the repair wrapper as well as its dependencies, avoiding the Command Bar's older cached wrapper. It stages geometry repair and suspension calibration, installs the validated template and retains original models in ScooterRepairBackups. Save and start a new Play session.
+
+ScooterSuspension bounds both ends using passive suspension HingeConstraints. Starting from the authored rest pose, it samples wheel and spring movement around each shared pivot axis. Travel stops before a wheel vertical derivative or spring length derivative reverses direction, preventing the arm from crossing its linkage turning point and folding above the chassis after wheelie. Left/right limits share the same physical arc, including when a hinge's attachment order is reversed. Stop restitution is zero. Suspension pivots remain passive; wheelie, steering and wheel motor controls are unchanged.
+
+Shared/ScooterConfig.Suspension configures front/back maximum compression/droop angles (22/12 degrees), desired travel relative to tire radius (0.4/0.2), a one-degree safety margin and sampling precision. The geometric checks can reduce those maxima on a particular model. Spring length limits cover the entire safe arc with clearance so they do not lock a shock at the neutral pose.
+
+Spring stiffness is computed at the wheel, using both shocks' actual length change per pivot rotation and the wheel's vertical change. Short and long spring linkages therefore have comparable wheel compliance instead of receiving the same arbitrary raw stiffness. Both ends use half the model's non-massless part mass plus half the configured reference rider mass (default 20 Roblox mass units). This is a starting tune, not measured runtime load distribution.
+
+The default tune preloads 80% of that reference load and targets sag of 40% of safe compression travel at the front and 30% at the rear for the remaining load. This deliberately gives the front a softer target. DampingRatio is 0.8, and maximum spring force includes configurable headroom. Increase Front.SagFraction or Back.SagFraction to soften that end's supported wheel response; front/back travel settings can be adjusted separately. Original Stiffness, Damping and FreeLength remain in AuthoredStiffness/AuthoredDamping/AuthoredFreeLength attributes, while SuspensionRestLength and SuspensionRestAngle identify the calibrated pose.
+
+Constraint.Visible defaults to false via ShowConstraints: the green SpringConstraint coils are debug visuals and are hidden in the prepared/live scooter. SuspensionRevision prevents recalibrating a cloned or moving scooter from a compressed pose; use Apply after configuration/geometry changes, or increment the configuration revision when installing revised tuning. Invalid spring leverage rejects calibration rather than assigning extreme forces. Verify loaded/unloaded support, front/rear compression and return after repeated wheelie in Studio; CLI checks evaluate geometry and force response rather than Roblox's solver.
+
+## Repair the front mounting while preserving the working rear
+
+Sync Rojo and **stop Play**. Select `ServerStorage.ScooterModels.scooter`. Optionally Ctrl-select the untouched original new-model Folder/Model (retained in ServerStorage or ScooterRepairBackups) to recover overwritten arm attachment frames. Selection order does not matter when only the installed template is marked ArticulatedScooter. Run:
+
+```lua
+require(game.ServerScriptService.Scooter.DevScooterFrontMount).Apply()
+```
+
+The command reloads the repair code, stages a clone and restores the front arm's original local pivot frames from the reference when available. With one selection, it looks for an uncalibrated original with identical front arm MeshIds and Sizes in ServerStorage or ScooterRepairBackups. It only chooses automatically if all matching candidates agree on both original pivot frames. Otherwise it retains the current validated mounts and reports the ambiguity. Front compression/droop, preload and damping are recomputed using the existing calibrated reference mass. Rear pivots, spring parameters and travel limits are preserved, including custom tuning. Installation retains the old template in backups and leaves the reference untouched. Save and start a new Play session.
+
+FrontRestPose mirrors the working rear pivot midpoint across the FootRest center plane perpendicular to travel. This supplies the front deck-side mount height and longitudinal position while retaining front arm spacing and the shared transverse axis. The full front arm/axle/wheel assembly translates to that mount and rotates around it until front and rear tire bottoms share the same deck-relative level, using each tire's actual radius. Internal welds are disabled while individual parts move and restored afterward so writing CFrame cannot move welded parts twice. Fixed spring endpoints and the steering shaft stay authored. Calibration then checks leverage and safe travel at the corrected pose. Corrections over 45 degrees or a mounting shift over four front tire radii reject the replacement. These limits and the revision are centralized in ScooterConfig.FrontRestPose. FrontRestPoseRevision, FrontRestCorrectionDegrees and FrontMountShift record the result.
+
+During spawn, ScooterRig first prepares a validated baseline with collision contacts and suspension tuning. If FrontRestPoseRevision is missing/outdated, it attempts the optional front correction and front-only recalibration on a second staged clone. The corrected clone is used only after all geometry checks pass. On any correction or calibration error, the staged clone is destroyed and the baseline spawns with its original pose, springs and welds intact. Output reports the concrete reason; FrontRestPoseStatus = Skipped and FrontRestPoseError retain it on the spawned model. A successful correction records Applied. Structural or mechanical errors in the baseline still reject spawning. The template source and working rear are untouched. Current templates retain their corrected pose when cloned; updates never rebase springs from a compressed live state. Explicit Edit-mode front repair still rejects invalid corrections without replacing the installed template.
+
+The front fixed attachments still belong to HandleBarStick, as required by the authored steering architecture. Their world positions are at the arm's deck-side joints. Welding the front axle to ScooterBody or reparenting its fixed pivots directly onto the deck would bypass steering. The wheel and both arms move together around the shared passive hinge axis, with the same leverage-based spring calculation as the rear.
+
+The old repair overwrote arm attachment positions. If no untouched source or saved original frames exist, rest alignment can move the current validated linkage but cannot reconstruct a lost local mesh mounting point. In that case manually position both front arm PivotAtt_FrontSuspensionLeft/Right attachments at their actual visible hinge centers in Edit mode, then set each attachment's AuthoredPivotCFrame attribute to its corrected local CFrame. Explicit calibrated references without saved original frames are rejected. Invalid transverse axes or insufficient spring leverage reject installation without replacing the working template. Verify rest alignment, curb travel, return after wheelie and steering in Play; local tests do not run the Roblox physics solver.
+
+## Authored hierarchy
+
+Names are case-sensitive. Do not rename `BackWheel` to `RearWheel` or `HandleBar` to `Handlebar`.
+
+```text
+scooter (Folder in source; Model in ServerStorage.ScooterModels)
+├── ScooterBody (MeshPart)
+│   ├── SteerBase (Attachment)
+│   ├── HingeConstraint (HingeConstraint, steering Servo)
+│   ├── PivotAttBase_BackSuspensionLeft/Right (Attachment, each)
+│   ├── PivotHinge_BackSuspensionLeft/Right (HingeConstraint, each)
+│   ├── SpringAttBase_BackSuspensionLeft/Right (Attachment, each)
+│   └── ShockAbsorber_BackSuspensionLeft/Right (SpringConstraint, each)
+├── HandleBarStick (MeshPart)
+│   ├── SteerPivot (Attachment)
+│   ├── WeldConstraint (welds HandleBarStick to HandleBar)
+│   ├── PivotAttBase_FrontSuspensionLeft/Right (Attachment, each)
+│   ├── PivotHinge_FrontSuspensionLeft/Right (HingeConstraint, each)
+│   ├── SpringAttBase_FrontSuspensionLeft/Right (Attachment, each)
+│   └── ShockAbsorber_FrontSuspensionLeft/Right (SpringConstraint, each)
+├── HandleBar (MeshPart)
+├── FrontWheel (MeshPart)
+│   └── WheelCenter (Attachment)
+├── BackWheel (MeshPart)
+│   └── WheelCenter (Attachment)
+├── FrontSuspensionLeft/Right (MeshPart, each)
+│   ├── PivotAtt_FrontSuspensionLeft/Right (matching Attachment)
+│   └── SpringAtt_FrontSuspensionLeft/Right (matching Attachment)
+├── BackSuspensionLeft/Right (MeshPart, each)
+│   ├── PivotAtt_BackSuspensionLeft/Right (matching Attachment)
+│   └── SpringAtt_BackSuspensionLeft/Right (matching Attachment)
+├── VirtualFrontAxle (Part)
+│   ├── WeldConstraint (x2: connects both front suspension arms)
+│   ├── AxlePivot (Attachment)
+│   └── HingeConstraint (links AxlePivot to FrontWheel.WheelCenter)
+├── VirtualBackAxle (Part)
+│   ├── WeldConstraint (x2: connects both back suspension arms)
+│   ├── AxlePivot (Attachment)
+│   └── HingeConstraint (links AxlePivot to BackWheel.WheelCenter)
+├── FootRest (MeshPart)
+└── BackFender (MeshPart)
+```
+
+The steering hinge links `ScooterBody.SteerBase` to `HandleBarStick.SteerPivot`. Each suspension pivot and spring links its named base attachment to the matching attachment on the corresponding suspension arm. Reversed Attachment0/Attachment1 order is accepted. Constraints and axle welds must be enabled. Extra authored Attachments and SurfaceAppearances remain intact. No missing authored part is created or waited for.
+
+## Generated runtime support
+
+`ScooterRig` adds an invisible `Root` welded only to ScooterBody and uses it as PrimaryPart. Its negative Z axis is derived from the rear-to-front axle direction, without changing any mesh's authored orientation. An invisible `DriverSeat`, rider/foot attachments and burnout emitter keep the existing authoritative mount and drive workflow working.
+
+`FootRest` is welded to ScooterBody; `BackFender` is welded to VirtualBackAxle so it follows rear suspension travel. `LeftHandGrip` and `RightHandGrip` are generated directly under HandleBar, initially at the configured half-width along the scooter's right axis. Adjust these generated grip attachments in the installed template to the actual grip centers and the rider/foot targets to the deck before playtesting. Prepared templates are cloned without recreating these offsets. No weld connects either axle to the chassis.
+
+All meshes and virtual axes are noncolliding. ScooterCollision creates two invisible spherical contact proxies centered at each wheel's WheelCenter and welded to that wheel, plus a massless DeckCollider welded to FootRest. The deck proxy is inset within its bounding box by DeckColliderInset (default 0.03 studs per side) and prevents the chassis disappearing through the road if it rolls or bottoms out. NoCollisionConstraints exclude the deck from both wheel proxies, so this protection cannot lock suspension against its own tires. Reconfiguration updates existing contacts without duplicating proxies or exclusion pairs. Server initialization preserves their CanCollide flags. Actual spring/hinge motion carries the wheel contact points and transmits forces through the suspension. Steering, wheel and suspension assemblies retain mass; all assemblies remain server-owned. Original spring parameters remain available in attributes.
+
+Set a finite positive `WheelRadius` attribute (studs) on each wheel or the template for an exact tire radius. Each wheel resolves independently: its own attribute, then the template attribute, then half the middle of its sorted Size dimensions (the smallest is normally tire thickness). Bounds inference is approximate for unusual meshes; verify the collider in Studio and supply an attribute when needed. ResolvedFrontWheelRadius/ResolvedBackWheelRadius and FrontWheelRadiusSource/BackWheelRadiusSource record the result without replacing authored overrides. Ground probes and step assistance use the corresponding wheel radius. Spawn height accounts for the lowest wheel/deck contact, including deck rotation. Root and DriverSeat never collide. Existing VectorForce propulsion includes the moving assemblies' mass. AlignOrientation now uses that same support mass instead of only the small Root assembly and initializes its target/torque before the first simulation update. UprightSupportMass exposes the reference in diagnostics. Wheelie/crash state rules, input validation and cooldowns retain their existing behavior.
+
+The steering hinge runs as a Servo, using the existing bounded, speed-dependent steering input. Authored positive ServoMaxTorque and AngularSpeed are preserved; centralized defaults supply zero values. Limits remain authored and must include neutral (0 degrees). `SteeringServoSign` configures the authored axis convention. Wheels roll physically rather than using Motor6D visual rotation. The front hinge is passive; the rear hinge becomes a Motor during server-accepted W+S burnout at up to 5 km/h with rear contact, then returns to passive rolling. Its AngularVelocity is 55 rad/s with endpoint/axis sign correction, MotorMaxAcceleration is 120 rad/s², and MotorMaxTorque is at least 100, otherwise supportedMass * gravity * backWheelRadius * 0.6. These settings follow the [HingeConstraint motor contract](https://create.roblox.com/docs/physics/constraints/hinge). BurnoutSmoke is attached to VirtualBackAxle, so it follows suspension travel without spinning with the wheel. Tuning the new mechanical assembly still requires Studio playtests.
+
+StudsPerKmH = 1.6 raises world travel speed 60% from the previous 1.0 scale without changing catalog speed ratings. A wheelie starts on the Shift/C rising edge above WheelieMinSpeedKmh (10 km/h). The trick key only triggers the state: afterward W raises the front, releasing W lowers it, and adding W again before landing regains pitch without another trigger. Once the front lands and the state ends, W alone cannot restart wheelie. Natural return is capped at WheelieNaturalDropRate (45 degrees/s), then eases exponentially at WheelieReturnSpeed (2.5/s) near landing. S uses the faster brake return. The existing low-speed drop and crash limits remain active; WheelieRestAngle (0.25 degrees) ends the residual pitch.
+
+Direction changes are controlled by the existing authoritative VectorForce. S brakes forward motion at DirectionChangeBrakingDeceleration (60 studs/s²), engages reverse below DirectionChangeSpeedKmh (2 km/h) and accelerates at ReverseAcceleration (75 studs/s²) toward MaxReverseSpeedKmh (18). W similarly engages forward drive during a reverse crawl. The existing hill assistance compensates slope gravity during both braking and powered travel. The force calculation bounds speed changes by the configured acceleration and frame time; it does not teleport velocity. Coasting, normal steering and W+S burnout keep their separate behavior.
+
+## Scooter brake light and cornering lean
+
+`ScooterServer` is this repository's scooter controller. BrakeLight.Enabled defaults to false: no red fender, emission changes or brake glow are currently created. The implementation is retained for a future dedicated lamp. When explicitly enabled, it creates one `ScooterBrakeLight` controller on the existing direct child `BackFender`. Accepted brake intent (S/down/reverse, including W+S) from the authorized rider turns the mesh bright red Neon and enables a small red PointLight. Release, throttle without brake, expired input, dismount, death and crash restore the authored Material, Color and SurfaceAppearance tints/emission. Cleanup destroys the generated light. No new input endpoint or premium entitlement is involved. `BrakeActive` is a server-published boolean; `ScooterConfig.BrakeLight` controls enablement, color, brightness, range and emission.
+
+The authored [SurfaceAppearance](https://create.roblox.com/docs/reference/engine/classes/SurfaceAppearance) can override a mesh's material appearance. Its existing Color tint and emissive tint/strength are adjusted without replacing textures. Emission uses any authored emissive mask; the PointLight supports meshes without one. A dark texture can limit the red surface tint, so final appearance needs a Studio check. There is no separate diode in the supplied hierarchy: the effect uses the whole BackFender.
+
+Servo target degrees are `sign * effectiveInput * deg(MaxHandlebarAngle)`, with sign inverted when Attachment0 belongs to HandleBarStick. MaxHandlebarAngle is 30 degrees. Effective input retains existing smoothing and speed fade. Below MinSteeringSpeed it is zero outside server-accepted burnout; active burnout retains handlebar input at rest. Authored LowerAngle/UpperAngle clamp the target. Chassis steering uses CurrentAngle divided by the signed full angle, so a blocked Servo cannot rotate the chassis from requested input alone. The [HingeConstraint Servo contract](https://create.roblox.com/docs/reference/engine/classes/HingeConstraint) specifies TargetAngle in degrees. Actual movement still depends on AngularSpeed/ServoMaxTorque; SteeringAngle publishes the measured angle in radians for rider IK/lean.
+
+The bicycle turn model is `yawRate = -abs(speed) * tan(turnInput * MaxHandlebarAngle) / actualWheelbase`, with reverse travel inverting turnInput and magnitude capped by TurnRate. Wheelbase is the initial separation of the virtual axle pivots. No wheel contact produces zero yaw; outside burnout, speed below MinSteeringSpeed also produces zero yaw. Unlike a minimum turn-rate floor, this keeps a finite radius while crawling. Desired heading stays within `min(MaxHeadingLeadAngle, abs(yawRate) * HeadingLeadSeconds)` of the actual planar chassis heading (12 degrees maximum, 0.15 seconds of lead), preventing orientation windup against obstacles. During accepted burnout, yaw instead uses `-measuredSteeringInput * BurnoutTurnRate` (90 degrees/s maximum), independent of travel speed. This allows sustained donuts without weakening normal low-speed steering rules. Releasing either W/S, stale input, losing rear contact, or exceeding 5 km/h disables that mode. The same heading lead bounds still prevent winding up against obstacles, and cornering roll is disabled during burnout. Outside burnout, cornering roll is `atan2(signedSpeed * yawRate, Workspace.Gravity)`, capped by MaxSteeringLean (16 degrees). This ties lean to centripetal acceleration and gives right turns negative roll. Exponential smoothing at SteeringLeanSmoothSpeed eases entry/exit independent of frame rate. Only an occupied, upright chassis with both wheel contacts requests roll; wheelie, airborne and parked states request zero.
+
+The roll replaces the old linear lean in the existing root [AlignOrientation](https://create.roblox.com/docs/reference/engine/classes/AlignOrientation) target. It does not teleport individual meshes, change center of mass, add a competing orientation actuator or change suspension spring parameters. Wheelie pitch, drive force and rear-wheel burnout motor retain their separate existing controls. Test the capped roll on the authored springs and slopes in Studio before changing its limits.
+
+## Rider animation
+
+`ScooterAnimator.new(scooter)` returns an animator exposing dot-call methods:
+
+```lua
+local animator = ScooterAnimator.new(scooter)
+animator.mount(character)
+animator.dismount()
+local state = animator.getState() -- IDLE / RIDING / WHEELIE, or nil when unmounted
+```
+
+ScooterRiderVisualizer binds an animator to every replicated scooter's DriverSeat.Occupant on each client. Missing streamed model/character descendants are retried through events, without per-frame hierarchy scans. Existing ScooterRiderPose supplies foot IK, wheelie foot balance and the R6 standing fallback. It no longer creates hand IK.
+
+For R15, two IKControls target attachments directly on HandleBar, so physical steering moves the hands. Elbow poles lift the arm on the corresponding turn side while preserving the hand target; writing Shoulder.Transform would compete with the arm IK chain. The [IKControl contract](https://create.roblox.com/docs/reference/engine/classes/IKControl) documents moving targets, chain overrides and pole control.
+
+Body lean blends forward speed, lateral speed (`velocity:Dot(root.CFrame.RightVector)`) and the measured steering angle. The server publishes `SteeringAngle` in radians with positive values representing right input, because HingeConstraint.CurrentAngle is [not replicated](https://create.roblox.com/docs/reference/engine/classes/HingeConstraint). Lean is bounded and shared between Root/RootJoint and Waist. PreAnimation updates IK targets and removes the previous procedural torso layer; PreSimulation applies torso transforms. R6 uses its RootJoint and existing procedural standing pose, as it lacks R15 hands.
+
+Dismount, death, character/scooter destruction and remount disconnect callbacks, remove generated IK/poles, restore saved motor transforms and restore the Animate script's previous enabled state. New steering, lean, grip-width and elbow settings live in Shared/ScooterConfig. No new remote grants client authority over physics or tricks.
+
+## Leg animation state machine
+
+The client derives leg states only from controller-published attributes. `WheelieActive` takes priority; `SpeedKmh` selects idle/riding with hysteresis. `DriveState = Airborne/Fallen` and `Fallen = true` prevent the idle ground-foot pose. Missing speed defaults to riding until replicated data arrives. These visual states do not change drive input, force, wheelie rules or burnout.
+
+| State | Entry | Legs |
+| --- | --- | --- |
+| `IDLE` | Speed at/below `IdleEnterSpeedKmh`; retains idle up to `IdleExitSpeedKmh` | Play `IdleFootAnim`, with one foot removed from the support/deck and resting on the ground. |
+| `RIDING` | Speed above the exit threshold or unsuitable ground-foot state | Fade out state clips; both feet return to the existing deck IK targets. |
+| `WHEELIE` | Authoritative `WheelieActive = true`, unless fallen | Play `WheelieBalanceAnim` for rearward body balance and the moving balance leg. |
+
+Set your R15 animation IDs in `Shared/ScooterConfig.RiderAnimations.IdleFootAnim` and `.WheelieBalanceAnim`, using either a numeric **string** or `rbxassetid://<ID>`. Both default to an empty string, which deliberately loads no asset. Until the IDs are supplied, or while a clip is unavailable/not yet loaded, the existing procedural foot/wheelie pose remains active. R6 retains its procedural standing/balance fallback; these clips are intended for R15.
+
+Author both clips with the legs and pelvis keyed; in idle, key the supporting leg on the deck as well as the ground leg. Arms remain driven by hand IK. Wheelie can key the pelvis/root for the rearward shift, with procedural steering lean applied as an additional layer. The actual ground-foot height and reach must be checked against the scooter, slopes and avatar scales in Studio after supplying your assets.
+
+Clips load once per mount and loop at matching Action priority. Attribute-change events drive transitions: entering a state calls `AnimationTrack:Play(FadeTime, Weight, PlaybackSpeed)` once, while the outgoing clip uses `Stop(FadeTime)`. The defaults are a 0.25-second fade, weight 1, playback speed 1 and idle thresholds of 0.5/1.5 km/h. Change these in the same configuration table. Stable states never restart a track every frame; see [AnimationTrack blending](https://create.roblox.com/docs/reference/engine/classes/AnimationTrack).
+
+PreAnimation sums the loaded tracks' current blend weights, then reduces foot IK by that amount. Fully blended clips disable foot IK entirely so poles cannot pin animated feet to the deck; fading back to riding restores both foot chains. Hand IK stays fully active. The character owner's client starts clips; observers follow the owner's replicated tracks through Animator.AnimationPlayed and never load or play a second copy. Existing replicated state clips are preserved when attaching an observer. A player character waits for its server-created Animator, because a client-created Animator cannot replicate tracks; see [Animator replication](https://create.roblox.com/docs/reference/engine/classes/Animator).
+
+Dismount stops/destroys the locally owned tracks and animation objects, disconnects state/animation listeners and resets `getState()` to nil. Observers release their references without stopping or destroying the owner's tracks. Asset load/play errors fall back to procedural foot support.

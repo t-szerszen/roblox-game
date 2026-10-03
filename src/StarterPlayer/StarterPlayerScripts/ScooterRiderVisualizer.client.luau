@@ -1,101 +1,84 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
+local Config = require(ReplicatedStorage.Shared.Scooter.ScooterConfig)
+local ScooterAnimator = require(script.Parent.ScooterAnimator)
 
-local ScooterConfig = require(ReplicatedStorage.Shared.Scooter.ScooterConfig)
-local ScooterRiderPose = require(script.Parent.ScooterRiderPose)
-
-type Controller = ScooterRiderPose.Controller
-type ScooterBinding = {
-	connection: RBXScriptConnection,
-	controller: Controller?,
+type Binding = {
+	seat: VehicleSeat,
+	animator: ScooterAnimator.Animator,
+	connections: { RBXScriptConnection },
+	mounted: boolean,
+	retryConnection: RBXScriptConnection?,
 }
 
-local bindings: { [Model]: ScooterBinding } = {}
-local pending: { [Model]: boolean } = {}
+local bindings: { [Model]: Binding } = {}
 local destroyed = false
 
-local function stopPose(binding: ScooterBinding)
-	if binding.controller then
-		binding.controller:Destroy()
-		binding.controller = nil
+local function refresh(binding: Binding)
+	if binding.retryConnection then
+		binding.retryConnection:Disconnect()
+		binding.retryConnection = nil
 	end
-end
-
-local function refreshPose(scooter: Model, seat: VehicleSeat, binding: ScooterBinding)
-	stopPose(binding)
-	local occupant = seat.Occupant
-	local character = if occupant then occupant.Parent else nil
+	binding.animator.dismount()
+	binding.mounted = false
+	local rider = binding.seat.Occupant
+	local character = if rider then rider.Parent else nil
 	if character and character:IsA("Model") then
-		binding.controller = ScooterRiderPose.Start(character, scooter)
-	end
-end
-
-local function addScooter(instance: Instance)
-	if not instance:IsA("Model") or bindings[instance] or pending[instance] then
-		return
-	end
-
-	pending[instance] = true
-	task.spawn(function()
-		local seat = instance:FindFirstChild("DriverSeat", true) or instance:WaitForChild("DriverSeat", 5)
-		pending[instance] = nil
-		if destroyed or not seat or not seat:IsA("VehicleSeat") or instance.Parent == nil or bindings[instance] then
-			return
+		binding.mounted = binding.animator.mount(character)
+		if not binding.mounted then
+			binding.retryConnection = character.DescendantAdded:Connect(function()
+				refresh(binding)
+			end)
 		end
-
-		local binding: ScooterBinding = {
-			connection = nil :: any,
-			controller = nil,
-		}
-		binding.connection = seat:GetPropertyChangedSignal("Occupant"):Connect(function()
-			refreshPose(instance, seat, binding)
-		end)
-		bindings[instance] = binding
-		refreshPose(instance, seat, binding)
-	end)
+	end
 end
 
 local function removeScooter(instance: Instance)
-	if not instance:IsA("Model") then
-		return
-	end
-	pending[instance] = nil
+	if not instance:IsA("Model") then return end
 	local binding = bindings[instance]
-	if not binding then
+	if not binding then return end
+	bindings[instance] = nil
+	for _, connection in binding.connections do connection:Disconnect() end
+	if binding.retryConnection then binding.retryConnection:Disconnect() end
+	binding.animator.dismount()
+end
+
+local function addScooter(instance: Instance)
+	if destroyed or not instance:IsA("Model") then return end
+	local existing = bindings[instance]
+	if existing then
+		if not existing.mounted then refresh(existing) end
 		return
 	end
-
-	binding.connection:Disconnect()
-	stopPose(binding)
-	bindings[instance] = nil
+	local seat = instance:FindFirstChild("DriverSeat")
+	if not seat or not seat:IsA("VehicleSeat") then return end
+	local binding: Binding = {
+		seat = seat, animator = ScooterAnimator.new(instance), connections = {}, mounted = false, retryConnection = nil,
+	}
+	bindings[instance] = binding
+	table.insert(binding.connections, seat:GetPropertyChangedSignal("Occupant"):Connect(function()
+		refresh(binding)
+	end))
+	table.insert(binding.connections, instance.Destroying:Connect(function() removeScooter(instance) end))
+	refresh(binding)
 end
 
-local scooterFolder = workspace:WaitForChild(ScooterConfig.ScooterFolderName)
-for _, scooter in scooterFolder:GetChildren() do
-	addScooter(scooter)
-end
-local scooterAddedConnection = scooterFolder.ChildAdded:Connect(addScooter)
-local scooterRemovedConnection = scooterFolder.ChildRemoved:Connect(removeScooter)
-
-local renderConnection = RunService.RenderStepped:Connect(function(deltaTime: number)
-	for _, binding in bindings do
-		if binding.controller then
-			binding.controller:Update(deltaTime)
-		end
-	end
+local folder = workspace:WaitForChild(Config.ScooterFolderName)
+local added = folder.ChildAdded:Connect(addScooter)
+local removed = folder.ChildRemoved:Connect(removeScooter)
+-- Replication can deliver DriverSeat and grip attachments after the model itself.
+local descendantAdded = folder.DescendantAdded:Connect(function(instance: Instance)
+	local ancestor = instance.Parent
+	while ancestor and ancestor.Parent ~= folder do ancestor = ancestor.Parent end
+	if ancestor then addScooter(ancestor) end
 end)
+for _, scooter in folder:GetChildren() do addScooter(scooter) end
 
 script.Destroying:Connect(function()
 	destroyed = true
-	renderConnection:Disconnect()
-	scooterAddedConnection:Disconnect()
-	scooterRemovedConnection:Disconnect()
-	for scooter, binding in bindings do
-		binding.connection:Disconnect()
-		stopPose(binding)
-		bindings[scooter] = nil
-	end
-	table.clear(pending)
+	added:Disconnect()
+	removed:Disconnect()
+	descendantAdded:Disconnect()
+	for scooter in bindings do removeScooter(scooter) end
 end)

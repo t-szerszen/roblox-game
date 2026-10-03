@@ -39,7 +39,7 @@ local Frame = {}
 local frameMethods = {}
 local frameMetatable = { __index = frameMethods }
 local function quaternion(x, y, z, w)
-	return setmetatable({ x = x, y = y, z = z, w = w }, frameMetatable)
+	return setmetatable({ x = x, y = y, z = z, w = w, __type = "CFrame" }, frameMetatable)
 end
 function Frame.fromAxisAngle(axis, angle)
 	local sine = math.sin(angle / 2)
@@ -100,7 +100,7 @@ function InstanceMock.new(className)
 		__newindex = function(self, key, value)
 			local old = values[key]
 			if key == "Parent" then
-				if old then old._children[values.Name] = nil end
+				if old and old._children[values.Name] == self then old._children[values.Name] = nil end
 				if value then value._children[values.Name] = self end
 			end
 			values[key] = value

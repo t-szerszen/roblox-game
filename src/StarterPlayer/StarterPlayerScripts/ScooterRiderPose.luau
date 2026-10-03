@@ -13,6 +13,7 @@ type LimbDefinition = {
 
 export type Controller = {
 	Update: (self: Controller, deltaTime: number) -> (),
+	SetAuthoredLegWeight: (self: Controller, weight: number) -> (),
 	Destroy: (self: Controller) -> (),
 }
 
@@ -29,16 +30,6 @@ local LIMBS: { [string]: LimbDefinition } = {
 		target = "RightFootPlant",
 		poleSide = 1,
 	},
-	LeftHand = {
-		chainRoot = "LeftUpperArm",
-		endEffector = "LeftHand",
-		target = "LeftHandGrip",
-	},
-	RightHand = {
-		chainRoot = "RightUpperArm",
-		endEffector = "RightHand",
-		target = "RightHandGrip",
-	},
 }
 
 local ScooterRiderPose = {}
@@ -48,7 +39,7 @@ local function findPart(character: Model, name: string): BasePart?
 	return if part and part:IsA("BasePart") then part else nil
 end
 
-function ScooterRiderPose.Start(character: Model, scooter: Model): Controller?
+function ScooterRiderPose.Start(character: Model, scooter: Model, preserveAnimations: { [string]: boolean }?): Controller?
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	local root = scooter.PrimaryPart
 	if not humanoid or not root then
@@ -57,6 +48,7 @@ function ScooterRiderPose.Start(character: Model, scooter: Model): Controller?
 
 	local created: { Instance } = {}
 	local targets: { [string]: Attachment } = {}
+	local footControls: { IKControl } = {}
 	local motorTransforms: { [Motor6D]: CFrame } = {}
 	local animateScript = character:FindFirstChild("Animate")
 	local animateWasDisabled: boolean? = nil
@@ -67,7 +59,10 @@ function ScooterRiderPose.Start(character: Model, scooter: Model): Controller?
 	local animator = humanoid:FindFirstChildOfClass("Animator")
 	if animator then
 		for _, track in animator:GetPlayingAnimationTracks() do
-			track:Stop(0.1)
+			local animation = track.Animation
+			if not animation or not preserveAnimations or not preserveAnimations[animation.AnimationId] then
+				track:Stop(0.1)
+			end
 		end
 	end
 
@@ -123,6 +118,7 @@ function ScooterRiderPose.Start(character: Model, scooter: Model): Controller?
 				end
 			end
 			control.Parent = humanoid
+			table.insert(footControls, control)
 			table.insert(created, control)
 		end
 	else
@@ -141,6 +137,16 @@ function ScooterRiderPose.Start(character: Model, scooter: Model): Controller?
 	local destroyed = false
 
 	local controller = {} :: any
+
+	function controller:SetAuthoredLegWeight(weight: number)
+		if destroyed then return end
+		local ikWeight = 1 - math.clamp(weight, 0, 1)
+		for _, control in footControls do
+			control.Weight = ikWeight
+			-- Zero Weight alone still lets the pole influence the authored pose.
+			control.Enabled = ikWeight > 0.001
+		end
+	end
 
 	function controller:Update(deltaTime: number)
 		if destroyed or scooter.Parent == nil or character.Parent == nil then
