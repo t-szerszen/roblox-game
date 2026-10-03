@@ -7,6 +7,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ActivityConfig = require(ReplicatedStorage.Shared.Activity.ActivityConfig)
 local PhoneConfig = require(ReplicatedStorage.Shared.Phone.PhoneConfig)
 local ShopConfig = require(ReplicatedStorage.Shared.Shop.ShopConfig)
+local ScooterConfig = require(ReplicatedStorage.Shared.ScooterConfig)
+
+export type VisualPreference = { enabled: boolean, color: { number } }
 
 export type Profile = {
 	coins: number,
@@ -21,6 +24,8 @@ export type Profile = {
 	loginDay: number,
 	loginStreak: number,
 	owned: { [string]: boolean },
+	scooterUpgrades: { [string]: number },
+	scooterVisuals: { Smoke: VisualPreference, Neon: VisualPreference },
 	canCreateGang: boolean,
 	ownsPepperSpray: boolean,
 }
@@ -28,6 +33,8 @@ export type Profile = {
 local PlayerDataService = {}
 local profileStore = DataStoreService:GetDataStore("PlayerProfiles_v1")
 local profiles: { [Player]: Profile } = {}
+local canSave: { [Player]: boolean } = {}
+local statConnections: { [Player]: { RBXScriptConnection } } = {}
 local started = false
 local shuttingDown = false
 
@@ -53,6 +60,11 @@ local function defaultProfile(): Profile
 		loginDay = 0,
 		loginStreak = 0,
 		owned = {},
+		scooterUpgrades = {},
+		scooterVisuals = {
+			Smoke = { enabled = false, color = { 1, 1, 1 } },
+			Neon = { enabled = false, color = { 0, 1, 1 } },
+		},
 		canCreateGang = false,
 		ownsPepperSpray = false,
 	}
@@ -94,6 +106,31 @@ local function deserialize(value: unknown): Profile
 			end
 		end
 	end
+	if typeof(data.scooterUpgrades) == "table" then
+		for modelName in ScooterConfig.Models do
+			local tier = data.scooterUpgrades[modelName]
+			if ScooterConfig.IsValidSpeedTier(tier) then
+				profile.scooterUpgrades[modelName] = tier
+			end
+		end
+	end
+	if typeof(data.scooterVisuals) == "table" then
+		for _, kind in { "Smoke", "Neon" } do
+			local preference = data.scooterVisuals[kind]
+			if typeof(preference) == "table" and typeof(preference.color) == "table" then
+				local color = preference.color
+				local r, g, b = finiteNumber(color[1], -1), finiteNumber(color[2], -1), finiteNumber(color[3], -1)
+				if r >= 0 and r <= 1 and g >= 0 and g <= 1 and b >= 0 and b <= 1 then
+					local visual = { enabled = preference.enabled == true, color = { r, g, b } }
+					if kind == "Smoke" then
+						profile.scooterVisuals.Smoke = visual
+					else
+						profile.scooterVisuals.Neon = visual
+					end
+				end
+			end
+		end
+	end
 	return profile
 end
 
@@ -128,6 +165,14 @@ local function syncAttributes(player: Player, profile: Profile)
 end
 
 local function makeLeaderstats(player: Player, profile: Profile)
+	local previousConnections = statConnections[player]
+	if previousConnections then
+		for _, connection in previousConnections do
+			connection:Disconnect()
+		end
+	end
+	local connections: { RBXScriptConnection } = {}
+	statConnections[player] = connections
 	local old = player:FindFirstChild("leaderstats")
 	if old then
 		old:Destroy()
@@ -139,17 +184,17 @@ local function makeLeaderstats(player: Player, profile: Profile)
 	coins.Name = "Coins"
 	coins.Value = profile.coins
 	coins.Parent = leaderstats
-	coins.Changed:Connect(function(value: number)
+	table.insert(connections, coins.Changed:Connect(function(value: number)
 		profile.coins = math.max(0, math.floor(value))
-	end)
+	end))
 	local xp = Instance.new("IntValue")
 	xp.Name = "XP"
 	xp.Value = profile.xp
 	xp.Parent = leaderstats
-	xp.Changed:Connect(function(value: number)
+	table.insert(connections, xp.Changed:Connect(function(value: number)
 		profile.xp = math.max(0, math.floor(value))
 		player:SetAttribute("XP", profile.xp)
-	end)
+	end))
 end
 
 local function applyDailyLogin(player: Player, profile: Profile)
@@ -167,7 +212,7 @@ end
 
 local function savePlayer(player: Player)
 	local profile = profiles[player]
-	if not profile then
+	if not profile or not canSave[player] then
 		return
 	end
 	local leaderstats = player:FindFirstChild("leaderstats")
@@ -202,17 +247,109 @@ local function loadPlayer(player: Player)
 	if not success then
 		warn(string.format("PlayerDataService: load failed for %s; using session data: %s", player.Name, tostring(message)))
 	end
+	-- An outstanding datastore request can complete after the player has left.
+	if player.Parent ~= Players or shuttingDown then
+		return
+	end
 	local profile = deserialize(loaded)
 	resetDailyIfNeeded(profile)
 	profiles[player] = profile
+	-- Never overwrite a real profile after a failed read with temporary defaults.
+	canSave[player] = success
 	applyDailyLogin(player, profile)
 	makeLeaderstats(player, profile)
 	syncAttributes(player, profile)
+	player:SetAttribute("DataPersistenceAvailable", success)
 	player:SetAttribute("DataLoaded", true)
 end
 
 function PlayerDataService.GetProfile(player: Player): Profile?
 	return profiles[player]
+end
+
+function PlayerDataService.OwnsScooter(player: Player, modelName: string): boolean
+	local product = ShopConfig.GetScooterProduct(modelName)
+	if not product or not product.stat then
+		return false
+	end
+	local profile = profiles[player]
+	return product.price == 0 or (profile ~= nil and profile.owned[product.stat] == true)
+end
+
+local function transactionCoins(player: Player): (Profile?, IntValue?)
+	local profile = profiles[player]
+	if not profile or not canSave[player] or player.Parent ~= Players then
+		return nil, nil
+	end
+	local leaderstats = player:FindFirstChild("leaderstats")
+	local coins = if leaderstats then leaderstats:FindFirstChild("Coins") else nil
+	return profile, if coins and coins:IsA("IntValue") then coins else nil
+end
+
+function PlayerDataService.PurchaseScooter(player: Player, modelName: string): (boolean, string)
+	local product = ShopConfig.GetScooterProduct(modelName)
+	if not product or not product.stat then
+		return false, "InvalidModel"
+	end
+	local profile, coins = transactionCoins(player)
+	if not profile or not coins then
+		return false, "DataUnavailable"
+	end
+	if PlayerDataService.OwnsScooter(player, modelName) then
+		return false, "AlreadyOwned"
+	end
+	if coins.Value < product.price then
+		return false, "InsufficientCoins"
+	end
+	-- Validation, debit and ownership update must remain in one non-yielding transaction.
+	profile.coins = coins.Value - product.price
+	profile.owned[product.stat] = true
+	coins.Value = profile.coins
+	player:SetAttribute(product.stat, true)
+	return true, "Purchased"
+end
+
+function PlayerDataService.PurchaseSpeedUpgrade(player: Player, modelName: string, expectedTier: number): (boolean, string)
+	if not ScooterConfig.Models[modelName] or not ScooterConfig.IsValidSpeedTier(expectedTier) then
+		return false, "InvalidUpgrade"
+	end
+	local profile, coins = transactionCoins(player)
+	if not profile or not coins then
+		return false, "DataUnavailable"
+	end
+	if not PlayerDataService.OwnsScooter(player, modelName) then
+		return false, "NotOwned"
+	end
+	local currentTier = profile.scooterUpgrades[modelName] or 0
+	if currentTier ~= expectedTier then
+		return false, "StaleTier"
+	end
+	local price = ScooterConfig.GetUpgradeCost(modelName, currentTier)
+	if not price then
+		return false, "MaximumTier"
+	end
+	if coins.Value < price then
+		return false, "InsufficientCoins"
+	end
+	-- Checking the expected tier makes delayed duplicate requests harmless.
+	profile.coins = coins.Value - price
+	profile.scooterUpgrades[modelName] = currentTier + 1
+	coins.Value = profile.coins
+	return true, "Purchased"
+end
+
+function PlayerDataService.SetScooterVisual(player: Player, kind: "Smoke" | "Neon", enabled: boolean, color: Color3): boolean
+	local profile = profiles[player]
+	if not profile or not canSave[player] or player.Parent ~= Players then
+		return false
+	end
+	local preference = { enabled = enabled, color = { color.R, color.G, color.B } }
+	if kind == "Smoke" then
+		profile.scooterVisuals.Smoke = preference
+	else
+		profile.scooterVisuals.Neon = preference
+	end
+	return true
 end
 
 function PlayerDataService.AddCurrency(player: Player, coinsAmount: number, xpAmount: number)
@@ -287,7 +424,15 @@ function PlayerDataService.Start()
 	Players.PlayerAdded:Connect(loadPlayer)
 	Players.PlayerRemoving:Connect(function(player: Player)
 		savePlayer(player)
+		local playerStatConnections = statConnections[player]
+		if playerStatConnections then
+			for _, connection in playerStatConnections do
+				connection:Disconnect()
+			end
+		end
+		statConnections[player] = nil
 		profiles[player] = nil
+		canSave[player] = nil
 	end)
 	task.spawn(function()
 		while not shuttingDown do

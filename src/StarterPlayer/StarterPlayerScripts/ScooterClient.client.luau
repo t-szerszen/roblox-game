@@ -1,17 +1,24 @@
 --!strict
 
+local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local ScooterConfig = require(ReplicatedStorage.Shared.Scooter.ScooterConfig)
-local RacingConfig = require(ReplicatedStorage.Shared.Phone.RacingConfig)
+local ScooterPhysics = require(ReplicatedStorage.Shared.Scooter.ScooterPhysics)
+type DriveInput = {
+	throttleHeld: boolean,
+	brakeHeld: boolean,
+	steering: number,
+	wheelieHeld: boolean,
+}
 
-type Connection = RBXScriptConnection
+type CleanupTask = RBXScriptConnection | Instance | (() -> ())
 type Maid = {
-	tasks: { Connection | Instance },
-	Give: (self: Maid, task: Connection | Instance) -> (),
+	tasks: { CleanupTask },
+	Give: (self: Maid, task: CleanupTask) -> (),
 	Clean: (self: Maid) -> (),
 }
 type VisualState = {
@@ -24,262 +31,271 @@ type VisualState = {
 }
 
 local localPlayer = Players.LocalPlayer
-local remotesFolder = ReplicatedStorage:WaitForChild(ScooterConfig.RemoteFolderName)
+local remotesFolder = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild(ScooterConfig.RemoteFolderName)
 local requestSpawnRemote = remotesFolder:WaitForChild("RequestSpawn") :: RemoteEvent
 local trickRemote = remotesFolder:WaitForChild("TrickState") :: RemoteEvent
 local driveInputRemote = remotesFolder:WaitForChild("DriveInput") :: RemoteEvent
 
 local activeMaid: Maid? = nil
+local characterMaid: Maid? = nil
 local activeScooter: Model? = nil
 local activeSeat: VehicleSeat? = nil
-local characterSeatConnection: RBXScriptConnection? = nil
+local localSteering = 0
 local burnoutActive = false
-local jumpQueued = false
-local wheelieQueued = false
+local wheelieButtonHeld = false
+local focused = true
+local destroyed = false
+local heldKeys: { [Enum.KeyCode]: boolean } = {}
 local visualStates: { [Model]: VisualState } = {}
-
-local inputState = {
-	throttle = false,
-	brake = false,
-	left = false,
-	right = false,
-}
+local mountedActions = { "ScooterBlockJump", "ScooterWheelie", "ScooterDismount" }
 
 local function newMaid(): Maid
-	local maid = {}
+	local maid = {} :: Maid
 	maid.tasks = {}
-
-	function maid:Give(task: Connection | Instance)
+	function maid:Give(task: CleanupTask)
 		table.insert(self.tasks, task)
 	end
-
 	function maid:Clean()
-		for _, task in ipairs(self.tasks) do
+		for _, task in self.tasks do
 			if typeof(task) == "RBXScriptConnection" then
 				task:Disconnect()
 			elseif typeof(task) == "Instance" then
 				task:Destroy()
+			else
+				task()
 			end
 		end
 		table.clear(self.tasks)
 	end
-
-	return maid :: Maid
+	return maid
 end
 
 local function resetInput()
-	inputState.throttle = false
-	inputState.brake = false
-	inputState.left = false
-	inputState.right = false
-	jumpQueued = false
-	wheelieQueued = false
-end
-
-local function keyChanged(input: InputObject, isDown: boolean)
-	if input.UserInputType ~= Enum.UserInputType.Keyboard then
-		return
-	end
-
-	local keyCode = input.KeyCode
-	if keyCode == Enum.KeyCode.W or keyCode == Enum.KeyCode.Up then
-		inputState.throttle = isDown
-	elseif keyCode == Enum.KeyCode.S or keyCode == Enum.KeyCode.Down then
-		inputState.brake = isDown
-	elseif keyCode == Enum.KeyCode.A or keyCode == Enum.KeyCode.Left then
-		inputState.left = isDown
-	elseif keyCode == Enum.KeyCode.D or keyCode == Enum.KeyCode.Right then
-		inputState.right = isDown
-	elseif (keyCode == Enum.KeyCode.LeftShift or keyCode == Enum.KeyCode.C) and isDown then
-		wheelieQueued = true
-	elseif keyCode == Enum.KeyCode.Space and isDown then
-		jumpQueued = true
-	elseif keyCode == Enum.KeyCode.H and isDown then
-		local RacingRemotes = ReplicatedStorage:WaitForChild(RacingConfig.RemoteFolderName)
-		local honkEvent = RacingRemotes:WaitForChild("Honk") :: RemoteEvent
-		local requestChallenge = RacingRemotes:WaitForChild("RequestChallenge") :: RemoteFunction
-		honkEvent:FireServer()
-		task.spawn(function()
-			requestChallenge:InvokeServer()
-		end)
-	end
-end
-
-local function findControlledScooter(): Model?
-	local folder = workspace:FindFirstChild(ScooterConfig.ScooterFolderName)
-	if not folder then
-		return nil
-	end
-
-	for _, child in ipairs(folder:GetChildren()) do
-		if child:IsA("Model") and child:GetAttribute("OwnerUserId") == localPlayer.UserId then
-			return child
-		end
-	end
-
-	return nil
+	table.clear(heldKeys)
+	wheelieButtonHeld = false
+	localSteering = 0
 end
 
 local function setLocalBurnout(active: boolean)
-	if burnoutActive == active then
-		return
+	if burnoutActive ~= active then
+		burnoutActive = active
+		trickRemote:FireServer("Burnout", active)
 	end
+end
 
-	burnoutActive = active
-	trickRemote:FireServer("Burnout", active, Color3.fromRGB(235, 235, 235))
+local function clearControls()
+	resetInput()
+	if activeSeat then
+		activeSeat.ThrottleFloat = 0
+		activeSeat.SteerFloat = 0
+	end
+	if activeScooter then
+		driveInputRemote:FireServer(false, false, 0, false)
+	end
+	setLocalBurnout(false)
 end
 
 local function cleanupController()
+	clearControls()
+	activeScooter = nil
+	activeSeat = nil
 	if activeMaid then
 		activeMaid:Clean()
 		activeMaid = nil
 	end
-	if burnoutActive then
-		trickRemote:FireServer("Burnout", false, Color3.fromRGB(235, 235, 235))
+	for _, action in mountedActions do
+		ContextActionService:UnbindAction(action)
 	end
-	activeScooter = nil
-	activeSeat = nil
-	burnoutActive = false
-	resetInput()
+end
+
+local function keyHeld(first: Enum.KeyCode, second: Enum.KeyCode): boolean
+	return heldKeys[first] == true or heldKeys[second] == true
+end
+
+local function readInput(seat: VehicleSeat): DriveInput
+	if not focused or UserInputService:GetFocusedTextBox() ~= nil then
+		return { throttleHeld = false, brakeHeld = false, steering = 0, wheelieHeld = false }
+	end
+	local keyboardSteering = (if keyHeld(Enum.KeyCode.D, Enum.KeyCode.Right) then 1 else 0)
+		- (if keyHeld(Enum.KeyCode.A, Enum.KeyCode.Left) then 1 else 0)
+	return {
+		throttleHeld = keyHeld(Enum.KeyCode.W, Enum.KeyCode.Up) or seat.ThrottleFloat > 0.1,
+		brakeHeld = keyHeld(Enum.KeyCode.S, Enum.KeyCode.Down) or seat.ThrottleFloat < -0.1,
+		steering = math.clamp(if math.abs(seat.SteerFloat) > 0.1 then seat.SteerFloat else keyboardSteering, -1, 1),
+		wheelieHeld = wheelieButtonHeld or keyHeld(Enum.KeyCode.LeftShift, Enum.KeyCode.C),
+	}
 end
 
 local function startController(scooter: Model, seat: VehicleSeat, root: BasePart)
 	cleanupController()
-
+	local character = localPlayer.Character
+	if not character then
+		return
+	end
 	activeScooter = scooter
 	activeSeat = seat
 	local maid = newMaid()
 	activeMaid = maid
+	local lastInputSentAt = -math.huge
+	local lastBurnoutSentAt = -math.huge
+	local lastSent: DriveInput? = nil
 
-	local lastInputSentAt = 0
-	local lastSentThrottle: number? = nil
-	local lastSentSteering: number? = nil
-	local smoothedSteering = 0
+	local function mountedAction(action: string, state: Enum.UserInputState, input: InputObject): Enum.ContextActionResult
+		local allowed = focused and UserInputService:GetFocusedTextBox() == nil
+		if action == "ScooterWheelie" then
+			local held = allowed and (state == Enum.UserInputState.Begin or state == Enum.UserInputState.Change)
+			if input.UserInputType == Enum.UserInputType.Touch then
+				wheelieButtonHeld = held
+			else
+				heldKeys[input.KeyCode] = held
+			end
+		elseif state == Enum.UserInputState.Begin and allowed then
+			if action == "ScooterDismount" then
+				clearControls()
+				trickRemote:FireServer("Dismount", true)
+			end
+		end
+		-- Space/ButtonA is intentionally inert while mounted and must not reach
+		-- the default Humanoid jump/dismount binding.
+		return Enum.ContextActionResult.Sink
+	end
+	local priority = Enum.ContextActionPriority.High.Value + 10
+	ContextActionService:BindActionAtPriority("ScooterBlockJump", mountedAction, false, priority, Enum.KeyCode.Space, Enum.KeyCode.ButtonA)
+	ContextActionService:BindActionAtPriority("ScooterWheelie", mountedAction, true, priority, Enum.KeyCode.LeftShift, Enum.KeyCode.C)
+	ContextActionService:BindActionAtPriority("ScooterDismount", mountedAction, true, priority, Enum.KeyCode.E)
+	ContextActionService:SetTitle("ScooterWheelie", "Wheelie")
+	ContextActionService:SetTitle("ScooterDismount", "Exit")
 
 	maid:Give(UserInputService.InputBegan:Connect(function(input: InputObject, gameProcessed: boolean)
-		if gameProcessed and UserInputService:GetFocusedTextBox() ~= nil then
+		if gameProcessed or not focused or UserInputService:GetFocusedTextBox() ~= nil then
 			return
 		end
-		keyChanged(input, true)
+		if input.UserInputType == Enum.UserInputType.Keyboard then
+			heldKeys[input.KeyCode] = true
+		end
 	end))
-
 	maid:Give(UserInputService.InputEnded:Connect(function(input: InputObject)
-		keyChanged(input, false)
+		heldKeys[input.KeyCode] = nil
 	end))
-
+	maid:Give(UserInputService.TextBoxFocused:Connect(clearControls))
 	maid:Give(seat:GetPropertyChangedSignal("Occupant"):Connect(function()
-		if seat.Occupant == nil then
+		if seat.Occupant == nil or seat.Occupant.Parent ~= character then
 			cleanupController()
 		end
 	end))
+	maid:Give(scooter.Destroying:Connect(cleanupController))
 
-	maid:Give(scooter.Destroying:Connect(function()
-		cleanupController()
-	end))
-
-	maid:Give(RunService.Heartbeat:Connect(function(deltaTime: number)
+	maid:Give(RunService.PreSimulation:Connect(function(deltaTime: number)
 		if activeScooter ~= scooter or activeSeat ~= seat or seat.Occupant == nil then
 			cleanupController()
 			return
 		end
+		local input = readInput(seat)
+		localSteering = ScooterPhysics.SmoothSteering(localSteering, input.steering, deltaTime)
 
-		local velocity = root.AssemblyLinearVelocity
-		local flatVelocity = Vector3.new(velocity.X, 0, velocity.Z)
-		local speed = flatVelocity.Magnitude
-
-		local grounded = scooter:GetAttribute("FrontGrounded") == true
-			or scooter:GetAttribute("RearGrounded") == true
-
-		local seatThrottle = seat.ThrottleFloat
-		local throttleHeld = seatThrottle > 0.1 or inputState.throttle
-		local brakeHeld = seatThrottle < -0.1 or inputState.brake
-		local keyboardSteering = (if inputState.right then 1 else 0) - (if inputState.left then 1 else 0)
-		local targetSteering = if math.abs(seat.SteerFloat) > 0.1 then seat.SteerFloat else keyboardSteering
-		targetSteering = math.clamp(targetSteering, -1, 1)
-		local steeringAlpha = 1 - math.exp(-ScooterConfig.SteerSmoothSpeed * math.min(deltaTime, 0.1))
-		smoothedSteering += (targetSteering - smoothedSteering) * steeringAlpha
-		if math.abs(smoothedSteering) < 0.001 and targetSteering == 0 then
-			smoothedSteering = 0
-		end
-		local wantsBurnout = throttleHeld
-			and brakeHeld
-			and speed <= ScooterConfig.BurnoutSmokeMaxSpeed
-			and grounded
-		local driveThrottle = if throttleHeld == brakeHeld then 0 else if throttleHeld then 1 else -1
-		local sendJump = jumpQueued
-		local sendWheelie = wheelieQueued
-		jumpQueued = false
-		wheelieQueued = false
 		local now = os.clock()
 		local elapsed = now - lastInputSentAt
-		local throttleChanged = driveThrottle ~= lastSentThrottle
-		local steeringChanged = lastSentSteering == nil
-			or math.abs(smoothedSteering - lastSentSteering) >= ScooterConfig.SteeringSendThreshold
-		local shouldSendSteering = steeringChanged and elapsed >= ScooterConfig.DriveInputSendInterval
-		if elapsed >= ScooterConfig.DriveInputKeepalive or throttleChanged or shouldSendSteering or sendJump or sendWheelie then
+		local previous = lastSent
+		local changed = previous == nil or input.throttleHeld ~= previous.throttleHeld
+			or input.brakeHeld ~= previous.brakeHeld or input.wheelieHeld ~= previous.wheelieHeld
+			or math.abs(input.steering - previous.steering) >= ScooterConfig.SteeringSendThreshold
+		if elapsed >= ScooterConfig.DriveInputSendInterval
+			and (changed or elapsed >= ScooterConfig.DriveInputKeepalive)
+		then
+			driveInputRemote:FireServer(input.throttleHeld, input.brakeHeld, input.steering, input.wheelieHeld)
 			lastInputSentAt = now
-			lastSentThrottle = driveThrottle
-			lastSentSteering = smoothedSteering
-			driveInputRemote:FireServer(driveThrottle, smoothedSteering, sendWheelie, sendJump)
+			lastSent = input
 		end
-
-		if wantsBurnout then
-			setLocalBurnout(true)
-		else
-			setLocalBurnout(false)
+		local velocity = root.AssemblyLinearVelocity
+		local speed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
+		local grounded = scooter:GetAttribute("FrontGrounded") == true or scooter:GetAttribute("RearGrounded") == true
+		local wantsBurnout = input.throttleHeld and input.brakeHeld and grounded
+			and scooter:GetAttribute("Fallen") ~= true and speed <= ScooterConfig.BurnoutSmokeMaxSpeed
+		if wantsBurnout ~= burnoutActive
+			or (wantsBurnout and scooter:GetAttribute("BurnoutActive") ~= true
+				and now - lastBurnoutSentAt >= ScooterConfig.DriveInputKeepalive)
+		then
+			burnoutActive = wantsBurnout
+			trickRemote:FireServer("Burnout", wantsBurnout)
+			lastBurnoutSentAt = now
 		end
 	end))
 end
 
-local function tryStartFromSeat(seat: Seat)
+local function tryStartFromSeat(seat: BasePart)
 	if not seat:IsA("VehicleSeat") then
 		return
 	end
-
 	local scooter = seat:FindFirstAncestorOfClass("Model")
 	if not scooter or scooter:GetAttribute("OwnerUserId") ~= localPlayer.UserId then
 		return
 	end
-
 	local root = scooter.PrimaryPart
-	if not root then
+	if root then
+		startController(scooter, seat, root)
+	end
+end
+
+local function requestDefaultScooter()
+	if destroyed then
 		return
 	end
-
-	startController(scooter, seat, root)
+	local folder = workspace:FindFirstChild(ScooterConfig.ScooterFolderName)
+	if folder then
+		for _, child in folder:GetChildren() do
+			if child:IsA("Model") and child:GetAttribute("OwnerUserId") == localPlayer.UserId then
+				return
+			end
+		end
+	end
+	requestSpawnRemote:FireServer(ScooterConfig.DefaultModel)
 end
 
 local function hookCharacter(character: Model)
 	cleanupController()
-	if characterSeatConnection then
-		characterSeatConnection:Disconnect()
-		characterSeatConnection = nil
+	if characterMaid then
+		characterMaid:Clean()
 	end
-
+	local maid = newMaid()
+	characterMaid = maid
 	local humanoid = character:WaitForChild("Humanoid", 10)
-	if not humanoid or not humanoid:IsA("Humanoid") then
+	if destroyed or localPlayer.Character ~= character or characterMaid ~= maid or not humanoid or not humanoid:IsA("Humanoid") then
 		return
 	end
-
-	characterSeatConnection = humanoid.Seated:Connect(function(isSeated: boolean, seat: Seat?)
+	maid:Give(humanoid.Seated:Connect(function(isSeated: boolean, seat: BasePart?)
 		if isSeated and seat then
 			tryStartFromSeat(seat)
 		else
 			cleanupController()
 		end
-	end)
+	end))
+	maid:Give(humanoid.Died:Connect(cleanupController))
+	maid:Give(character.Destroying:Connect(cleanupController))
+	if humanoid.SeatPart then
+		tryStartFromSeat(humanoid.SeatPart)
+	end
+	task.defer(requestDefaultScooter)
 end
 
+local focusLostConnection = UserInputService.WindowFocusReleased:Connect(function()
+	focused = false
+	clearControls()
+end)
+local focusGainedConnection = UserInputService.WindowFocused:Connect(function()
+	focused = true
+	clearControls()
+end)
 local characterAddedConnection = localPlayer.CharacterAdded:Connect(hookCharacter)
-if localPlayer.Character then
-	hookCharacter(localPlayer.Character)
-end
-
-task.defer(function()
-	if not findControlledScooter() then
-		requestSpawnRemote:FireServer(ScooterConfig.DefaultModel)
+local characterRemovingConnection = localPlayer.CharacterRemoving:Connect(function()
+	cleanupController()
+	if characterMaid then
+		characterMaid:Clean()
+		characterMaid = nil
 	end
 end)
+if localPlayer.Character then
+	task.spawn(hookCharacter, localPlayer.Character)
+end
 
 local function findMotor(scooter: Model, name: string): Motor6D?
 	local instance = scooter:FindFirstChild(name, true)
@@ -375,13 +391,17 @@ local visualConnection = RunService.RenderStepped:Connect(function(deltaTime: nu
 			state.rearWheel.Transform = CFrame.Angles(state.rearSpin, 0, 0)
 		end
 		if state.steering then
-			local steering = scooter:GetAttribute("Steering")
-			local steeringInput = if typeof(steering) == "number" then math.clamp(steering, -1, 1) else 0
-			local steeringAlpha = 1 - math.exp(-ScooterConfig.SteerSmoothSpeed * math.min(deltaTime, 0.1))
+			local steering = scooter:GetAttribute("SteeringInput")
+			local steeringInput = if scooter == activeScooter
+				then localSteering
+				else if typeof(steering) == "number" then math.clamp(steering, -1, 1) else 0
+			local steeringAlpha = 1 - math.exp(-ScooterConfig.HandlebarSmoothSpeed * math.min(deltaTime, 0.1))
 			state.displayedSteering += (steeringInput - state.displayedSteering) * steeringAlpha
+			local animatedSteering = math.sign(state.displayedSteering)
+				* math.abs(state.displayedSteering) ^ ScooterConfig.HandlebarInputExponent
 			state.steering.Transform = CFrame.Angles(
 				0,
-				-state.displayedSteering * ScooterConfig.MaxHandlebarAngle,
+				-animatedSteering * ScooterConfig.MaxHandlebarAngle,
 				0
 			)
 		end
@@ -389,12 +409,16 @@ local visualConnection = RunService.RenderStepped:Connect(function(deltaTime: nu
 end)
 
 script.Destroying:Connect(function()
+	destroyed = true
 	cleanupController()
-	if characterSeatConnection then
-		characterSeatConnection:Disconnect()
-		characterSeatConnection = nil
+	if characterMaid then
+		characterMaid:Clean()
+		characterMaid = nil
 	end
 	characterAddedConnection:Disconnect()
+	characterRemovingConnection:Disconnect()
+	focusLostConnection:Disconnect()
+	focusGainedConnection:Disconnect()
 	visualConnection:Disconnect()
 	scooterAddedConnection:Disconnect()
 	scooterRemovedConnection:Disconnect()

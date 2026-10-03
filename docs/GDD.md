@@ -62,17 +62,18 @@ Wszelkie transakcje potrącające walutę (Coins) muszą być wykonywane i walid
 
 - **Wsiadanie:** Gracz wsiada na własną hulajnogę wyłącznie przez interakcję `E`; dotknięcie siedzenia nie może automatycznie posadzić postaci.
 - **Skręcanie:** Zmiana kierunku jest możliwa dopiero po rozpoczęciu jazdy; hulajnoga nie obraca się wokół własnej osi na postoju.
-- **Wheelie:** `Shift` lub `C` wykonuje jednorazowe wyrwanie przedniego koła podczas jazdy do przodu. Po rozpoczęciu wheelie gaz `W` podnosi przód, a hamulec `S` go opuszcza. Wheelie nie może rozpocząć się podczas cofania.
+- **Wheelie:** Naciśnięcie `Shift` lub `C` jednorazowo rozpoczyna wheelie podczas jazdy do przodu. Po uruchomieniu gaz `W` podnosi przód i pomaga utrzymać prędkość, natomiast hamulec `S` szybko go opuszcza. Brak obu wejść utrzymuje kąt tylko przy wystarczającym pędzie; wraz ze spadkiem prędkości przód coraz szybciej opada, a zatrzymanie natychmiast kończy wheelie. Poza aktywnym wheelie gaz i hamulec nie przechylają sztucznie podwozia. Wheelie nie może rozpocząć się podczas cofania ani w powietrzu. Przekroczenie maksymalnego kąta wyrzuca kierowcę. Skok hulajnogą jest wyłączony; `Space` nie wykonuje akcji podczas jazdy, a `E` pozwala zsiąść.
+- **Nierówności i cofanie:** Przytrzymanie `S` po zatrzymaniu uruchamia responsywne cofanie. Kierunkowa asysta przedniego lub tylnego koła pomaga przejechać z małej prędkości przez pasy, łączenia drogi i krawężniki do skonfigurowanej wysokości, bez globalnego podnoszenia podwozia.
 
 ### Cennik i Parametry Hulajnóg (Cel: 200 dostaw do End-game)
 
 | Model                 | Prędkość Bazowa | Cena (Coins)            |
 | :-------------------- | :-------------- | :---------------------- |
-| **KuKirin G2 Pro**    | 45 km/h         | **0** (Pojazd Startowy) |
-| **KuKirin G2 Max**    | 55 km/h         | **1 000 Coins**         |
-| **KuKirin G2 Master** | 60 km/h         | **4 500 Coins**         |
-| **KuKirin G3 Pro**    | 65 km/h         | **12 000 Coins**        |
-| **KuKirin G4**        | 70 km/h         | **26 000 Coins**        |
+| **KuKirin G2 Pro**    | 55 km/h         | **0** (Pojazd Startowy) |
+| **KuKirin G2 Max**    | 65 km/h         | **1 000 Coins**         |
+| **KuKirin G2 Master** | 72 km/h         | **4 500 Coins**         |
+| **KuKirin G3 Pro**    | 80 km/h         | **12 000 Coins**        |
+| **KuKirin G4**        | 90 km/h         | **26 000 Coins**        |
 
 ### Koszty Ulepszeń Szybkości (Perki w Garażu)
 

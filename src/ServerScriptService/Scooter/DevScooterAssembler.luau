@@ -190,8 +190,9 @@ function DevScooterAssembler.AssembleFromSelection(): Model
 	attachmentAt(root, parts.RearWheel.Position, "RearSuspensionPoint")
 	local right = rootCFrame.RightVector
 	attachmentAt(root, Vector3.new(bodyPosition.X, deckY + 2.8, bodyPosition.Z) - flatForward * 0.25, "RiderRootAttachment")
-	attachmentAt(root, Vector3.new(bodyPosition.X, deckY + 0.08, bodyPosition.Z) + flatForward * 0.45 - right * 0.32, "LeftFootPlant")
-	attachmentAt(root, Vector3.new(bodyPosition.X, deckY + 0.08, bodyPosition.Z) - flatForward * 0.55 + right * 0.32, "RightFootPlant")
+	local footY = deckY + ScooterConfig.RiderPose.FootPlantClearance
+	attachmentAt(root, Vector3.new(bodyPosition.X, footY, bodyPosition.Z) + flatForward * 0.45 - right * 0.32, "LeftFootPlant")
+	attachmentAt(root, Vector3.new(bodyPosition.X, footY, bodyPosition.Z) - flatForward * 0.55 + right * 0.32, "RightFootPlant")
 	attachmentAt(root, parts.Handlebar.Position - right * 0.58, "LeftHandGrip")
 	attachmentAt(root, parts.Handlebar.Position + right * 0.58, "RightHandGrip")
 	createSmoke(parts.RearWheel)
@@ -220,8 +221,6 @@ function DevScooterAssembler.AssembleFromSelection(): Model
 	model:SetAttribute("RiderMounted", false)
 	model:SetAttribute("Steering", 0)
 	model:SetAttribute("SpeedKmh", 0)
-	model:SetAttribute("FrontSuspensionCompression", 0)
-	model:SetAttribute("RearSuspensionCompression", 0)
 	model:SetAttribute("WheelRadius", visualWheelRadius)
 	model.Parent = templates
 	Selection:Set({ model })

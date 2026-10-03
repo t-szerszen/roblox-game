@@ -4,7 +4,7 @@ local Workspace = game:GetService("Workspace")
 
 local ROAD_HINTS = { "road", "street", "avenue", "intersection", "asphalt", "crossing" }
 local MARKING_HINTS = { "marking", "centerline", "lane", "stripe", "paint" }
-local ROAD_PROPERTIES = PhysicalProperties.new(0.7, 0.05, 0, 10, 10)
+local ROAD_PROPERTIES = PhysicalProperties.new(0.7, 0.25, 0, 10, 10)
 local PROXY_ATTRIBUTE = "RoadCollisionProxy"
 
 local mapDescendantConnection: RBXScriptConnection? = nil
