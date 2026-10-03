@@ -2,7 +2,8 @@
 
 export type Currency = "Coins" | "Robux"
 export type ProductKind = "Scooter" | "GamePass" | "DeveloperProduct"
-export type TabId = "Hulajnogi" | "Premium" | "Dopalacze" | "Kody"
+export type TabId = "Hulajnogi" | "Premium" | "Kody"
+export type Tab = { id: TabId, label: string, icon: string, accentColor: Color3 }
 export type Product = {
 	id: string,
 	name: string,
@@ -15,9 +16,9 @@ export type Product = {
 	accent: Color3,
 	tab: TabId,
 	speed: number?,      -- km/h display for scooters
-	featured: boolean?,  -- glowing border / special card treatment
-	imageId: string?,    -- TODO: Wstaw ID grafiki produktu (np. hulajnogi)
-	buttonImageId: string?, -- TODO: Wstaw ID wygenerowanego przycisku z ceną
+	featured: boolean?,
+	imageId: string?, -- Roblox image URI for premium artwork.
+	previewKey: string?, -- Key in PreviewConfig.Sources; independent of the gameplay rig.
 }
 
 local ShopConfig = {}
@@ -29,13 +30,13 @@ ShopConfig.RequestCooldown = 0.25
 ShopConfig.Tabs = {
 	{ id = "Hulajnogi" :: TabId, label = "Hulajnogi", icon = "🛴", accentColor = Color3.fromRGB(241, 196, 43) },
 	{ id = "Premium" :: TabId,   label = "Premium",   icon = "💎", accentColor = Color3.fromRGB(180, 70, 220) },
-	{ id = "Dopalacze" :: TabId, label = "Dopalacze", icon = "⚡", accentColor = Color3.fromRGB(60, 220, 80) },
 	{ id = "Kody" :: TabId,      label = "Kody",      icon = "🎁", accentColor = Color3.fromRGB(56, 182, 255) },
-}
+} :: { Tab }
 
 ShopConfig.CoinProducts = {
 	{
 		id = "kukirin_g2_pro",
+		previewKey = "scooter",
 		name = "KuKirin G2 Pro",
 		description = "Model startowy",
 		price = 0,
@@ -48,6 +49,7 @@ ShopConfig.CoinProducts = {
 	},
 	{
 		id = "kukirin_g2_max",
+		previewKey = "scooter",
 		name = "KuKirin G2 Max",
 		description = "Szybszy naped",
 		price = 1_000,
@@ -60,6 +62,7 @@ ShopConfig.CoinProducts = {
 	},
 	{
 		id = "kukirin_g2_master",
+		previewKey = "scooter",
 		name = "KuKirin G2 Master",
 		description = "Mocny model miejski",
 		price = 4_500,
@@ -72,6 +75,7 @@ ShopConfig.CoinProducts = {
 	},
 	{
 		id = "kukirin_g3_pro",
+		previewKey = "scooter",
 		name = "KuKirin G3 Pro",
 		description = "Wyczynowa konfiguracja",
 		price = 12_000,
@@ -84,6 +88,7 @@ ShopConfig.CoinProducts = {
 	},
 	{
 		id = "kukirin_g4",
+		previewKey = "scooter",
 		name = "KuKirin G4",
 		description = "Najwyzsza klasa",
 		price = 26_000,
