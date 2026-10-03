@@ -60,13 +60,36 @@ ScooterConfig.EntitlementCacheSeconds = 60
 ScooterConfig.GarageRequestFunctionName = "GarageRequest"
 
 ScooterConfig.DefaultModel = "KuKirin G2 Pro"
-ScooterConfig.StudsPerKmH = 0.78
-ScooterConfig.BurnoutSmokeMaxSpeed = 0.75
+-- All catalog entries use the single Studio-authored articulated rig.
+ScooterConfig.TemplateName = "scooter"
+ScooterConfig.SteeringServoTorque = 6000
+ScooterConfig.SteeringServoSpeed = 8
+ScooterConfig.SteeringServoSign = -1
+ScooterConfig.SteeringAnglePrecisionDegrees = 0.1
+ScooterConfig.BrakeLight = {
+	Enabled = false,
+	Color = Color3.fromRGB(255, 20, 20),
+	Brightness = 1.5,
+	Range = 4,
+	EmissiveStrength = 1,
+}
+ScooterConfig.BurnoutMotorTorque = 100
+ScooterConfig.BurnoutMotorForceScale = 0.6
+ScooterConfig.BurnoutMotorAcceleration = 120
+ScooterConfig.BurnoutTurnRate = math.rad(90)
+-- Gameplay conversion keeps catalog ratings while increasing world travel speed.
+ScooterConfig.StudsPerKmH = 1.6
+ScooterConfig.BurnoutMaxSpeedKmh = 5
+ScooterConfig.BurnoutSmokeMaxSpeed = ScooterConfig.BurnoutMaxSpeedKmh * ScooterConfig.StudsPerKmH
 ScooterConfig.CoastingDeceleration = 10
 ScooterConfig.BrakingDeceleration = 40
-ScooterConfig.ReverseAcceleration = 50
-ScooterConfig.MaxReverseSpeedKmh = 12
+ScooterConfig.DirectionChangeBrakingDeceleration = 60
+ScooterConfig.DirectionChangeSpeedKmh = 2
+ScooterConfig.ReverseAcceleration = 75
+ScooterConfig.MaxReverseSpeedKmh = 18
 ScooterConfig.TurnRate = math.rad(165)
+ScooterConfig.MaxHeadingLeadAngle = math.rad(12)
+ScooterConfig.HeadingLeadSeconds = 0.15
 ScooterConfig.MinSteeringSpeed = 0.5
 ScooterConfig.StopSpeed = 0.25
 ScooterConfig.SteerSmoothSpeed = 14
@@ -75,10 +98,15 @@ ScooterConfig.SteeringFadeEndKmh = 90
 ScooterConfig.HighSpeedSteeringScale = 0.55
 ScooterConfig.LateralGripDeceleration = 100
 ScooterConfig.HillAssistGravityScale = 0.85
-ScooterConfig.WheelieMinSpeed = 3
+ScooterConfig.WheelieMinSpeedKmh = 10
+ScooterConfig.WheelieMinSpeed = ScooterConfig.WheelieMinSpeedKmh * ScooterConfig.StudsPerKmH
 ScooterConfig.WheelieKickAngle = math.rad(14)
 ScooterConfig.WheeliePitchRate = math.rad(34)
 ScooterConfig.WheelieBrakeDropRate = math.rad(125)
+ScooterConfig.WheelieNaturalDropRate = math.rad(45)
+ScooterConfig.WheelieReturnSpeed = 2.5
+ScooterConfig.WheelieBrakeReturnSpeed = 8
+ScooterConfig.WheelieRestAngle = math.rad(0.25)
 ScooterConfig.WheelieLowSpeedDropStart = 6
 ScooterConfig.WheelieLowSpeedDropRate = math.rad(80)
 ScooterConfig.WheelieStallDropRate = math.rad(260)
@@ -97,13 +125,43 @@ ScooterConfig.PredictionMaxAngle = math.rad(12)
 ScooterConfig.PredictionCameraLead = 0.35
 ScooterConfig.PredictionCameraBlendSpeed = 12
 ScooterConfig.MaxSteeringLean = math.rad(16)
-ScooterConfig.SteeringLeanFullSpeed = 14
-ScooterConfig.MaxHandlebarAngle = math.rad(40)
+ScooterConfig.SteeringLeanSmoothSpeed = 8
+ScooterConfig.MaxHandlebarAngle = math.rad(30)
 ScooterConfig.HandlebarSmoothSpeed = 18
 ScooterConfig.HandlebarInputExponent = 0.72
 ScooterConfig.WheelBase = 4.5
 ScooterConfig.WheelRadius = 0.7
 ScooterConfig.WheelColliderClearance = 0.03
+ScooterConfig.SpawnGroundClearance = 0.25
+ScooterConfig.DeckColliderInset = 0.03
+ScooterConfig.FrontRestPose = {
+	Revision = 1, MaxCorrectionDegrees = 45, HeightTolerance = 0.01,
+	MatchRearMount = true, MaxMountShiftRadiusRatio = 4,
+}
+ScooterConfig.RigValidation = {
+	PositionTolerance = 0.03,
+	AxisToleranceDegrees = 2,
+	MinimumSteeringAxisUpDot = 0.3,
+}
+ScooterConfig.Suspension = {
+	Revision = 1,
+	ShowConstraints = false,
+	ReferenceRiderMass = 20,
+	PreloadSupportFraction = 0.8,
+	DampingRatio = 0.8,
+	ForceHeadroom = 4,
+	MinimumLeverageRatio = 0.02,
+	SampleStepDegrees = 0.5,
+	LimitMarginDegrees = 1,
+	Front = {
+		CompressionRadiusRatio = 0.4, DroopRadiusRatio = 0.2,
+		MaxCompressionDegrees = 22, MaxDroopDegrees = 12, SagFraction = 0.4,
+	},
+	Back = {
+		CompressionRadiusRatio = 0.4, DroopRadiusRatio = 0.2,
+		MaxCompressionDegrees = 22, MaxDroopDegrees = 12, SagFraction = 0.3,
+	},
+}
 ScooterConfig.GroundProbeTolerance = 0.45
 ScooterConfig.SuspensionProbeLift = 1.25
 ScooterConfig.GroundNormalSmoothSpeed = 14
@@ -144,6 +202,25 @@ ScooterConfig.RiderPose = {
 	BalanceFootOffset = Vector3.new(0.2, 0, 0.2),
 	BalanceFootSwing = Vector3.new(0.08, 0, 0.08),
 	BalanceFootFrequency = 7,
+	MaxBodyLean = math.rad(22),
+	LeanFullSpeed = 24,
+	LateralLeanFullSpeed = 10,
+	LateralLeanWeight = 0.25,
+	RootLeanShare = 0.3,
+	ElbowOutwardOffset = 1.2,
+	ElbowForwardOffset = 0.6,
+	ElbowLift = 0.7,
+	GripHalfWidth = 0.58,
+}
+ScooterConfig.RiderAnimations = {
+	-- Supply R15 clips that key the legs/pelvis and leave the arms to hand IK.
+	IdleFootAnim = "",
+	WheelieBalanceAnim = "",
+	FadeTime = 0.25,
+	Weight = 1,
+	PlaybackSpeed = 1,
+	IdleEnterSpeedKmh = 0.5,
+	IdleExitSpeedKmh = 1.5,
 }
 ScooterConfig.ScooterFolderName = "Scooters"
 ScooterConfig.RemoteFolderName = "ScooterRemotes"
