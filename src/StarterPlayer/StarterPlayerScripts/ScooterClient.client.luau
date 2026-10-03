@@ -21,16 +21,9 @@ type Maid = {
 	Give: (self: Maid, task: CleanupTask) -> (),
 	Clean: (self: Maid) -> (),
 }
-type VisualState = {
-	frontWheel: Motor6D?,
-	rearWheel: Motor6D?,
-	steering: Motor6D?,
-	frontSpin: number,
-	rearSpin: number,
-	displayedSteering: number,
-}
 
 local localPlayer = Players.LocalPlayer
+local playerGui = localPlayer:WaitForChild("PlayerGui")
 local remotesFolder = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild(ScooterConfig.RemoteFolderName)
 local requestSpawnRemote = remotesFolder:WaitForChild("RequestSpawn") :: RemoteEvent
 local trickRemote = remotesFolder:WaitForChild("TrickState") :: RemoteEvent
@@ -40,13 +33,11 @@ local activeMaid: Maid? = nil
 local characterMaid: Maid? = nil
 local activeScooter: Model? = nil
 local activeSeat: VehicleSeat? = nil
-local localSteering = 0
 local burnoutActive = false
 local wheelieButtonHeld = false
 local focused = true
 local destroyed = false
 local heldKeys: { [Enum.KeyCode]: boolean } = {}
-local visualStates: { [Model]: VisualState } = {}
 local mountedActions = { "ScooterBlockJump", "ScooterWheelie", "ScooterDismount" }
 
 local function newMaid(): Maid
@@ -73,7 +64,6 @@ end
 local function resetInput()
 	table.clear(heldKeys)
 	wheelieButtonHeld = false
-	localSteering = 0
 end
 
 local function setLocalBurnout(active: boolean)
@@ -113,7 +103,7 @@ local function keyHeld(first: Enum.KeyCode, second: Enum.KeyCode): boolean
 end
 
 local function readInput(seat: VehicleSeat): DriveInput
-	if not focused or UserInputService:GetFocusedTextBox() ~= nil then
+	if not focused or playerGui:GetAttribute("GameplayInputBlocked") == true or UserInputService:GetFocusedTextBox() ~= nil then
 		return { throttleHeld = false, brakeHeld = false, steering = 0, wheelieHeld = false }
 	end
 	local keyboardSteering = (if keyHeld(Enum.KeyCode.D, Enum.KeyCode.Right) then 1 else 0)
@@ -141,6 +131,9 @@ local function startController(scooter: Model, seat: VehicleSeat, root: BasePart
 	local lastSent: DriveInput? = nil
 
 	local function mountedAction(action: string, state: Enum.UserInputState, input: InputObject): Enum.ContextActionResult
+		if playerGui:GetAttribute("GameplayInputBlocked") == true then
+			return Enum.ContextActionResult.Pass
+		end
 		local allowed = focused and UserInputService:GetFocusedTextBox() == nil
 		if action == "ScooterWheelie" then
 			local held = allowed and (state == Enum.UserInputState.Begin or state == Enum.UserInputState.Change)
@@ -178,6 +171,9 @@ local function startController(scooter: Model, seat: VehicleSeat, root: BasePart
 		heldKeys[input.KeyCode] = nil
 	end))
 	maid:Give(UserInputService.TextBoxFocused:Connect(clearControls))
+	maid:Give(playerGui:GetAttributeChangedSignal("GameplayInputBlocked"):Connect(function()
+		if playerGui:GetAttribute("GameplayInputBlocked") == true then clearControls() end
+	end))
 	maid:Give(seat:GetPropertyChangedSignal("Occupant"):Connect(function()
 		if seat.Occupant == nil or seat.Occupant.Parent ~= character then
 			cleanupController()
@@ -185,13 +181,12 @@ local function startController(scooter: Model, seat: VehicleSeat, root: BasePart
 	end))
 	maid:Give(scooter.Destroying:Connect(cleanupController))
 
-	maid:Give(RunService.PreSimulation:Connect(function(deltaTime: number)
+	maid:Give(RunService.PreSimulation:Connect(function()
 		if activeScooter ~= scooter or activeSeat ~= seat or seat.Occupant == nil then
 			cleanupController()
 			return
 		end
 		local input = readInput(seat)
-		localSteering = ScooterPhysics.SmoothSteering(localSteering, input.steering, deltaTime)
 
 		local now = os.clock()
 		local elapsed = now - lastInputSentAt
@@ -209,8 +204,8 @@ local function startController(scooter: Model, seat: VehicleSeat, root: BasePart
 		local velocity = root.AssemblyLinearVelocity
 		local speed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
 		local grounded = scooter:GetAttribute("FrontGrounded") == true or scooter:GetAttribute("RearGrounded") == true
-		local wantsBurnout = input.throttleHeld and input.brakeHeld and grounded
-			and scooter:GetAttribute("Fallen") ~= true and speed <= ScooterConfig.BurnoutSmokeMaxSpeed
+		local wantsBurnout = ScooterPhysics.CanBurnout(speed, input.throttleHeld, input.brakeHeld) and grounded
+			and scooter:GetAttribute("Fallen") ~= true
 		if wantsBurnout ~= burnoutActive
 			or (wantsBurnout and scooter:GetAttribute("BurnoutActive") ~= true
 				and now - lastBurnoutSentAt >= ScooterConfig.DriveInputKeepalive)
@@ -297,117 +292,6 @@ if localPlayer.Character then
 	task.spawn(hookCharacter, localPlayer.Character)
 end
 
-local function findMotor(scooter: Model, name: string): Motor6D?
-	local instance = scooter:FindFirstChild(name, true)
-	return if instance and instance:IsA("Motor6D") then instance else nil
-end
-
-local scooterFolderInstance = workspace:WaitForChild(ScooterConfig.ScooterFolderName)
-assert(scooterFolderInstance:IsA("Folder"), "Workspace scooter container must be a Folder")
-local scooterFolder = scooterFolderInstance
-
-local function registerVisual(instance: Instance)
-	if not instance:IsA("Model") or visualStates[instance] then
-		return
-	end
-	visualStates[instance] = {
-		frontWheel = findMotor(instance, "FrontWheelMotor"),
-		rearWheel = findMotor(instance, "RearWheelMotor"),
-		steering = findMotor(instance, "SteeringMotor"),
-		frontSpin = 0,
-		rearSpin = 0,
-		displayedSteering = 0,
-	}
-end
-
-local function unregisterVisual(instance: Instance)
-	if instance:IsA("Model") then
-		visualStates[instance] = nil
-	end
-end
-
-for _, scooter in scooterFolder:GetChildren() do
-	registerVisual(scooter)
-end
-local scooterAddedConnection = scooterFolder.ChildAdded:Connect(registerVisual)
-local scooterRemovedConnection = scooterFolder.ChildRemoved:Connect(unregisterVisual)
-local motorAddedConnection = scooterFolder.DescendantAdded:Connect(function(instance: Instance)
-	if not instance:IsA("Motor6D") then
-		return
-	end
-	local scooter = instance:FindFirstAncestorOfClass("Model")
-	local state = if scooter then visualStates[scooter] else nil
-	if not state then
-		return
-	end
-	if instance.Name == "FrontWheelMotor" then
-		state.frontWheel = instance
-	elseif instance.Name == "RearWheelMotor" then
-		state.rearWheel = instance
-	elseif instance.Name == "SteeringMotor" then
-		state.steering = instance
-	end
-end)
-local motorRemovingConnection = scooterFolder.DescendantRemoving:Connect(function(instance: Instance)
-	if not instance:IsA("Motor6D") then
-		return
-	end
-	local scooter = instance:FindFirstAncestorOfClass("Model")
-	local state = if scooter then visualStates[scooter] else nil
-	if not state then
-		return
-	end
-	if state.frontWheel == instance then
-		state.frontWheel = nil
-	elseif state.rearWheel == instance then
-		state.rearWheel = nil
-	elseif state.steering == instance then
-		state.steering = nil
-	end
-end)
-
-local visualConnection = RunService.RenderStepped:Connect(function(deltaTime: number)
-	for scooter, state in visualStates do
-		local root = scooter.PrimaryPart
-		if not root then
-			continue
-		end
-
-		local forwardSpeed = root.AssemblyLinearVelocity:Dot(root.CFrame.LookVector)
-		local wheelRadiusAttribute = scooter:GetAttribute("WheelRadius")
-		local wheelRadius = if typeof(wheelRadiusAttribute) == "number"
-			then math.clamp(wheelRadiusAttribute, 0.2, 3)
-			else ScooterConfig.WheelRadius
-		local travelAngularSpeed = -forwardSpeed / wheelRadius
-		local rearAngularSpeed = if scooter:GetAttribute("BurnoutActive") == true
-			then -ScooterConfig.BurnoutWheelAngularSpeed
-			else travelAngularSpeed
-		state.frontSpin = (state.frontSpin + travelAngularSpeed * deltaTime) % (math.pi * 2)
-		state.rearSpin = (state.rearSpin + rearAngularSpeed * deltaTime) % (math.pi * 2)
-		if state.frontWheel then
-			state.frontWheel.Transform = CFrame.Angles(state.frontSpin, 0, 0)
-		end
-		if state.rearWheel then
-			state.rearWheel.Transform = CFrame.Angles(state.rearSpin, 0, 0)
-		end
-		if state.steering then
-			local steering = scooter:GetAttribute("SteeringInput")
-			local steeringInput = if scooter == activeScooter
-				then localSteering
-				else if typeof(steering) == "number" then math.clamp(steering, -1, 1) else 0
-			local steeringAlpha = 1 - math.exp(-ScooterConfig.HandlebarSmoothSpeed * math.min(deltaTime, 0.1))
-			state.displayedSteering += (steeringInput - state.displayedSteering) * steeringAlpha
-			local animatedSteering = math.sign(state.displayedSteering)
-				* math.abs(state.displayedSteering) ^ ScooterConfig.HandlebarInputExponent
-			state.steering.Transform = CFrame.Angles(
-				0,
-				-animatedSteering * ScooterConfig.MaxHandlebarAngle,
-				0
-			)
-		end
-	end
-end)
-
 script.Destroying:Connect(function()
 	destroyed = true
 	cleanupController()
@@ -419,10 +303,4 @@ script.Destroying:Connect(function()
 	characterRemovingConnection:Disconnect()
 	focusLostConnection:Disconnect()
 	focusGainedConnection:Disconnect()
-	visualConnection:Disconnect()
-	scooterAddedConnection:Disconnect()
-	scooterRemovedConnection:Disconnect()
-	motorAddedConnection:Disconnect()
-	motorRemovingConnection:Disconnect()
-	table.clear(visualStates)
 end)
