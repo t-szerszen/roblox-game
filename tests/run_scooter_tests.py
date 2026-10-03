@@ -26,10 +26,24 @@ def main() -> None:
         "ReplicatedStorage/Shared/ScooterConfig",
         "ReplicatedStorage/Shared/Scooter/ScooterConfig",
         "ReplicatedStorage/Shared/Scooter/ScooterPhysics",
+        "ReplicatedStorage/Shared/Scooter/ScooterAnimationMath",
         "ReplicatedStorage/Shared/Shop/ShopConfig",
         "ReplicatedStorage/Shared/Activity/ActivityConfig",
         "ReplicatedStorage/Shared/Phone/PhoneConfig",
         "ServerScriptService/Scooter/ScooterInput",
+        "ServerScriptService/Scooter/ScooterRig",
+        "ServerScriptService/Scooter/ScooterServer",
+        "ServerScriptService/Scooter/ScooterRigGeometry",
+        "ServerScriptService/Scooter/ScooterCollision",
+        "ServerScriptService/Scooter/ScooterSuspension",
+        "ServerScriptService/Scooter/DevScooterSuspension",
+        "ServerScriptService/Scooter/DevScooterFrontMount",
+        "ServerScriptService/Scooter/DevScooterRepair",
+        "ServerScriptService/Scooter/ScooterBrakeLight",
+        "ServerScriptService/Scooter/DevScooterAssembler",
+        "ServerScriptService/Scooter/ScooterWorkflow",
+        "StarterPlayer/StarterPlayerScripts/ScooterRiderPose",
+        "StarterPlayer/StarterPlayerScripts/ScooterAnimator",
         "ServerScriptService/Activity/PlayerDataService",
         "ServerScriptService/Scooter/GarageService",
     ]
@@ -40,6 +54,11 @@ def main() -> None:
             source += f"SOURCES[ {literal(path)} ] = {literal(module.read_text())}\n"
     source += (root / "tests" / "support" / "roblox_mock.luau").read_text()
     source += "\n" + (root / "tests" / "scooter.spec.luau").read_text()
+    source += "\n" + (root / "tests" / "support" / "scooter_animation_mock.luau").read_text()
+    source += "\n" + (root / "tests" / "scooter_animation.spec.luau").read_text()
+    source += "\n" + (root / "tests" / "scooter_leg_states.spec.luau").read_text()
+    for spec in ["scooter_visuals.spec.luau", "scooter_repair.spec.luau", "scooter_suspension.spec.luau", "scooter_front_mount.spec.luau", "scooter_handling.spec.luau", "scooter_stability.spec.luau"]:
+        source += "\ndo\n" + (root / "tests" / spec).read_text() + "\nend\n"
     with tempfile.TemporaryDirectory(prefix="scooter-tests-") as directory:
         bundle = Path(directory) / "run.luau"
         bundle.write_text(source)

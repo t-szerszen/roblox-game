@@ -68,8 +68,8 @@ near(Physics.SmoothSteering(0, 1, 1 / 30),
 near(Physics.SmoothSteering(0, 1, 1), Physics.SmoothSteering(0, 1, 0.1), "Long frame steering is bounded")
 near(Physics.GetEffectiveSteering(1, 0), 0, "Scooter cannot turn in place")
 near(Physics.GetEffectiveSteering(1, 10), 1, "Low speed retains maneuverability")
-near(Physics.GetEffectiveSteering(1, 100), Config.HighSpeedSteeringScale, "High speed yaw is limited")
-near(Physics.GetEffectiveSteering(1, -100), Config.HighSpeedSteeringScale, "Reverse steering uses absolute speed")
+near(Physics.GetEffectiveSteering(1, 100 * Config.StudsPerKmH), Config.HighSpeedSteeringScale, "High speed yaw is limited")
+near(Physics.GetEffectiveSteering(1, -100 * Config.StudsPerKmH), Config.HighSpeedSteeringScale, "Reverse steering uses absolute speed")
 near(Physics.GetTurnSteering(0.7, 10), 0.7, "Forward steering keeps input direction")
 near(Physics.GetTurnSteering(0.7, -10), -0.7, "Reverse steering inverts chassis yaw")
 near(Physics.GetTurnSteering(0.7, 0), 0.7, "Stationary steering does not flip")
@@ -85,8 +85,8 @@ local raisedWheelie = Physics.AdvanceWheeliePitch(Config.WheelieKickAngle, 1, ba
 check(raisedWheelie > Config.WheelieKickAngle, "W raises an active wheelie")
 check(Physics.AdvanceWheeliePitch(raisedWheelie, -1, balanceSpeed, 0.1) < raisedWheelie,
 	"S lowers an active wheelie")
-near(Physics.AdvanceWheeliePitch(raisedWheelie, 0, balanceSpeed, 0.1), raisedWheelie,
-	"Wheelie angle holds without W or S")
+check(Physics.AdvanceWheeliePitch(raisedWheelie, 0, balanceSpeed, 0.1) < raisedWheelie,
+	"Released wheelie returns while scooter is still moving")
 check(Physics.AdvanceWheeliePitch(raisedWheelie, 0, 0, 0.1) < raisedWheelie,
 	"Wheelie drops without forward momentum")
 check(Physics.AdvanceWheeliePitch(raisedWheelie, 1, 0, 0.1) < raisedWheelie,
@@ -109,7 +109,9 @@ drive.brakeHeld = true
 local brake = Physics.ComputeDriveForce(drive):Dot(forward)
 check(brake < coast, "Braking is stronger than coasting")
 drive.throttleHeld = true
-near(Physics.ComputeDriveForce(drive):Dot(forward), brake, "Brake and throttle cannot launch during burnout")
+local bothHeld = Physics.ComputeDriveForce(drive):Dot(forward)
+check(bothHeld < 0 and 20 + bothHeld / drive.mass * drive.deltaTime >= 0,
+	"Brake and throttle slow forward travel without launching during burnout")
 drive.brakeHeld = false
 check(Physics.ComputeDriveForce(drive):Dot(forward) > 0, "Throttle accelerates below top speed")
 drive.throttleHeld = false

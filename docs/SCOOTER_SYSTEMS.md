@@ -1,27 +1,33 @@
 # Drivable scooter MVP
 
-Current scope: throttle, coasting/braking/reverse, smooth steering, wheelie, burnout and cleanup. Garage, premium visuals, audio and local prediction are paused; the later sections describe parked work, not the active MVP.
+Current scope: throttle, coasting/braking/reverse, smooth steering, wheelie, burnout, calibrated suspension, cornering lean and cleanup. The new articulated rig and procedural rider animation are active. Garage, premium visuals, audio and local prediction are paused; the later sections describe parked work, not the active MVP.
 
 ## Studio setup
 
 1. Run `rojo serve default.project.json` and connect/sync the Rojo plugin to this project.
-2. Keep the existing template in `ServerStorage.ScooterModels.KuKirin G2 Pro`. It needs `PrimaryPart = Root`, a welded `DriverSeat` VehicleSeat, and `BurnoutSmoke` ParticleEmitter. Preserve authored rider attachments and wheel motors. With no template the server creates a basic test scooter automatically.
-3. Set a numeric `WheelRadius` attribute on the template to the tire radius in studs (normally `0.7` for the assembler model). This takes precedence over visual mesh bounds, which may include fenders. All fixed visual parts must be welded or Motor6D-connected to Root. Runtime unanchors/sanitizes them and creates spherical collision proxies at both wheel axles.
+2. Select the complete new `scooter` Folder in Edit mode and run `require(game.ServerScriptService.Scooter.ScooterWorkflow).Assemble()`. This installs `ServerStorage.ScooterModels.scooter` and replaces the old KuKirin template. The new rig is required; there is no generated fallback. See [SCOOTER_MODEL.md](SCOOTER_MODEL.md) for the authored hierarchy and generated support parts.
+3. Verify tire contact radius in Studio. A positive `WheelRadius` attribute on each wheel or the template overrides the radius inferred from wheel mesh Size. Apply the suspension calibration from DevScooterSuspension.Apply and verify its travel and sag in Studio. Adjust generated foot targets and HandleBar grip attachments to the authored meshes. Prepared templates contain wheel contact proxies; the server preserves their collisions and uses their actual radii for ground probes and spawn clearance. It does not rigidly weld suspension to Root. For a collapsing rig use DevScooterRepair as described in [SCOOTER_MODEL.md](SCOOTER_MODEL.md#diagnose-or-repair-a-collapsing-scooter).
 4. Use a flat collidable road and an enabled SpawnLocation. Press **Play**, approach the automatically spawned scooter, and press **E**. The map is not rebuilt or overwritten.
 
 | Input | Behavior |
 | --- | --- |
 | E | Mount nearby / dismount |
 | W / up | Throttle |
-| S / down | Brake, then low-speed reverse |
-| A / D, left / right | Steering; no turning at rest; reverse travel follows the requested screen direction |
-| Press Shift or C | Trigger wheelie once while moving forward; afterward W raises, S lowers, and neutral holds the angle |
-| W + S at standstill | White burnout smoke visible to all players |
+| S / down | Brake, then automatically engage reverse below 2 km/h; reverse up to 18 km/h |
+| A / D, left / right | Steering; no turning at rest outside burnout; reverse travel follows the requested screen direction |
+| Shift or C | Tap above 10 km/h to trigger wheelie; afterward W raises, releasing W lowers smoothly, S lowers faster |
+| W + S at up to 5 km/h | Rear wheel motor spins the tire; A/D permit donuts, including at rest; white smoke is visible to all players |
 | Space / gamepad A | No action while mounted; default avatar jump is blocked |
 
-`ScooterServer` uses `VectorForce` and native `AlignOrientation`, retaining server network ownership. The client sends input only; no duplicate scooter/avatar or camera prediction is created. Physics does not depend on DataStore access or premium ownership. Visual parts and seat are massless/noncolliding; the invisible Root supplies mass and two wheel proxies supply ground contact.
+`ScooterServer` uses `VectorForce` and native `AlignOrientation`, retaining server network ownership. Stabilization accounts for articulated moving mass and initializes its target/torque before the first simulation update. The client sends input only; no duplicate scooter/avatar or camera prediction is created. Physics does not depend on DataStore access or premium ownership. Meshes and seat are noncolliding; moving suspension, steering and wheel assemblies retain mass. Two wheel proxies supply contact through the authored springs and virtual axles; a massless FootRest collider supports the deck if it tips or bottoms out, excluding its own tires. Legacy templates receive bounded front linkage rest alignment from the working rear during spawn, including actual part repositioning and front-only calibration. The physical Servo steers HandleBarStick. ScooterAnimator provides hand IK on HandleBar, torso lean, turn-side elbow lift and IDLE/RIDING/WHEELIE leg states. Add your R15 IdleFootAnim and WheelieBalanceAnim IDs to Shared/ScooterConfig.RiderAnimations to activate the authored clips; empty IDs retain the procedural fallback.
 
-For acceptance, drive and coast on flat ground, verify left/right steering in both forward and reverse, then hold a wheelie and use `W`/`S` to cross the balance point or lower the front. Confirm that crossing the maximum wheelie angle ejects the rider. Hold/release burnout, then dismount and remount repeatedly; smoke and inputs must stop on exit. With two clients, verify the second sees burnout and cannot mount your scooter. CLI build/type checks do not replace this Studio test.
+World speed uses StudsPerKmH = 1.6 instead of the previous 1.0, increasing travel speed by 60% while retaining catalog km/h ratings and upgrade prices. Steering uses the measured Servo angle and actual axle spacing to determine curvature; yaw tends to zero at rest outside burnout. Active W+S burnout instead permits bounded A/D rotation from the measured Servo angle. The full steering target is now 30 degrees, subject to authored limits and speed fade. A speed-dependent heading lead prevents a blocked or crawling scooter from accumulating a large orientation error.
+
+Reverse uses MaxReverseSpeedKmh = 18 and ReverseAcceleration = 75 studs/s² (formerly 12 and 50). Holding S first brakes forward motion at DirectionChangeBrakingDeceleration = 60 studs/s², then engages reverse below DirectionChangeSpeedKmh = 2 without a second press or a mandatory stationary frame. W uses the same transition when changing from reverse to forward. Forces remain bounded; velocity is never assigned by this transition. Hill assistance now also operates while braking into a direction change, so downhill gravity does not keep the scooter stuck in the braking stage. Releasing S retains normal coasting; W+S retains burnout behavior.
+
+For acceptance, drive and coast on flat ground, verify left/right steering in both forward and reverse, then tap Shift/C above 10 km/h and release it. W must continue raising the front; release W to lower it, then add W again before landing to regain pitch without another trigger. S must lower it faster. Confirm that crossing the maximum wheelie angle ejects the rider. Hold/release burnout at rest and at 5 km/h; steer both ways and complete a donut before releasing S. Then dismount and remount repeatedly; smoke and inputs must stop on exit. With two clients, verify the second sees burnout and cannot mount your scooter. CLI build/type checks do not replace this Studio test.
+
+Whole-fender brake visuals are disabled via BrakeLight.Enabled until a dedicated lamp is authored. Passive suspension uses geometry-safe pivot stops and leverage-aware spring tuning; green constraint debug coils are hidden. Cornering lean uses speed and the measured steering angle, caps roll at 16 degrees and eases back during wheelie or lost contact. Chassis yaw follows actual Servo movement, including authored angular limits. Settings and equations are documented in [SCOOTER_MODEL.md](SCOOTER_MODEL.md#scooter-brake-light-and-cornering-lean).
 
 ## Paused implementation reference
 
@@ -41,7 +47,7 @@ Set real experience-owned game-pass IDs for `burnout_smoke` and `scooter_neons` 
 
 Players with a verified pass can save RGB values and toggle each effect in the garage. The server validates finite channels in `[0, 1]`; the UI accepts `[0, 255]`. Ordinary burnout remains available with white smoke. Premium smoke colors, the neon strip, and underglow light are server-owned and visible to other clients. Each spawned model receives the owner's saved preferences; entitlement checks fail closed when unavailable.
 
-Smoke is mounted on `RearWheelAttachment` at the rear axle. It activates only while the server sees a living authorized rider, fresh simultaneous throttle/brake intent, ground contact, and speed below the configured threshold. Acceleration, releasing controls, stale input, and dismount disable it. The client sends no smoke color through the trick event.
+Smoke is mounted on `VirtualBackAxle.RearWheelAttachment` at the rear axle. It activates only while the server sees a living authorized rider, fresh simultaneous throttle/brake intent, rear-wheel ground contact, and planar speed at most BurnoutMaxSpeedKmh (5 km/h). Releasing either key, exceeding the threshold, losing rear contact, stale input, and dismount disable the smoke and motor. Motor torque scales with supported mass, gravity and tire radius so the tire can overcome ground friction. The client sends no smoke color through the trick event.
 
 ## Networking
 
@@ -51,7 +57,7 @@ All endpoints are under `ReplicatedStorage.Remotes.ScooterRemotes`:
 | --- | --- | --- |
 | `RequestSpawn` event | `modelName` | Known owned model, living player, spawn cooldown |
 | `DriveInput` event | `throttleHeld, brakeHeld, steering, wheelieHeld` | Exact boolean types; finite steering in `[-1, 1]`; the server converts the rising wheelie-button edge into one trigger; owner, seat, life/stun state, server rate limit |
-| `TrickState` event | `"Burnout", active` or `"Dismount", true` | Authorized rider; burnout starts are rate limited and rechecked against server physics; releases are always accepted |
+| `TrickState` event | `"Burnout", active` or `"Dismount", true` | Authorized rider; rate-limited legacy burnout start hint, immediate release; actual burnout is derived each simulation step from validated DriveInput and server physics |
 | `GarageRequest` function | `"GetState", nil, nil` | Rate-limited server snapshot |
 | `GarageRequest` function | `"PurchaseSpeed", modelName, expectedCurrentTier` | Loaded persistent profile, ownership, exact current tier, tier cap, sufficient coins |
 | `GarageRequest` function | `"SetVisual", nil, {kind = "Smoke" or "Neon", enabled = boolean, color = Color3}` | Exact fields, valid RGB, verified corresponding game pass |
