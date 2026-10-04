@@ -1,0 +1,2135 @@
+<roblox version="4">
+  <Item class="Model" referent="0">
+    <Properties>
+      <string name="Name">ScooterDashboard</string>
+      <bool name="NeedsPivotMigration">false</bool>
+    </Properties>
+    <Item class="WedgePart" referent="1">
+      <Properties>
+        <string name="Name">CaseCorner-1_-1</string>
+        <bool name="Anchored">true</bool>
+        <BinaryString name="AttributesSerialize">AQAAABEAAABTY29vdGVyRGVjb3JhdGlvbgMB</BinaryString>
+        <token name="BottomSurface">0</token>
+        <CoordinateFrame name="CFrame">
+          <X>-0.865</X>
+          <Y>-0.31</Y>
+          <Z>0</Z>
+          <R00>0</R00>
+          <R01>0</R01>
+          <R02>1</R02>
+          <R10>0</R10>
+          <R11>-1</R11>
+          <R12>0</R12>
+          <R20>1</R20>
+          <R21>0</R21>
+          <R22>0</R22>
+        </CoordinateFrame>
+        <bool name="CanCollide">false</bool>
+        <bool name="CanQuery">false</bool>
+        <bool name="CanTouch">false</bool>
+        <bool name="CastShadow">false</bool>
+        <Color3uint8 name="Color3uint8">1778738</Color3uint8>
+        <bool name="Massless">true</bool>
+        <token name="Material">272</token>
+        <Vector3 name="size">
+          <X>0.24</X>
+          <Y>0.12</Y>
+          <Z>0.12</Z>
+        </Vector3>
+        <token name="TopSurface">0</token>
+      </Properties>
+    </Item>
+    <Item class="WedgePart" referent="2">
+      <Properties>
+        <string name="Name">CaseCorner-1_1</string>
+        <bool name="Anchored">true</bool>
+        <BinaryString name="AttributesSerialize">AQAAABEAAABTY29vdGVyRGVjb3JhdGlvbgMB</BinaryString>
+        <token name="BottomSurface">0</token>
+        <CoordinateFrame name="CFrame">
+          <X>-0.865</X>
+          <Y>0.31</Y>
+          <Z>0</Z>
+          <R00>0</R00>
+          <R01>0</R01>
+          <R02>1</R02>
+          <R10>0</R10>
+          <R11>1</R11>
+          <R12>0</R12>
+          <R20>-1</R20>
+          <R21>0</R21>
+          <R22>0</R22>
+        </CoordinateFrame>
+        <bool name="CanCollide">false</bool>
+        <bool name="CanQuery">false</bool>
+        <bool name="CanTouch">false</bool>
+        <bool name="CastShadow">false</bool>
+        <Color3uint8 name="Color3uint8">1778738</Color3uint8>
+        <bool name="Massless">true</bool>
+        <token name="Material">272</token>
+        <Vector3 name="size">
+          <X>0.24</X>
+          <Y>0.12</Y>
+          <Z>0.12</Z>
+        </Vector3>
+        <token name="TopSurface">0</token>
+      </Properties>
+    </Item>
+    <Item class="WedgePart" referent="3">
+      <Properties>
+        <string name="Name">CaseCorner1_-1</string>
+        <bool name="Anchored">true</bool>
+        <BinaryString name="AttributesSerialize">AQAAABEAAABTY29vdGVyRGVjb3JhdGlvbgMB</BinaryString>
+        <token name="BottomSurface">0</token>
+        <CoordinateFrame name="CFrame">
+          <X>0.865</X>
+          <Y>-0.31</Y>
+          <Z>0</Z>
+          <R00>0</R00>
+          <R01>0</R01>
+          <R02>-1</R02>
+          <R10>0</R10>
+          <R11>-1</R11>
+          <R12>0</R12>
+          <R20>-1</R20>
+          <R21>0</R21>
+          <R22>0</R22>
+        </CoordinateFrame>
+        <bool name="CanCollide">false</bool>
+        <bool name="CanQuery">false</bool>
+        <bool name="CanTouch">false</bool>
+        <bool name="CastShadow">false</bool>
+        <Color3uint8 name="Color3uint8">1778738</Color3uint8>
+        <bool name="Massless">true</bool>
+        <token name="Material">272</token>
+        <Vector3 name="size">
+          <X>0.24</X>
+          <Y>0.12</Y>
+          <Z>0.12</Z>
+        </Vector3>
+        <token name="TopSurface">0</token>
+      </Properties>
+    </Item>
+    <Item class="WedgePart" referent="4">
+      <Properties>
+        <string name="Name">CaseCorner1_1</string>
+        <bool name="Anchored">true</bool>
+        <BinaryString name="AttributesSerialize">AQAAABEAAABTY29vdGVyRGVjb3JhdGlvbgMB</BinaryString>
+        <token name="BottomSurface">0</token>
+        <CoordinateFrame name="CFrame">
+          <X>0.865</X>
+          <Y>0.31</Y>
+          <Z>0</Z>
+          <R00>0</R00>
+          <R01>0</R01>
+          <R02>-1</R02>
+          <R10>0</R10>
+          <R11>1</R11>
+          <R12>0</R12>
+          <R20>1</R20>
+          <R21>0</R21>
+          <R22>0</R22>
+        </CoordinateFrame>
+        <bool name="CanCollide">false</bool>
+        <bool name="CanQuery">false</bool>
+        <bool name="CanTouch">false</bool>
+        <bool name="CastShadow">false</bool>
+        <Color3uint8 name="Color3uint8">1778738</Color3uint8>
+        <bool name="Massless">true</bool>
+        <token name="Material">272</token>
+        <Vector3 name="size">
+          <X>0.24</X>
+          <Y>0.12</Y>
+          <Z>0.12</Z>
+        </Vector3>
+        <token name="TopSurface">0</token>
+      </Properties>
+    </Item>
+    <Item class="Part" referent="5">
+      <Properties>
+        <string name="Name">CaseHorizontal</string>
+        <bool name="Anchored">true</bool>
+        <BinaryString name="AttributesSerialize">AQAAABEAAABTY29vdGVyRGVjb3JhdGlvbgMB</BinaryString>
+        <token name="BottomSurface">0</token>
+        <CoordinateFrame name="CFrame">
+          <X>0</X>
+          <Y>0</Y>
+          <Z>0</Z>
+          <R00>1</R00>
+          <R01>0</R01>
+          <R02>0</R02>
+          <R10>0</R10>
+          <R11>1</R11>
+          <R12>0</R12>
+          <R20>0</R20>
+          <R21>0</R21>
+          <R22>1</R22>
+        </CoordinateFrame>
+        <bool name="CanCollide">false</bool>
+        <bool name="CanQuery">false</bool>
+        <bool name="CanTouch">false</bool>
+        <bool name="CastShadow">false</bool>
+        <Color3uint8 name="Color3uint8">1778738</Color3uint8>
+        <bool name="Massless">true</bool>
+        <token name="Material">272</token>
+        <Vector3 name="size">
+          <X>1.85</X>
+          <Y>0.5</Y>
+          <Z>0.24</Z>
+        </Vector3>
+        <token name="TopSurface">0</token>
+      </Properties>
+    </Item>
+    <Item class="Part" referent="6">
+      <Properties>
+        <string name="Name">CaseVertical</string>
+        <bool name="Anchored">true</bool>
+        <BinaryString name="AttributesSerialize">AQAAABEAAABTY29vdGVyRGVjb3JhdGlvbgMB</BinaryString>
+        <token name="BottomSurface">0</token>
+        <CoordinateFrame name="CFrame">
+          <X>0</X>
+          <Y>0</Y>
+          <Z>0</Z>
+          <R00>1</R00>
+          <R01>0</R01>
+          <R02>0</R02>
+          <R10>0</R10>
+          <R11>1</R11>
+          <R12>0</R12>
+          <R20>0</R20>
+          <R21>0</R21>
+          <R22>1</R22>
+        </CoordinateFrame>
+        <bool name="CanCollide">false</bool>
+        <bool name="CanQuery">false</bool>
+        <bool name="CanTouch">false</bool>
+        <bool name="CastShadow">false</bool>
+        <Color3uint8 name="Color3uint8">1778738</Color3uint8>
+        <bool name="Massless">true</bool>
+        <token name="Material">272</token>
+        <Vector3 name="size">
+          <X>1.61</X>
+          <Y>0.74</Y>
+          <Z>0.24</Z>
+        </Vector3>
+        <token name="TopSurface">0</token>
+      </Properties>
+    </Item>
+    <Item class="Part" referent="7">
+      <Properties>
+        <string name="Name">DisplaySurface</string>
+        <bool name="Anchored">true</bool>
+        <BinaryString name="AttributesSerialize">AQAAABEAAABTY29vdGVyRGVjb3JhdGlvbgMB</BinaryString>
+        <token name="BottomSurface">0</token>
+        <CoordinateFrame name="CFrame">
+          <X>0</X>
+          <Y>0</Y>
+          <Z>-0.16</Z>
+          <R00>1</R00>
+          <R01>0</R01>
+          <R02>0</R02>
+          <R10>0</R10>
+          <R11>1</R11>
+          <R12>0</R12>
+          <R20>0</R20>
+          <R21>0</R21>
+          <R22>1</R22>
+        </CoordinateFrame>
+        <bool name="CanCollide">false</bool>
+        <bool name="CanQuery">false</bool>
+        <bool name="CanTouch">false</bool>
+        <bool name="CastShadow">false</bool>
+        <Color3uint8 name="Color3uint8">528153</Color3uint8>
+        <bool name="Massless">true</bool>
+        <token name="Material">272</token>
+        <Vector3 name="size">
+          <X>1.745</X>
+          <Y>0.635</Y>
+          <Z>0.01</Z>
+        </Vector3>
+        <token name="TopSurface">0</token>
+        <float name="Transparency">1</float>
+      </Properties>
+      <Item class="SurfaceGui" referent="8">
+        <Properties>
+          <string name="Name">DashboardGui</string>
+          <bool name="AlwaysOnTop">false</bool>
+          <float name="Brightness">1.15</float>
+          <Vector2 name="CanvasSize">
+            <X>1000</X>
+            <Y>400</Y>
+          </Vector2>
+          <bool name="ClipsDescendants">true</bool>
+          <token name="Face">5</token>
+          <float name="LightInfluence">0</float>
+          <float name="MaxDistance">65</float>
+          <token name="SizingMode">0</token>
+        </Properties>
+        <Item class="Frame" referent="9">
+          <Properties>
+            <string name="Name">Battery</string>
+            <Color3 name="BackgroundColor3">
+              <R>0.03137255</R>
+              <G>0.05882353</G>
+              <B>0.09803922</B>
+            </Color3>
+            <float name="BackgroundTransparency">1</float>
+            <int name="BorderSizePixel">0</int>
+            <UDim2 name="Position">
+              <XS>0</XS>
+              <XO>354</XO>
+              <YS>0</YS>
+              <YO>322</YO>
+            </UDim2>
+            <UDim2 name="Size">
+              <XS>0</XS>
+              <XO>178</XO>
+              <YS>0</YS>
+              <YO>26</YO>
+            </UDim2>
+          </Properties>
+          <Item class="Frame" referent="10">
+            <Properties>
+              <string name="Name">Bar1</string>
+              <Color3 name="BackgroundColor3">
+                <R>0.9490196</R>
+                <G>0.972549</G>
+                <B>1</B>
+              </Color3>
+              <float name="BackgroundTransparency">0</float>
+              <int name="BorderSizePixel">0</int>
+              <UDim2 name="Position">
+                <XS>0</XS>
+                <XO>0</XO>
+                <YS>0</YS>
+                <YO>0</YO>
+              </UDim2>
+              <UDim2 name="Size">
+                <XS>0</XS>
+                <XO>18</XO>
+                <YS>0</YS>
+                <YO>26</YO>
+              </UDim2>
+            </Properties>
+          </Item>
+          <Item class="Frame" referent="11">
+            <Properties>
+              <string name="Name">Bar2</string>
+              <Color3 name="BackgroundColor3">
+                <R>0.9490196</R>
+                <G>0.972549</G>
+                <B>1</B>
+              </Color3>
+              <float name="BackgroundTransparency">0</float>
+              <int name="BorderSizePixel">0</int>
+              <UDim2 name="Position">
+                <XS>0</XS>
+                <XO>32</XO>
+                <YS>0</YS>
+                <YO>0</YO>
+              </UDim2>
+              <UDim2 name="Size">
+                <XS>0</XS>
+                <XO>18</XO>
+                <YS>0</YS>
+                <YO>26</YO>
+              </UDim2>
+            </Properties>
+          </Item>
+          <Item class="Frame" referent="12">
+            <Properties>
+              <string name="Name">Bar3</string>
+              <Color3 name="BackgroundColor3">
+                <R>0.9490196</R>
+                <G>0.972549</G>
+                <B>1</B>
+              </Color3>
+              <float name="BackgroundTransparency">0</float>
+              <int name="BorderSizePixel">0</int>
+              <UDim2 name="Position">
+                <XS>0</XS>
+                <XO>64</XO>
+                <YS>0</YS>
+                <YO>0</YO>
+              </UDim2>
+              <UDim2 name="Size">
+                <XS>0</XS>
+                <XO>18</XO>
+                <YS>0</YS>
+                <YO>26</YO>
+              </UDim2>
+            </Properties>
+          </Item>
+          <Item class="Frame" referent="13">
+            <Properties>
+              <string name="Name">Bar4</string>
+              <Color3 name="BackgroundColor3">
+                <R>0.9490196</R>
+                <G>0.972549</G>
+                <B>1</B>
+              </Color3>
+              <float name="BackgroundTransparency">0</float>
+              <int name="BorderSizePixel">0</int>
+              <UDim2 name="Position">
+                <XS>0</XS>
+                <XO>96</XO>
+                <YS>0</YS>
+                <YO>0</YO>
+              </UDim2>
+              <UDim2 name="Size">
+                <XS>0</XS>
+                <XO>18</XO>
+                <YS>0</YS>
+                <YO>26</YO>
+              </UDim2>
+            </Properties>
+          </Item>
+          <Item class="Frame" referent="14">
+            <Properties>
+              <string name="Name">Bar5</string>
+              <Color3 name="BackgroundColor3">
+                <R>0.9490196</R>
+                <G>0.972549</G>
+                <B>1</B>
+              </Color3>
+              <float name="BackgroundTransparency">0.85</float>
+              <int name="BorderSizePixel">0</int>
+              <UDim2 name="Position">
+                <XS>0</XS>
+                <XO>128</XO>
+                <YS>0</YS>
+                <YO>0</YO>
+              </UDim2>
+              <UDim2 name="Size">
+                <XS>0</XS>
+                <XO>18</XO>
+                <YS>0</YS>
+                <YO>26</YO>
+              </UDim2>
+            </Properties>
+          </Item>
+          <Item class="Frame" referent="15">
+            <Properties>
+              <string name="Name">Bar6</string>
+              <Color3 name="BackgroundColor3">
+                <R>0.9490196</R>
+                <G>0.972549</G>
+                <B>1</B>
+              </Color3>
+              <float name="BackgroundTransparency">0.85</float>
+              <int name="BorderSizePixel">0</int>
+              <UDim2 name="Position">
+                <XS>0</XS>
+                <XO>160</XO>
+                <YS>0</YS>
+                <YO>0</YO>
+              </UDim2>
+              <UDim2 name="Size">
+                <XS>0</XS>
+                <XO>18</XO>
+                <YS>0</YS>
+                <YO>26</YO>
+              </UDim2>
+            </Properties>
+          </Item>
+        </Item>
+        <Item class="TextLabel" referent="16">
+          <Properties>
+            <string name="Name">BatteryPercent</string>
+            <float name="BackgroundTransparency">1</float>
+            <Font name="FontFace">
+              <Family>
+                <url>rbxasset://fonts/families/GothamSSm.json</url>
+              </Family>
+              <Weight>700</Weight>
+              <Style>Normal</Style>
+            </Font>
+            <UDim2 name="Position">
+              <XS>0</XS>
+              <XO>570</XO>
+              <YS>0</YS>
+              <YO>311</YO>
+            </UDim2>
+            <UDim2 name="Size">
+              <XS>0</XS>
+              <XO>92</XO>
+              <YS>0</YS>
+              <YO>44</YO>
+            </UDim2>
+            <string name="Text">67%</string>
+            <Color3 name="TextColor3">
+              <R>0.9490196</R>
+              <G>0.972549</G>
+              <B>1</B>
+            </Color3>
+            <float name="TextSize">26</float>
+            <float name="TextTransparency">0</float>
+          </Properties>
+        </Item>
+        <Item class="TextLabel" referent="17">
+          <Properties>
+            <string name="Name">Brake</string>
+            <float name="BackgroundTransparency">1</float>
+            <Font name="FontFace">
+              <Family>
+                <url>rbxasset://fonts/families/GothamSSm.json</url>
+              </Family>
+              <Weight>700</Weight>
+              <Style>Normal</Style>
+            </Font>
+            <UDim2 name="Position">
+              <XS>0</XS>
+              <XO>54</XO>
+              <YS>0</YS>
+              <YO>311</YO>
+            </UDim2>
+            <UDim2 name="Size">
+              <XS>0</XS>
+              <XO>200</XO>
+              <YS>0</YS>
+              <YO>44</YO>
+            </UDim2>
+            <string name="Text">(!)  BRAKE</string>
+            <Color3 name="TextColor3">
+              <R>1</R>
+              <G>0.27450982</G>
+              <B>0.32941177</B>
+            </Color3>
+            <float name="TextSize">27</float>
+            <float name="TextTransparency">0.84</float>
+          </Properties>
+        </Item>
+        <Item class="TextLabel" referent="18">
+          <Properties>
+            <string name="Name">Brand</string>
+            <float name="BackgroundTransparency">1</float>
+            <Font name="FontFace">
+              <Family>
+                <url>rbxasset://fonts/families/GothamSSm.json</url>
+              </Family>
+              <Weight>700</Weight>
+              <Style>Normal</Style>
+            </Font>
+            <UDim2 name="Position">
+              <XS>0</XS>
+              <XO>748</XO>
+              <YS>0</YS>
+              <YO>28</YO>
+            </UDim2>
+            <UDim2 name="Size">
+              <XS>0</XS>
+              <XO>195</XO>
+              <YS>0</YS>
+              <YO>52</YO>
+            </UDim2>
+            <string name="Text">KuKirin</string>
+            <Color3 name="TextColor3">
+              <R>0.23921569</R>
+              <G>0.8627451</G>
+              <B>0.9411765</B>
+            </Color3>
+            <float name="TextSize">33</float>
+            <float name="TextTransparency">0</float>
+          </Properties>
+        </Item>
+        <Item class="Frame" referent="19">
+          <Properties>
+            <string name="Name">Digit1</string>
+            <Color3 name="BackgroundColor3">
+              <R>0.03137255</R>
+              <G>0.05882353</G>
+              <B>0.09803922</B>
+            </Color3>
+            <float name="BackgroundTransparency">1</float>
+            <int name="BorderSizePixel">0</int>
+            <UDim2 name="Position">
+              <XS>0</XS>
+              <XO>180</XO>
+              <YS>0</YS>
+              <YO>91</YO>
+            </UDim2>
+            <UDim2 name="Size">
+              <XS>0</XS>
+              <XO>112</XO>
+              <YS>0</YS>
+              <YO>212</YO>
+            </UDim2>
+            <bool name="Visible">false</bool>
+          </Properties>
+          <Item class="Frame" referent="20">
+            <Properties>
+              <string name="Name">A</string>
+              <Color3 name="BackgroundColor3">
+                <R>0.9490196</R>
+                <G>0.972549</G>
+                <B>1</B>
+              </Color3>
+              <float name="BackgroundTransparency">0</float>
+              <int name="BorderSizePixel">0</int>
+              <UDim2 name="Position">
+                <XS>0</XS>
+                <XO>16</XO>
+                <YS>0</YS>
+                <YO>0</YO>
+              </UDim2>
+              <UDim2 name="Size">
+                <XS>0</XS>
+                <XO>80</XO>
+                <YS>0</YS>
+                <YO>12</YO>
+              </UDim2>
+            </Properties>
+            <Item class="UICorner" referent="21">
+              <Properties>
+                <string name="Name">Corners</string>
+                <UDim name="BottomLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="BottomRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+              </Properties>
+            </Item>
+          </Item>
+          <Item class="Frame" referent="22">
+            <Properties>
+              <string name="Name">B</string>
+              <Color3 name="BackgroundColor3">
+                <R>0.9490196</R>
+                <G>0.972549</G>
+                <B>1</B>
+              </Color3>
+              <float name="BackgroundTransparency">0</float>
+              <int name="BorderSizePixel">0</int>
+              <UDim2 name="Position">
+                <XS>0</XS>
+                <XO>96</XO>
+                <YS>0</YS>
+                <YO>16</YO>
+              </UDim2>
+              <UDim2 name="Size">
+                <XS>0</XS>
+                <XO>12</XO>
+                <YS>0</YS>
+                <YO>82</YO>
+              </UDim2>
+            </Properties>
+            <Item class="UICorner" referent="23">
+              <Properties>
+                <string name="Name">Corners</string>
+                <UDim name="BottomLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="BottomRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+              </Properties>
+            </Item>
+          </Item>
+          <Item class="Frame" referent="24">
+            <Properties>
+              <string name="Name">C</string>
+              <Color3 name="BackgroundColor3">
+                <R>0.9490196</R>
+                <G>0.972549</G>
+                <B>1</B>
+              </Color3>
+              <float name="BackgroundTransparency">0</float>
+              <int name="BorderSizePixel">0</int>
+              <UDim2 name="Position">
+                <XS>0</XS>
+                <XO>96</XO>
+                <YS>0</YS>
+                <YO>114</YO>
+              </UDim2>
+              <UDim2 name="Size">
+                <XS>0</XS>
+                <XO>12</XO>
+                <YS>0</YS>
+                <YO>82</YO>
+              </UDim2>
+            </Properties>
+            <Item class="UICorner" referent="25">
+              <Properties>
+                <string name="Name">Corners</string>
+                <UDim name="BottomLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="BottomRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+              </Properties>
+            </Item>
+          </Item>
+          <Item class="Frame" referent="26">
+            <Properties>
+              <string name="Name">D</string>
+              <Color3 name="BackgroundColor3">
+                <R>0.9490196</R>
+                <G>0.972549</G>
+                <B>1</B>
+              </Color3>
+              <float name="BackgroundTransparency">0</float>
+              <int name="BorderSizePixel">0</int>
+              <UDim2 name="Position">
+                <XS>0</XS>
+                <XO>16</XO>
+                <YS>0</YS>
+                <YO>200</YO>
+              </UDim2>
+              <UDim2 name="Size">
+                <XS>0</XS>
+                <XO>80</XO>
+                <YS>0</YS>
+                <YO>12</YO>
+              </UDim2>
+            </Properties>
+            <Item class="UICorner" referent="27">
+              <Properties>
+                <string name="Name">Corners</string>
+                <UDim name="BottomLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="BottomRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+              </Properties>
+            </Item>
+          </Item>
+          <Item class="Frame" referent="28">
+            <Properties>
+              <string name="Name">E</string>
+              <Color3 name="BackgroundColor3">
+                <R>0.9490196</R>
+                <G>0.972549</G>
+                <B>1</B>
+              </Color3>
+              <float name="BackgroundTransparency">0</float>
+              <int name="BorderSizePixel">0</int>
+              <UDim2 name="Position">
+                <XS>0</XS>
+                <XO>4</XO>
+                <YS>0</YS>
+                <YO>114</YO>
+              </UDim2>
+              <UDim2 name="Size">
+                <XS>0</XS>
+                <XO>12</XO>
+                <YS>0</YS>
+                <YO>82</YO>
+              </UDim2>
+            </Properties>
+            <Item class="UICorner" referent="29">
+              <Properties>
+                <string name="Name">Corners</string>
+                <UDim name="BottomLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="BottomRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+              </Properties>
+            </Item>
+          </Item>
+          <Item class="Frame" referent="30">
+            <Properties>
+              <string name="Name">F</string>
+              <Color3 name="BackgroundColor3">
+                <R>0.9490196</R>
+                <G>0.972549</G>
+                <B>1</B>
+              </Color3>
+              <float name="BackgroundTransparency">0</float>
+              <int name="BorderSizePixel">0</int>
+              <UDim2 name="Position">
+                <XS>0</XS>
+                <XO>4</XO>
+                <YS>0</YS>
+                <YO>16</YO>
+              </UDim2>
+              <UDim2 name="Size">
+                <XS>0</XS>
+                <XO>12</XO>
+                <YS>0</YS>
+                <YO>82</YO>
+              </UDim2>
+            </Properties>
+            <Item class="UICorner" referent="31">
+              <Properties>
+                <string name="Name">Corners</string>
+                <UDim name="BottomLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="BottomRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+              </Properties>
+            </Item>
+          </Item>
+          <Item class="Frame" referent="32">
+            <Properties>
+              <string name="Name">G</string>
+              <Color3 name="BackgroundColor3">
+                <R>0.9490196</R>
+                <G>0.972549</G>
+                <B>1</B>
+              </Color3>
+              <float name="BackgroundTransparency">0.95</float>
+              <int name="BorderSizePixel">0</int>
+              <UDim2 name="Position">
+                <XS>0</XS>
+                <XO>16</XO>
+                <YS>0</YS>
+                <YO>100</YO>
+              </UDim2>
+              <UDim2 name="Size">
+                <XS>0</XS>
+                <XO>80</XO>
+                <YS>0</YS>
+                <YO>12</YO>
+              </UDim2>
+            </Properties>
+            <Item class="UICorner" referent="33">
+              <Properties>
+                <string name="Name">Corners</string>
+                <UDim name="BottomLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="BottomRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+              </Properties>
+            </Item>
+          </Item>
+        </Item>
+        <Item class="Frame" referent="34">
+          <Properties>
+            <string name="Name">Digit2</string>
+            <Color3 name="BackgroundColor3">
+              <R>0.03137255</R>
+              <G>0.05882353</G>
+              <B>0.09803922</B>
+            </Color3>
+            <float name="BackgroundTransparency">1</float>
+            <int name="BorderSizePixel">0</int>
+            <UDim2 name="Position">
+              <XS>0</XS>
+              <XO>312</XO>
+              <YS>0</YS>
+              <YO>91</YO>
+            </UDim2>
+            <UDim2 name="Size">
+              <XS>0</XS>
+              <XO>112</XO>
+              <YS>0</YS>
+              <YO>212</YO>
+            </UDim2>
+            <bool name="Visible">false</bool>
+          </Properties>
+          <Item class="Frame" referent="35">
+            <Properties>
+              <string name="Name">A</string>
+              <Color3 name="BackgroundColor3">
+                <R>0.9490196</R>
+                <G>0.972549</G>
+                <B>1</B>
+              </Color3>
+              <float name="BackgroundTransparency">0</float>
+              <int name="BorderSizePixel">0</int>
+              <UDim2 name="Position">
+                <XS>0</XS>
+                <XO>16</XO>
+                <YS>0</YS>
+                <YO>0</YO>
+              </UDim2>
+              <UDim2 name="Size">
+                <XS>0</XS>
+                <XO>80</XO>
+                <YS>0</YS>
+                <YO>12</YO>
+              </UDim2>
+            </Properties>
+            <Item class="UICorner" referent="36">
+              <Properties>
+                <string name="Name">Corners</string>
+                <UDim name="BottomLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="BottomRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+              </Properties>
+            </Item>
+          </Item>
+          <Item class="Frame" referent="37">
+            <Properties>
+              <string name="Name">B</string>
+              <Color3 name="BackgroundColor3">
+                <R>0.9490196</R>
+                <G>0.972549</G>
+                <B>1</B>
+              </Color3>
+              <float name="BackgroundTransparency">0</float>
+              <int name="BorderSizePixel">0</int>
+              <UDim2 name="Position">
+                <XS>0</XS>
+                <XO>96</XO>
+                <YS>0</YS>
+                <YO>16</YO>
+              </UDim2>
+              <UDim2 name="Size">
+                <XS>0</XS>
+                <XO>12</XO>
+                <YS>0</YS>
+                <YO>82</YO>
+              </UDim2>
+            </Properties>
+            <Item class="UICorner" referent="38">
+              <Properties>
+                <string name="Name">Corners</string>
+                <UDim name="BottomLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="BottomRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+              </Properties>
+            </Item>
+          </Item>
+          <Item class="Frame" referent="39">
+            <Properties>
+              <string name="Name">C</string>
+              <Color3 name="BackgroundColor3">
+                <R>0.9490196</R>
+                <G>0.972549</G>
+                <B>1</B>
+              </Color3>
+              <float name="BackgroundTransparency">0</float>
+              <int name="BorderSizePixel">0</int>
+              <UDim2 name="Position">
+                <XS>0</XS>
+                <XO>96</XO>
+                <YS>0</YS>
+                <YO>114</YO>
+              </UDim2>
+              <UDim2 name="Size">
+                <XS>0</XS>
+                <XO>12</XO>
+                <YS>0</YS>
+                <YO>82</YO>
+              </UDim2>
+            </Properties>
+            <Item class="UICorner" referent="40">
+              <Properties>
+                <string name="Name">Corners</string>
+                <UDim name="BottomLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="BottomRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+              </Properties>
+            </Item>
+          </Item>
+          <Item class="Frame" referent="41">
+            <Properties>
+              <string name="Name">D</string>
+              <Color3 name="BackgroundColor3">
+                <R>0.9490196</R>
+                <G>0.972549</G>
+                <B>1</B>
+              </Color3>
+              <float name="BackgroundTransparency">0</float>
+              <int name="BorderSizePixel">0</int>
+              <UDim2 name="Position">
+                <XS>0</XS>
+                <XO>16</XO>
+                <YS>0</YS>
+                <YO>200</YO>
+              </UDim2>
+              <UDim2 name="Size">
+                <XS>0</XS>
+                <XO>80</XO>
+                <YS>0</YS>
+                <YO>12</YO>
+              </UDim2>
+            </Properties>
+            <Item class="UICorner" referent="42">
+              <Properties>
+                <string name="Name">Corners</string>
+                <UDim name="BottomLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="BottomRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+              </Properties>
+            </Item>
+          </Item>
+          <Item class="Frame" referent="43">
+            <Properties>
+              <string name="Name">E</string>
+              <Color3 name="BackgroundColor3">
+                <R>0.9490196</R>
+                <G>0.972549</G>
+                <B>1</B>
+              </Color3>
+              <float name="BackgroundTransparency">0</float>
+              <int name="BorderSizePixel">0</int>
+              <UDim2 name="Position">
+                <XS>0</XS>
+                <XO>4</XO>
+                <YS>0</YS>
+                <YO>114</YO>
+              </UDim2>
+              <UDim2 name="Size">
+                <XS>0</XS>
+                <XO>12</XO>
+                <YS>0</YS>
+                <YO>82</YO>
+              </UDim2>
+            </Properties>
+            <Item class="UICorner" referent="44">
+              <Properties>
+                <string name="Name">Corners</string>
+                <UDim name="BottomLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="BottomRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+              </Properties>
+            </Item>
+          </Item>
+          <Item class="Frame" referent="45">
+            <Properties>
+              <string name="Name">F</string>
+              <Color3 name="BackgroundColor3">
+                <R>0.9490196</R>
+                <G>0.972549</G>
+                <B>1</B>
+              </Color3>
+              <float name="BackgroundTransparency">0</float>
+              <int name="BorderSizePixel">0</int>
+              <UDim2 name="Position">
+                <XS>0</XS>
+                <XO>4</XO>
+                <YS>0</YS>
+                <YO>16</YO>
+              </UDim2>
+              <UDim2 name="Size">
+                <XS>0</XS>
+                <XO>12</XO>
+                <YS>0</YS>
+                <YO>82</YO>
+              </UDim2>
+            </Properties>
+            <Item class="UICorner" referent="46">
+              <Properties>
+                <string name="Name">Corners</string>
+                <UDim name="BottomLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="BottomRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+              </Properties>
+            </Item>
+          </Item>
+          <Item class="Frame" referent="47">
+            <Properties>
+              <string name="Name">G</string>
+              <Color3 name="BackgroundColor3">
+                <R>0.9490196</R>
+                <G>0.972549</G>
+                <B>1</B>
+              </Color3>
+              <float name="BackgroundTransparency">0.95</float>
+              <int name="BorderSizePixel">0</int>
+              <UDim2 name="Position">
+                <XS>0</XS>
+                <XO>16</XO>
+                <YS>0</YS>
+                <YO>100</YO>
+              </UDim2>
+              <UDim2 name="Size">
+                <XS>0</XS>
+                <XO>80</XO>
+                <YS>0</YS>
+                <YO>12</YO>
+              </UDim2>
+            </Properties>
+            <Item class="UICorner" referent="48">
+              <Properties>
+                <string name="Name">Corners</string>
+                <UDim name="BottomLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="BottomRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+              </Properties>
+            </Item>
+          </Item>
+        </Item>
+        <Item class="Frame" referent="49">
+          <Properties>
+            <string name="Name">Digit3</string>
+            <Color3 name="BackgroundColor3">
+              <R>0.03137255</R>
+              <G>0.05882353</G>
+              <B>0.09803922</B>
+            </Color3>
+            <float name="BackgroundTransparency">1</float>
+            <int name="BorderSizePixel">0</int>
+            <UDim2 name="Position">
+              <XS>0</XS>
+              <XO>444</XO>
+              <YS>0</YS>
+              <YO>91</YO>
+            </UDim2>
+            <UDim2 name="Size">
+              <XS>0</XS>
+              <XO>112</XO>
+              <YS>0</YS>
+              <YO>212</YO>
+            </UDim2>
+            <bool name="Visible">true</bool>
+          </Properties>
+          <Item class="Frame" referent="50">
+            <Properties>
+              <string name="Name">A</string>
+              <Color3 name="BackgroundColor3">
+                <R>0.9490196</R>
+                <G>0.972549</G>
+                <B>1</B>
+              </Color3>
+              <float name="BackgroundTransparency">0</float>
+              <int name="BorderSizePixel">0</int>
+              <UDim2 name="Position">
+                <XS>0</XS>
+                <XO>16</XO>
+                <YS>0</YS>
+                <YO>0</YO>
+              </UDim2>
+              <UDim2 name="Size">
+                <XS>0</XS>
+                <XO>80</XO>
+                <YS>0</YS>
+                <YO>12</YO>
+              </UDim2>
+            </Properties>
+            <Item class="UICorner" referent="51">
+              <Properties>
+                <string name="Name">Corners</string>
+                <UDim name="BottomLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="BottomRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+              </Properties>
+            </Item>
+          </Item>
+          <Item class="Frame" referent="52">
+            <Properties>
+              <string name="Name">B</string>
+              <Color3 name="BackgroundColor3">
+                <R>0.9490196</R>
+                <G>0.972549</G>
+                <B>1</B>
+              </Color3>
+              <float name="BackgroundTransparency">0</float>
+              <int name="BorderSizePixel">0</int>
+              <UDim2 name="Position">
+                <XS>0</XS>
+                <XO>96</XO>
+                <YS>0</YS>
+                <YO>16</YO>
+              </UDim2>
+              <UDim2 name="Size">
+                <XS>0</XS>
+                <XO>12</XO>
+                <YS>0</YS>
+                <YO>82</YO>
+              </UDim2>
+            </Properties>
+            <Item class="UICorner" referent="53">
+              <Properties>
+                <string name="Name">Corners</string>
+                <UDim name="BottomLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="BottomRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+              </Properties>
+            </Item>
+          </Item>
+          <Item class="Frame" referent="54">
+            <Properties>
+              <string name="Name">C</string>
+              <Color3 name="BackgroundColor3">
+                <R>0.9490196</R>
+                <G>0.972549</G>
+                <B>1</B>
+              </Color3>
+              <float name="BackgroundTransparency">0</float>
+              <int name="BorderSizePixel">0</int>
+              <UDim2 name="Position">
+                <XS>0</XS>
+                <XO>96</XO>
+                <YS>0</YS>
+                <YO>114</YO>
+              </UDim2>
+              <UDim2 name="Size">
+                <XS>0</XS>
+                <XO>12</XO>
+                <YS>0</YS>
+                <YO>82</YO>
+              </UDim2>
+            </Properties>
+            <Item class="UICorner" referent="55">
+              <Properties>
+                <string name="Name">Corners</string>
+                <UDim name="BottomLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="BottomRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+              </Properties>
+            </Item>
+          </Item>
+          <Item class="Frame" referent="56">
+            <Properties>
+              <string name="Name">D</string>
+              <Color3 name="BackgroundColor3">
+                <R>0.9490196</R>
+                <G>0.972549</G>
+                <B>1</B>
+              </Color3>
+              <float name="BackgroundTransparency">0</float>
+              <int name="BorderSizePixel">0</int>
+              <UDim2 name="Position">
+                <XS>0</XS>
+                <XO>16</XO>
+                <YS>0</YS>
+                <YO>200</YO>
+              </UDim2>
+              <UDim2 name="Size">
+                <XS>0</XS>
+                <XO>80</XO>
+                <YS>0</YS>
+                <YO>12</YO>
+              </UDim2>
+            </Properties>
+            <Item class="UICorner" referent="57">
+              <Properties>
+                <string name="Name">Corners</string>
+                <UDim name="BottomLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="BottomRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+              </Properties>
+            </Item>
+          </Item>
+          <Item class="Frame" referent="58">
+            <Properties>
+              <string name="Name">E</string>
+              <Color3 name="BackgroundColor3">
+                <R>0.9490196</R>
+                <G>0.972549</G>
+                <B>1</B>
+              </Color3>
+              <float name="BackgroundTransparency">0</float>
+              <int name="BorderSizePixel">0</int>
+              <UDim2 name="Position">
+                <XS>0</XS>
+                <XO>4</XO>
+                <YS>0</YS>
+                <YO>114</YO>
+              </UDim2>
+              <UDim2 name="Size">
+                <XS>0</XS>
+                <XO>12</XO>
+                <YS>0</YS>
+                <YO>82</YO>
+              </UDim2>
+            </Properties>
+            <Item class="UICorner" referent="59">
+              <Properties>
+                <string name="Name">Corners</string>
+                <UDim name="BottomLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="BottomRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+              </Properties>
+            </Item>
+          </Item>
+          <Item class="Frame" referent="60">
+            <Properties>
+              <string name="Name">F</string>
+              <Color3 name="BackgroundColor3">
+                <R>0.9490196</R>
+                <G>0.972549</G>
+                <B>1</B>
+              </Color3>
+              <float name="BackgroundTransparency">0</float>
+              <int name="BorderSizePixel">0</int>
+              <UDim2 name="Position">
+                <XS>0</XS>
+                <XO>4</XO>
+                <YS>0</YS>
+                <YO>16</YO>
+              </UDim2>
+              <UDim2 name="Size">
+                <XS>0</XS>
+                <XO>12</XO>
+                <YS>0</YS>
+                <YO>82</YO>
+              </UDim2>
+            </Properties>
+            <Item class="UICorner" referent="61">
+              <Properties>
+                <string name="Name">Corners</string>
+                <UDim name="BottomLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="BottomRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+              </Properties>
+            </Item>
+          </Item>
+          <Item class="Frame" referent="62">
+            <Properties>
+              <string name="Name">G</string>
+              <Color3 name="BackgroundColor3">
+                <R>0.9490196</R>
+                <G>0.972549</G>
+                <B>1</B>
+              </Color3>
+              <float name="BackgroundTransparency">0.95</float>
+              <int name="BorderSizePixel">0</int>
+              <UDim2 name="Position">
+                <XS>0</XS>
+                <XO>16</XO>
+                <YS>0</YS>
+                <YO>100</YO>
+              </UDim2>
+              <UDim2 name="Size">
+                <XS>0</XS>
+                <XO>80</XO>
+                <YS>0</YS>
+                <YO>12</YO>
+              </UDim2>
+            </Properties>
+            <Item class="UICorner" referent="63">
+              <Properties>
+                <string name="Name">Corners</string>
+                <UDim name="BottomLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="BottomRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopLeftRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+                <UDim name="TopRightRadius">
+                  <S>0</S>
+                  <O>3</O>
+                </UDim>
+              </Properties>
+            </Item>
+          </Item>
+        </Item>
+        <Item class="TextLabel" referent="64">
+          <Properties>
+            <string name="Name">Header</string>
+            <float name="BackgroundTransparency">1</float>
+            <Font name="FontFace">
+              <Family>
+                <url>rbxasset://fonts/families/GothamSSm.json</url>
+              </Family>
+              <Weight>700</Weight>
+              <Style>Normal</Style>
+            </Font>
+            <UDim2 name="Position">
+              <XS>0</XS>
+              <XO>92</XO>
+              <YS>0</YS>
+              <YO>30</YO>
+            </UDim2>
+            <UDim2 name="Size">
+              <XS>0</XS>
+              <XO>122</XO>
+              <YS>0</YS>
+              <YO>42</YO>
+            </UDim2>
+            <string name="Text">SPEED</string>
+            <Color3 name="TextColor3">
+              <R>0.23921569</R>
+              <G>0.8627451</G>
+              <B>0.9411765</B>
+            </Color3>
+            <float name="TextSize">22</float>
+            <float name="TextTransparency">0</float>
+          </Properties>
+        </Item>
+        <Item class="Frame" referent="65">
+          <Properties>
+            <string name="Name">HeaderAccent</string>
+            <Color3 name="BackgroundColor3">
+              <R>0.23921569</R>
+              <G>0.8627451</G>
+              <B>0.9411765</B>
+            </Color3>
+            <float name="BackgroundTransparency">0</float>
+            <int name="BorderSizePixel">0</int>
+            <UDim2 name="Position">
+              <XS>0</XS>
+              <XO>52</XO>
+              <YS>0</YS>
+              <YO>49</YO>
+            </UDim2>
+            <UDim2 name="Size">
+              <XS>0</XS>
+              <XO>34</XO>
+              <YS>0</YS>
+              <YO>5</YO>
+            </UDim2>
+          </Properties>
+        </Item>
+        <Item class="TextLabel" referent="66">
+          <Properties>
+            <string name="Name">Mode</string>
+            <float name="BackgroundTransparency">1</float>
+            <Font name="FontFace">
+              <Family>
+                <url>rbxasset://fonts/families/GothamSSm.json</url>
+              </Family>
+              <Weight>700</Weight>
+              <Style>Normal</Style>
+            </Font>
+            <UDim2 name="Position">
+              <XS>0</XS>
+              <XO>766</XO>
+              <YS>0</YS>
+              <YO>311</YO>
+            </UDim2>
+            <UDim2 name="Size">
+              <XS>0</XS>
+              <XO>165</XO>
+              <YS>0</YS>
+              <YO>44</YO>
+            </UDim2>
+            <string name="Text">SPORT</string>
+            <Color3 name="TextColor3">
+              <R>0.6666667</R>
+              <G>0.53333336</G>
+              <B>1</B>
+            </Color3>
+            <float name="TextSize">30</float>
+            <float name="TextTransparency">0</float>
+          </Properties>
+        </Item>
+        <Item class="TextLabel" referent="67">
+          <Properties>
+            <string name="Name">Unit</string>
+            <float name="BackgroundTransparency">1</float>
+            <Font name="FontFace">
+              <Family>
+                <url>rbxasset://fonts/families/GothamSSm.json</url>
+              </Family>
+              <Weight>700</Weight>
+              <Style>Normal</Style>
+            </Font>
+            <UDim2 name="Position">
+              <XS>0</XS>
+              <XO>720</XO>
+              <YS>0</YS>
+              <YO>213</YO>
+            </UDim2>
+            <UDim2 name="Size">
+              <XS>0</XS>
+              <XO>148</XO>
+              <YS>0</YS>
+              <YO>50</YO>
+            </UDim2>
+            <string name="Text">km/h</string>
+            <Color3 name="TextColor3">
+              <R>0.9490196</R>
+              <G>0.972549</G>
+              <B>1</B>
+            </Color3>
+            <float name="TextSize">32</float>
+            <float name="TextTransparency">0</float>
+          </Properties>
+        </Item>
+      </Item>
+    </Item>
+    <Item class="WedgePart" referent="68">
+      <Properties>
+        <string name="Name">GlassCorner-1_-1</string>
+        <bool name="Anchored">true</bool>
+        <BinaryString name="AttributesSerialize">AQAAABEAAABTY29vdGVyRGVjb3JhdGlvbgMB</BinaryString>
+        <token name="BottomSurface">0</token>
+        <CoordinateFrame name="CFrame">
+          <X>-0.83</X>
+          <Y>-0.275</Y>
+          <Z>-0.149</Z>
+          <R00>0</R00>
+          <R01>0</R01>
+          <R02>1</R02>
+          <R10>0</R10>
+          <R11>-1</R11>
+          <R12>0</R12>
+          <R20>1</R20>
+          <R21>0</R21>
+          <R22>0</R22>
+        </CoordinateFrame>
+        <bool name="CanCollide">false</bool>
+        <bool name="CanQuery">false</bool>
+        <bool name="CanTouch">false</bool>
+        <bool name="CastShadow">false</bool>
+        <Color3uint8 name="Color3uint8">528153</Color3uint8>
+        <bool name="Massless">true</bool>
+        <token name="Material">272</token>
+        <Vector3 name="size">
+          <X>0.016</X>
+          <Y>0.095</Y>
+          <Z>0.095</Z>
+        </Vector3>
+        <token name="TopSurface">0</token>
+      </Properties>
+    </Item>
+    <Item class="WedgePart" referent="69">
+      <Properties>
+        <string name="Name">GlassCorner-1_1</string>
+        <bool name="Anchored">true</bool>
+        <BinaryString name="AttributesSerialize">AQAAABEAAABTY29vdGVyRGVjb3JhdGlvbgMB</BinaryString>
+        <token name="BottomSurface">0</token>
+        <CoordinateFrame name="CFrame">
+          <X>-0.83</X>
+          <Y>0.275</Y>
+          <Z>-0.149</Z>
+          <R00>0</R00>
+          <R01>0</R01>
+          <R02>1</R02>
+          <R10>0</R10>
+          <R11>1</R11>
+          <R12>0</R12>
+          <R20>-1</R20>
+          <R21>0</R21>
+          <R22>0</R22>
+        </CoordinateFrame>
+        <bool name="CanCollide">false</bool>
+        <bool name="CanQuery">false</bool>
+        <bool name="CanTouch">false</bool>
+        <bool name="CastShadow">false</bool>
+        <Color3uint8 name="Color3uint8">528153</Color3uint8>
+        <bool name="Massless">true</bool>
+        <token name="Material">272</token>
+        <Vector3 name="size">
+          <X>0.016</X>
+          <Y>0.095</Y>
+          <Z>0.095</Z>
+        </Vector3>
+        <token name="TopSurface">0</token>
+      </Properties>
+    </Item>
+    <Item class="WedgePart" referent="70">
+      <Properties>
+        <string name="Name">GlassCorner1_-1</string>
+        <bool name="Anchored">true</bool>
+        <BinaryString name="AttributesSerialize">AQAAABEAAABTY29vdGVyRGVjb3JhdGlvbgMB</BinaryString>
+        <token name="BottomSurface">0</token>
+        <CoordinateFrame name="CFrame">
+          <X>0.83</X>
+          <Y>-0.275</Y>
+          <Z>-0.149</Z>
+          <R00>0</R00>
+          <R01>0</R01>
+          <R02>-1</R02>
+          <R10>0</R10>
+          <R11>-1</R11>
+          <R12>0</R12>
+          <R20>-1</R20>
+          <R21>0</R21>
+          <R22>0</R22>
+        </CoordinateFrame>
+        <bool name="CanCollide">false</bool>
+        <bool name="CanQuery">false</bool>
+        <bool name="CanTouch">false</bool>
+        <bool name="CastShadow">false</bool>
+        <Color3uint8 name="Color3uint8">528153</Color3uint8>
+        <bool name="Massless">true</bool>
+        <token name="Material">272</token>
+        <Vector3 name="size">
+          <X>0.016</X>
+          <Y>0.095</Y>
+          <Z>0.095</Z>
+        </Vector3>
+        <token name="TopSurface">0</token>
+      </Properties>
+    </Item>
+    <Item class="WedgePart" referent="71">
+      <Properties>
+        <string name="Name">GlassCorner1_1</string>
+        <bool name="Anchored">true</bool>
+        <BinaryString name="AttributesSerialize">AQAAABEAAABTY29vdGVyRGVjb3JhdGlvbgMB</BinaryString>
+        <token name="BottomSurface">0</token>
+        <CoordinateFrame name="CFrame">
+          <X>0.83</X>
+          <Y>0.275</Y>
+          <Z>-0.149</Z>
+          <R00>0</R00>
+          <R01>0</R01>
+          <R02>-1</R02>
+          <R10>0</R10>
+          <R11>1</R11>
+          <R12>0</R12>
+          <R20>1</R20>
+          <R21>0</R21>
+          <R22>0</R22>
+        </CoordinateFrame>
+        <bool name="CanCollide">false</bool>
+        <bool name="CanQuery">false</bool>
+        <bool name="CanTouch">false</bool>
+        <bool name="CastShadow">false</bool>
+        <Color3uint8 name="Color3uint8">528153</Color3uint8>
+        <bool name="Massless">true</bool>
+        <token name="Material">272</token>
+        <Vector3 name="size">
+          <X>0.016</X>
+          <Y>0.095</Y>
+          <Z>0.095</Z>
+        </Vector3>
+        <token name="TopSurface">0</token>
+      </Properties>
+    </Item>
+    <Item class="Part" referent="72">
+      <Properties>
+        <string name="Name">GlassHorizontal</string>
+        <bool name="Anchored">true</bool>
+        <BinaryString name="AttributesSerialize">AQAAABEAAABTY29vdGVyRGVjb3JhdGlvbgMB</BinaryString>
+        <token name="BottomSurface">0</token>
+        <CoordinateFrame name="CFrame">
+          <X>0</X>
+          <Y>0</Y>
+          <Z>-0.149</Z>
+          <R00>1</R00>
+          <R01>0</R01>
+          <R02>0</R02>
+          <R10>0</R10>
+          <R11>1</R11>
+          <R12>0</R12>
+          <R20>0</R20>
+          <R21>0</R21>
+          <R22>1</R22>
+        </CoordinateFrame>
+        <bool name="CanCollide">false</bool>
+        <bool name="CanQuery">false</bool>
+        <bool name="CanTouch">false</bool>
+        <bool name="CastShadow">false</bool>
+        <Color3uint8 name="Color3uint8">528153</Color3uint8>
+        <bool name="Massless">true</bool>
+        <token name="Material">272</token>
+        <Vector3 name="size">
+          <X>1.755</X>
+          <Y>0.455</Y>
+          <Z>0.016</Z>
+        </Vector3>
+        <token name="TopSurface">0</token>
+      </Properties>
+    </Item>
+    <Item class="Part" referent="73">
+      <Properties>
+        <string name="Name">GlassVertical</string>
+        <bool name="Anchored">true</bool>
+        <BinaryString name="AttributesSerialize">AQAAABEAAABTY29vdGVyRGVjb3JhdGlvbgMB</BinaryString>
+        <token name="BottomSurface">0</token>
+        <CoordinateFrame name="CFrame">
+          <X>0</X>
+          <Y>0</Y>
+          <Z>-0.149</Z>
+          <R00>1</R00>
+          <R01>0</R01>
+          <R02>0</R02>
+          <R10>0</R10>
+          <R11>1</R11>
+          <R12>0</R12>
+          <R20>0</R20>
+          <R21>0</R21>
+          <R22>1</R22>
+        </CoordinateFrame>
+        <bool name="CanCollide">false</bool>
+        <bool name="CanQuery">false</bool>
+        <bool name="CanTouch">false</bool>
+        <bool name="CastShadow">false</bool>
+        <Color3uint8 name="Color3uint8">528153</Color3uint8>
+        <bool name="Massless">true</bool>
+        <token name="Material">272</token>
+        <Vector3 name="size">
+          <X>1.565</X>
+          <Y>0.645</Y>
+          <Z>0.016</Z>
+        </Vector3>
+        <token name="TopSurface">0</token>
+      </Properties>
+    </Item>
+    <Item class="Part" referent="74">
+      <Properties>
+        <string name="Name">Mount</string>
+        <bool name="Anchored">true</bool>
+        <BinaryString name="AttributesSerialize">AQAAABEAAABTY29vdGVyRGVjb3JhdGlvbgMB</BinaryString>
+        <token name="BottomSurface">0</token>
+        <CoordinateFrame name="CFrame">
+          <X>0</X>
+          <Y>-0.415</Y>
+          <Z>0.035</Z>
+          <R00>1</R00>
+          <R01>0</R01>
+          <R02>0</R02>
+          <R10>0</R10>
+          <R11>1</R11>
+          <R12>0</R12>
+          <R20>0</R20>
+          <R21>0</R21>
+          <R22>1</R22>
+        </CoordinateFrame>
+        <bool name="CanCollide">false</bool>
+        <bool name="CanQuery">false</bool>
+        <bool name="CanTouch">false</bool>
+        <bool name="CastShadow">false</bool>
+        <Color3uint8 name="Color3uint8">1778738</Color3uint8>
+        <bool name="Massless">true</bool>
+        <token name="Material">272</token>
+        <Vector3 name="size">
+          <X>0.46</X>
+          <Y>0.14</Y>
+          <Z>0.22</Z>
+        </Vector3>
+        <token name="TopSurface">0</token>
+      </Properties>
+    </Item>
+    <Item class="WedgePart" referent="75">
+      <Properties>
+        <string name="Name">RimCorner-1_-1</string>
+        <bool name="Anchored">true</bool>
+        <BinaryString name="AttributesSerialize">AQAAABEAAABTY29vdGVyRGVjb3JhdGlvbgMB</BinaryString>
+        <token name="BottomSurface">0</token>
+        <CoordinateFrame name="CFrame">
+          <X>-0.855</X>
+          <Y>-0.3</Y>
+          <Z>-0.13</Z>
+          <R00>0</R00>
+          <R01>0</R01>
+          <R02>1</R02>
+          <R10>0</R10>
+          <R11>-1</R11>
+          <R12>0</R12>
+          <R20>1</R20>
+          <R21>0</R21>
+          <R22>0</R22>
+        </CoordinateFrame>
+        <bool name="CanCollide">false</bool>
+        <bool name="CanQuery">false</bool>
+        <bool name="CanTouch">false</bool>
+        <bool name="CastShadow">false</bool>
+        <Color3uint8 name="Color3uint8">3424594</Color3uint8>
+        <bool name="Massless">true</bool>
+        <token name="Material">272</token>
+        <Vector3 name="size">
+          <X>0.028</X>
+          <Y>0.1</Y>
+          <Z>0.1</Z>
+        </Vector3>
+        <token name="TopSurface">0</token>
+      </Properties>
+    </Item>
+    <Item class="WedgePart" referent="76">
+      <Properties>
+        <string name="Name">RimCorner-1_1</string>
+        <bool name="Anchored">true</bool>
+        <BinaryString name="AttributesSerialize">AQAAABEAAABTY29vdGVyRGVjb3JhdGlvbgMB</BinaryString>
+        <token name="BottomSurface">0</token>
+        <CoordinateFrame name="CFrame">
+          <X>-0.855</X>
+          <Y>0.3</Y>
+          <Z>-0.13</Z>
+          <R00>0</R00>
+          <R01>0</R01>
+          <R02>1</R02>
+          <R10>0</R10>
+          <R11>1</R11>
+          <R12>0</R12>
+          <R20>-1</R20>
+          <R21>0</R21>
+          <R22>0</R22>
+        </CoordinateFrame>
+        <bool name="CanCollide">false</bool>
+        <bool name="CanQuery">false</bool>
+        <bool name="CanTouch">false</bool>
+        <bool name="CastShadow">false</bool>
+        <Color3uint8 name="Color3uint8">3424594</Color3uint8>
+        <bool name="Massless">true</bool>
+        <token name="Material">272</token>
+        <Vector3 name="size">
+          <X>0.028</X>
+          <Y>0.1</Y>
+          <Z>0.1</Z>
+        </Vector3>
+        <token name="TopSurface">0</token>
+      </Properties>
+    </Item>
+    <Item class="WedgePart" referent="77">
+      <Properties>
+        <string name="Name">RimCorner1_-1</string>
+        <bool name="Anchored">true</bool>
+        <BinaryString name="AttributesSerialize">AQAAABEAAABTY29vdGVyRGVjb3JhdGlvbgMB</BinaryString>
+        <token name="BottomSurface">0</token>
+        <CoordinateFrame name="CFrame">
+          <X>0.855</X>
+          <Y>-0.3</Y>
+          <Z>-0.13</Z>
+          <R00>0</R00>
+          <R01>0</R01>
+          <R02>-1</R02>
+          <R10>0</R10>
+          <R11>-1</R11>
+          <R12>0</R12>
+          <R20>-1</R20>
+          <R21>0</R21>
+          <R22>0</R22>
+        </CoordinateFrame>
+        <bool name="CanCollide">false</bool>
+        <bool name="CanQuery">false</bool>
+        <bool name="CanTouch">false</bool>
+        <bool name="CastShadow">false</bool>
+        <Color3uint8 name="Color3uint8">3424594</Color3uint8>
+        <bool name="Massless">true</bool>
+        <token name="Material">272</token>
+        <Vector3 name="size">
+          <X>0.028</X>
+          <Y>0.1</Y>
+          <Z>0.1</Z>
+        </Vector3>
+        <token name="TopSurface">0</token>
+      </Properties>
+    </Item>
+    <Item class="WedgePart" referent="78">
+      <Properties>
+        <string name="Name">RimCorner1_1</string>
+        <bool name="Anchored">true</bool>
+        <BinaryString name="AttributesSerialize">AQAAABEAAABTY29vdGVyRGVjb3JhdGlvbgMB</BinaryString>
+        <token name="BottomSurface">0</token>
+        <CoordinateFrame name="CFrame">
+          <X>0.855</X>
+          <Y>0.3</Y>
+          <Z>-0.13</Z>
+          <R00>0</R00>
+          <R01>0</R01>
+          <R02>-1</R02>
+          <R10>0</R10>
+          <R11>1</R11>
+          <R12>0</R12>
+          <R20>1</R20>
+          <R21>0</R21>
+          <R22>0</R22>
+        </CoordinateFrame>
+        <bool name="CanCollide">false</bool>
+        <bool name="CanQuery">false</bool>
+        <bool name="CanTouch">false</bool>
+        <bool name="CastShadow">false</bool>
+        <Color3uint8 name="Color3uint8">3424594</Color3uint8>
+        <bool name="Massless">true</bool>
+        <token name="Material">272</token>
+        <Vector3 name="size">
+          <X>0.028</X>
+          <Y>0.1</Y>
+          <Z>0.1</Z>
+        </Vector3>
+        <token name="TopSurface">0</token>
+      </Properties>
+    </Item>
+    <Item class="Part" referent="79">
+      <Properties>
+        <string name="Name">RimHorizontal</string>
+        <bool name="Anchored">true</bool>
+        <BinaryString name="AttributesSerialize">AQAAABEAAABTY29vdGVyRGVjb3JhdGlvbgMB</BinaryString>
+        <token name="BottomSurface">0</token>
+        <CoordinateFrame name="CFrame">
+          <X>0</X>
+          <Y>0</Y>
+          <Z>-0.13</Z>
+          <R00>1</R00>
+          <R01>0</R01>
+          <R02>0</R02>
+          <R10>0</R10>
+          <R11>1</R11>
+          <R12>0</R12>
+          <R20>0</R20>
+          <R21>0</R21>
+          <R22>1</R22>
+        </CoordinateFrame>
+        <bool name="CanCollide">false</bool>
+        <bool name="CanQuery">false</bool>
+        <bool name="CanTouch">false</bool>
+        <bool name="CastShadow">false</bool>
+        <Color3uint8 name="Color3uint8">3424594</Color3uint8>
+        <bool name="Massless">true</bool>
+        <token name="Material">272</token>
+        <Vector3 name="size">
+          <X>1.81</X>
+          <Y>0.5</Y>
+          <Z>0.028</Z>
+        </Vector3>
+        <token name="TopSurface">0</token>
+      </Properties>
+    </Item>
+    <Item class="Part" referent="80">
+      <Properties>
+        <string name="Name">RimVertical</string>
+        <bool name="Anchored">true</bool>
+        <BinaryString name="AttributesSerialize">AQAAABEAAABTY29vdGVyRGVjb3JhdGlvbgMB</BinaryString>
+        <token name="BottomSurface">0</token>
+        <CoordinateFrame name="CFrame">
+          <X>0</X>
+          <Y>0</Y>
+          <Z>-0.13</Z>
+          <R00>1</R00>
+          <R01>0</R01>
+          <R02>0</R02>
+          <R10>0</R10>
+          <R11>1</R11>
+          <R12>0</R12>
+          <R20>0</R20>
+          <R21>0</R21>
+          <R22>1</R22>
+        </CoordinateFrame>
+        <bool name="CanCollide">false</bool>
+        <bool name="CanQuery">false</bool>
+        <bool name="CanTouch">false</bool>
+        <bool name="CastShadow">false</bool>
+        <Color3uint8 name="Color3uint8">3424594</Color3uint8>
+        <bool name="Massless">true</bool>
+        <token name="Material">272</token>
+        <Vector3 name="size">
+          <X>1.61</X>
+          <Y>0.7</Y>
+          <Z>0.028</Z>
+        </Vector3>
+        <token name="TopSurface">0</token>
+      </Properties>
+    </Item>
+  </Item>
+</roblox>
