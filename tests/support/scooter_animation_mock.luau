@@ -139,6 +139,8 @@ function InstanceMock.new(className)
 	return instance
 end
 function instanceMethods:IsA(className)
+	if className == "GuiObject" then return self.ClassName == "Frame" or self.ClassName == "TextLabel" end
+	if className == "UIComponent" then return self.ClassName == "UICorner" end
 	if className == "BasePart" then return self.ClassName == "Part" or self.ClassName == "MeshPart" or self.ClassName == "VehicleSeat" end
 	if className == "Constraint" then return self.ClassName == "HingeConstraint" or self.ClassName == "SpringConstraint" end
 	return self.ClassName == className or className == "Instance"
@@ -238,5 +240,8 @@ end
 
 baseEnvironment.Enum = enumMock
 baseEnvironment.Vector2 = { new = function(x, y) return { X = x, Y = y } end }
+baseEnvironment.UDim2 = { new = function(xs, xo, ys, yo)
+	return { X = { Scale = xs, Offset = xo }, Y = { Scale = ys, Offset = yo } }
+end }
 baseEnvironment.PhysicalProperties = { new = function(...) return { ... } end }
 services.Workspace = InstanceMock.new("Workspace")

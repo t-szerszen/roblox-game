@@ -27,6 +27,9 @@ def main() -> None:
         "ReplicatedStorage/Shared/Scooter/ScooterConfig",
         "ReplicatedStorage/Shared/Scooter/ScooterPhysics",
         "ReplicatedStorage/Shared/Scooter/ScooterAnimationMath",
+        "ReplicatedStorage/Shared/Scooter/ScooterDashboardConfig",
+        "ReplicatedStorage/Shared/Scooter/ScooterDashboard",
+        "ReplicatedStorage/Shared/UI/Scope",
         "ReplicatedStorage/Shared/Shop/ShopConfig",
         "ReplicatedStorage/Shared/Activity/ActivityConfig",
         "ReplicatedStorage/Shared/Phone/PhoneConfig",
@@ -41,6 +44,7 @@ def main() -> None:
         "ServerScriptService/Scooter/DevScooterRepair",
         "ServerScriptService/Scooter/ScooterBrakeLight",
         "ServerScriptService/Scooter/DevScooterAssembler",
+        "ServerScriptService/Scooter/DevScooterDashboard",
         "ServerScriptService/Scooter/ScooterWorkflow",
         "StarterPlayer/StarterPlayerScripts/ScooterRiderPose",
         "StarterPlayer/StarterPlayerScripts/ScooterAnimator",
@@ -57,7 +61,7 @@ def main() -> None:
     source += "\n" + (root / "tests" / "support" / "scooter_animation_mock.luau").read_text()
     source += "\n" + (root / "tests" / "scooter_animation.spec.luau").read_text()
     source += "\n" + (root / "tests" / "scooter_leg_states.spec.luau").read_text()
-    for spec in ["scooter_visuals.spec.luau", "scooter_repair.spec.luau", "scooter_suspension.spec.luau", "scooter_front_mount.spec.luau", "scooter_handling.spec.luau", "scooter_stability.spec.luau"]:
+    for spec in ["scooter_visuals.spec.luau", "scooter_repair.spec.luau", "scooter_suspension.spec.luau", "scooter_front_mount.spec.luau", "scooter_handling.spec.luau", "scooter_stability.spec.luau", "scooter_dashboard.spec.luau"]:
         source += "\ndo\n" + (root / "tests" / spec).read_text() + "\nend\n"
     with tempfile.TemporaryDirectory(prefix="scooter-tests-") as directory:
         bundle = Path(directory) / "run.luau"

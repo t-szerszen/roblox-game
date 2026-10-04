@@ -1,5 +1,9 @@
 # Articulated scooter model contract
 
+An optional handlebar speedometer is available as a separate, manually mounted
+asset. See [dashboard creation and mounting](SCOOTER_DASHBOARD.md); it is never
+automatically inserted into the authored production template.
+
 The only visual/physical template is `ServerStorage.ScooterModels.scooter`. Catalog model names still select existing tuning and ownership rules; they all use this rig. The old five-part KuKirin template and procedural fallback are retired.
 
 ## Install the authored Studio model

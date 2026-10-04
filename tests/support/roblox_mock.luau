@@ -77,7 +77,7 @@ local function signal()
 	local callbacks = {}
 	return {
 		Connect = function(_, callback)
-			local connection = { Connected = true }
+			local connection = { Connected = true, __type = "RBXScriptConnection" }
 			function connection:Disconnect() self.Connected = false end
 			table.insert(callbacks, { connection = connection, callback = callback })
 			return connection
@@ -93,7 +93,7 @@ end
 local instanceMethods = {}
 local InstanceMock = {}
 function InstanceMock.new(className)
-	local values = { ClassName = className, Name = className, Value = 0, Changed = signal() }
+	local values = { ClassName = className, Name = className, Value = 0, Changed = signal(), __type = "Instance" }
 	local children, attributes = {}, {}
 	return setmetatable({ _values = values, _children = children, _attributes = attributes, _attributeSignals = {} }, {
 		__index = function(_, key) return instanceMethods[key] or values[key] or children[key] end,
