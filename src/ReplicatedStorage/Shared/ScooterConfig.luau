@@ -13,6 +13,13 @@ local ScooterConfig = {}
 -- Secondary systems remain parked while validating the drivable Studio MVP.
 ScooterConfig.GarageEnabled = false
 
+ScooterConfig.DriveModes = {
+	Default = "SPORT",
+	EcoMaxSpeedKmh = 25,
+	ToggleCooldown = 0.4,
+	ToggleRemoteName = "ToggleDriveMode",
+}
+
 ScooterConfig.Models = {
 	["KuKirin G2 Pro"] = {
 		maxSpeed = 55,
@@ -254,6 +261,10 @@ function ScooterConfig.GetUpgradeCost(modelName: string, currentTier: number): n
 	end
 	local costs = ScooterConfig.SpeedUpgradeCosts[modelName]
 	return if costs then costs[currentTier + 1] else nil
+end
+
+function ScooterConfig.GetDriveModeMaxSpeed(sportMaxSpeed: number, mode: string): number
+	return if mode == "ECO" then math.min(sportMaxSpeed, ScooterConfig.DriveModes.EcoMaxSpeedKmh) else sportMaxSpeed
 end
 
 return ScooterConfig

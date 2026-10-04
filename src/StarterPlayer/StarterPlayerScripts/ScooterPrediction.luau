@@ -243,6 +243,9 @@ function ScooterPrediction.Start(scooter: Model, root: BasePart, character: Mode
 			return
 		end
 		local grounded = scooter:GetAttribute("FrontGrounded") == true or scooter:GetAttribute("RearGrounded") == true
+		local driveMode = scooter:GetAttribute("DriveMode")
+		local maxSpeed = ScooterConfig.GetDriveModeMaxSpeed(tuning.maxSpeed,
+			if typeof(driveMode) == "string" then driveMode else ScooterConfig.DriveModes.Default)
 		local fallen = scooter:GetAttribute("Fallen") == true
 		local velocity = proxy.AssemblyLinearVelocity
 		local speed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
@@ -269,7 +272,7 @@ function ScooterPrediction.Start(scooter: Model, root: BasePart, character: Mode
 			groundUp = groundUp,
 			gravity = Workspace.Gravity,
 			mass = mass,
-			maxSpeed = tuning.maxSpeed * ScooterConfig.StudsPerKmH,
+			maxSpeed = maxSpeed * ScooterConfig.StudsPerKmH,
 			acceleration = tuning.acceleration,
 			throttleHeld = input.throttleHeld,
 			brakeHeld = input.brakeHeld,

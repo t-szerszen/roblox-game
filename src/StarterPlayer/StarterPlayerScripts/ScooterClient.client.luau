@@ -8,6 +8,8 @@ local UserInputService = game:GetService("UserInputService")
 
 local ScooterConfig = require(ReplicatedStorage.Shared.Scooter.ScooterConfig)
 local ScooterPhysics = require(ReplicatedStorage.Shared.Scooter.ScooterPhysics)
+local Scope = require(ReplicatedStorage.Shared.UI.Scope)
+local Feedback = require(script.Parent.UI.Feedback)
 type DriveInput = {
 	throttleHeld: boolean,
 	brakeHeld: boolean,
@@ -28,6 +30,7 @@ local remotesFolder = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild(Sco
 local requestSpawnRemote = remotesFolder:WaitForChild("RequestSpawn") :: RemoteEvent
 local trickRemote = remotesFolder:WaitForChild("TrickState") :: RemoteEvent
 local driveInputRemote = remotesFolder:WaitForChild("DriveInput") :: RemoteEvent
+local toggleDriveModeRemote = remotesFolder:WaitForChild(ScooterConfig.DriveModes.ToggleRemoteName) :: RemoteEvent
 
 local activeMaid: Maid? = nil
 local characterMaid: Maid? = nil
@@ -38,7 +41,8 @@ local wheelieButtonHeld = false
 local focused = true
 local destroyed = false
 local heldKeys: { [Enum.KeyCode]: boolean } = {}
-local mountedActions = { "ScooterBlockJump", "ScooterWheelie", "ScooterDismount" }
+local mountedActions = { "ScooterBlockJump", "ScooterWheelie", "ScooterDismount", "ScooterDriveMode" }
+local driveModeKey = Enum.KeyCode.P
 
 local function newMaid(): Maid
 	local maid = {} :: Maid
@@ -129,6 +133,16 @@ local function startController(scooter: Model, seat: VehicleSeat, root: BasePart
 	local lastInputSentAt = -math.huge
 	local lastBurnoutSentAt = -math.huge
 	local lastSent: DriveInput? = nil
+	local lastModeRequestAt = -math.huge
+	local hintScope = Scope.new()
+	local hintGui = Instance.new("ScreenGui")
+	hintGui.Name = "ScooterRideFeedback"
+	hintGui.ResetOnSpawn = false
+	hintGui.DisplayOrder = 40
+	hintGui.Parent = playerGui
+	maid:Give(function() hintScope:Clean(); hintGui:Destroy() end)
+	local feedback = Feedback.new(hintGui, hintScope)
+	feedback.Show(driveModeKey.Name .. " — zmiana trybu ECO / SPORT")
 
 	local function mountedAction(action: string, state: Enum.UserInputState, input: InputObject): Enum.ContextActionResult
 		if playerGui:GetAttribute("GameplayInputBlocked") == true then
@@ -143,7 +157,13 @@ local function startController(scooter: Model, seat: VehicleSeat, root: BasePart
 				heldKeys[input.KeyCode] = held
 			end
 		elseif state == Enum.UserInputState.Begin and allowed then
-			if action == "ScooterDismount" then
+			if action == "ScooterDriveMode" then
+				local now = os.clock()
+				if now - lastModeRequestAt >= ScooterConfig.DriveModes.ToggleCooldown then
+					lastModeRequestAt = now
+					toggleDriveModeRemote:FireServer()
+				end
+			elseif action == "ScooterDismount" then
 				clearControls()
 				trickRemote:FireServer("Dismount", true)
 			end
@@ -156,8 +176,11 @@ local function startController(scooter: Model, seat: VehicleSeat, root: BasePart
 	ContextActionService:BindActionAtPriority("ScooterBlockJump", mountedAction, false, priority, Enum.KeyCode.Space, Enum.KeyCode.ButtonA)
 	ContextActionService:BindActionAtPriority("ScooterWheelie", mountedAction, true, priority, Enum.KeyCode.LeftShift, Enum.KeyCode.C)
 	ContextActionService:BindActionAtPriority("ScooterDismount", mountedAction, true, priority, Enum.KeyCode.E)
+	ContextActionService:BindActionAtPriority("ScooterDriveMode", mountedAction, true, priority,
+		driveModeKey)
 	ContextActionService:SetTitle("ScooterWheelie", "Wheelie")
 	ContextActionService:SetTitle("ScooterDismount", "Exit")
+	ContextActionService:SetTitle("ScooterDriveMode", "ECO / SPORT")
 
 	maid:Give(UserInputService.InputBegan:Connect(function(input: InputObject, gameProcessed: boolean)
 		if gameProcessed or not focused or UserInputService:GetFocusedTextBox() ~= nil then
