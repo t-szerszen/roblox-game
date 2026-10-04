@@ -5,6 +5,8 @@ local Workspace = game:GetService("Workspace")
 
 local ScooterConfig = require(ReplicatedStorage.Shared.Scooter.ScooterConfig)
 local ScooterPhysics = require(ReplicatedStorage.Shared.Scooter.ScooterPhysics)
+local DashboardConfig = require(ReplicatedStorage.Shared.Scooter.ScooterDashboardConfig)
+local Dashboard = require(ReplicatedStorage.Shared.Scooter.ScooterDashboard)
 
 export type Input = {
 	throttleHeld: boolean,
@@ -25,6 +27,7 @@ type Visual = {
 	part: BasePart,
 	originalTransparency: number,
 	displayTransparency: number,
+	dashboard: Dashboard.Controller?,
 }
 
 local ScooterPrediction = {}
@@ -130,7 +133,18 @@ function ScooterPrediction.Start(scooter: Model, root: BasePart, character: Mode
 	local offsetCamera: Camera? = nil
 	local lastCameraCFrame: CFrame? = nil
 
+	local function addDashboard(instance: Instance)
+		local source: Instance? = instance
+		while source and not source:IsA("BasePart") do source = source.Parent end
+		if not source or not source:IsA("BasePart") or source.Name ~= DashboardConfig.ScreenName then return end
+		local visual = visuals[source]
+		if visual and not visual.dashboard then
+			visual.dashboard = Dashboard.CreatePresentation(scooter, source, visual.part)
+		end
+	end
+
 	local function addVisual(instance: Instance)
+		addDashboard(instance)
 		if not instance:IsA("BasePart") or instance:IsA("Seat") or instance:IsA("VehicleSeat") or visuals[instance] then
 			return
 		end
@@ -150,16 +164,25 @@ function ScooterPrediction.Start(scooter: Model, root: BasePart, character: Mode
 			part = copy,
 			originalTransparency = instance.LocalTransparencyModifier,
 			displayTransparency = instance.LocalTransparencyModifier,
+			dashboard = nil,
 		}
+		addDashboard(instance)
 		instance.LocalTransparencyModifier = 1
 	end
 
 	local function removeVisual(instance: Instance)
 		if not instance:IsA("BasePart") then
+			local source = instance:FindFirstAncestorWhichIsA("BasePart")
+			local visual = if source and source:IsA("BasePart") then visuals[source] else nil
+			if visual and visual.dashboard then
+				visual.dashboard.Destroy()
+				visual.dashboard = nil
+			end
 			return
 		end
 		local visual = visuals[instance]
 		if visual then
+			if visual.dashboard then visual.dashboard.Destroy() end
 			instance.LocalTransparencyModifier = visual.originalTransparency
 			visual.part:Destroy()
 			visuals[instance] = nil
@@ -243,6 +266,9 @@ function ScooterPrediction.Start(scooter: Model, root: BasePart, character: Mode
 			return
 		end
 		local grounded = scooter:GetAttribute("FrontGrounded") == true or scooter:GetAttribute("RearGrounded") == true
+		local driveMode = scooter:GetAttribute("DriveMode")
+		local maxSpeed = ScooterConfig.GetDriveModeMaxSpeed(tuning.maxSpeed,
+			if typeof(driveMode) == "string" then driveMode else ScooterConfig.DriveModes.Default)
 		local fallen = scooter:GetAttribute("Fallen") == true
 		local velocity = proxy.AssemblyLinearVelocity
 		local speed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
@@ -269,7 +295,7 @@ function ScooterPrediction.Start(scooter: Model, root: BasePart, character: Mode
 			groundUp = groundUp,
 			gravity = Workspace.Gravity,
 			mass = mass,
-			maxSpeed = tuning.maxSpeed * ScooterConfig.StudsPerKmH,
+			maxSpeed = maxSpeed * ScooterConfig.StudsPerKmH,
 			acceleration = tuning.acceleration,
 			throttleHeld = input.throttleHeld,
 			brakeHeld = input.brakeHeld,
@@ -352,6 +378,7 @@ function ScooterPrediction.Start(scooter: Model, root: BasePart, character: Mode
 			connection:Disconnect()
 		end
 		for source, visual in visuals do
+			if visual.dashboard then visual.dashboard.Destroy() end
 			if source.Parent then
 				source.LocalTransparencyModifier = visual.originalTransparency
 			end

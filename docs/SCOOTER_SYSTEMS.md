@@ -51,12 +51,24 @@ Smoke is mounted on `VirtualBackAxle.RearWheelAttachment` at the rear axle. It a
 
 ## Networking
 
+Drive modes belong to the authoritative scooter controller. New scooters start
+in SPORT; `P` requests one ECO/SPORT toggle while the owner is mounted. ECO uses
+a 25 km/h motor target, bounded by the model's own maximum; SPORT uses the full
+existing tuning. Acceleration and the 18 km/h reverse limit are unchanged.
+Mode changes retain velocity and use existing bounded drive forces to approach
+the new forward target. Coasting, slope/gravity motion and external forces retain
+their existing behavior; this is a motor limit, not a velocity teleport. The
+chosen mode survives dismount/remount and resets with a new scooter. The popup
+and touch shortcut are cleaned with the mounted controller. See
+[dashboard setup](SCOOTER_DASHBOARD.md) for the static 67% battery and display.
+
 All endpoints are under `ReplicatedStorage.Remotes.ScooterRemotes`:
 
 | Endpoint | Arguments | Validation / result |
 | --- | --- | --- |
 | `RequestSpawn` event | `modelName` | Known owned model, living player, spawn cooldown |
 | `DriveInput` event | `throttleHeld, brakeHeld, steering, wheelieHeld` | Exact boolean types; finite steering in `[-1, 1]`; the server converts the rising wheelie-button edge into one trigger; owner, seat, life/stun state, server rate limit |
+| `ToggleDriveMode` event | No arguments | Rejects any arguments; current owner/rider, living and unstunned rider, nonfallen scooter, 0.4-second server cooldown; server toggles the record's mode and publishes `DriveMode` and effective `MaxSpeedKmh` |
 | `TrickState` event | `"Burnout", active` or `"Dismount", true` | Authorized rider; rate-limited legacy burnout start hint, immediate release; actual burnout is derived each simulation step from validated DriveInput and server physics |
 | `GarageRequest` function | `"GetState", nil, nil` | Rate-limited server snapshot |
 | `GarageRequest` function | `"PurchaseSpeed", modelName, expectedCurrentTier` | Loaded persistent profile, ownership, exact current tier, tier cap, sufficient coins |

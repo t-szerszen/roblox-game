@@ -25,6 +25,8 @@ type ScooterRecord = {
 	upright: AlignOrientation,
 	input: ScooterInput.State,
 	tuning: ScooterConfig.Tuning,
+	driveMode: string,
+	lastModeChangeAt: number,
 	driveForce: VectorForce,
 	ridePrompt: ProximityPrompt,
 	raycastParams: RaycastParams,
@@ -69,6 +71,7 @@ local remotesFolder: Folder
 local requestSpawnRemote: RemoteEvent
 local trickRemote: RemoteEvent
 local driveInputRemote: RemoteEvent
+local toggleDriveModeRemote: RemoteEvent
 local connections: { Connection } = {}
 local started = false
 
@@ -435,6 +438,7 @@ local function spawnForPlayer(player: Player, requestedModel: string?): Model
 	scooter:SetAttribute("UprightSupportMass", root.AssemblyMass + additionalMass)
 	scooter:SetAttribute("SpeedUpgradeTier", tuning.speedTier)
 	scooter:SetAttribute("MaxSpeedKmh", tuning.maxSpeed)
+	scooter:SetAttribute("DriveMode", ScooterConfig.DriveModes.Default)
 	scooter:SetAttribute("Acceleration", tuning.acceleration)
 
 	local ridePrompt = Instance.new("ProximityPrompt")
@@ -468,6 +472,8 @@ local function spawnForPlayer(player: Player, requestedModel: string?): Model
 		upright = upright,
 		input = ScooterInput.New(),
 		tuning = tuning,
+		driveMode = ScooterConfig.DriveModes.Default,
+		lastModeChangeAt = -math.huge,
 		driveForce = driveForce,
 		ridePrompt = ridePrompt,
 		raycastParams = RaycastParams.new(),
@@ -822,6 +828,7 @@ function ScooterServer.Start()
 	requestSpawnRemote = getOrCreateRemote("RequestSpawn")
 	trickRemote = getOrCreateRemote("TrickState")
 	driveInputRemote = getOrCreateRemote("DriveInput")
+	toggleDriveModeRemote = getOrCreateRemote(ScooterConfig.DriveModes.ToggleRemoteName)
 	local pausedGarage = remotesFolder:FindFirstChild("GarageRequest")
 	if pausedGarage and pausedGarage:IsA("RemoteFunction") then
 		pausedGarage.OnServerInvoke = function(_player: Player)
@@ -840,6 +847,19 @@ function ScooterServer.Start()
 		local record = recordsByPlayer[player]
 		if not record or record.fallen or not playerOwnsOccupiedScooter(player, record) then return end
 		ScooterInput.Apply(record.input, os.clock(), throttleHeld, brakeHeld, steering, wheelieHeld)
+	end))
+
+	table.insert(connections, toggleDriveModeRemote.OnServerEvent:Connect(function(player: Player, ...: unknown)
+		-- The client requests one toggle, never a mode, speed or tuning value.
+		if select("#", ...) ~= 0 then return end
+		local record = recordsByPlayer[player]
+		if not record or record.fallen or not playerOwnsOccupiedScooter(player, record) then return end
+		local now = os.clock()
+		if now - record.lastModeChangeAt < ScooterConfig.DriveModes.ToggleCooldown then return end
+		record.lastModeChangeAt = now
+		record.driveMode = if record.driveMode == "SPORT" then "ECO" else "SPORT"
+		setAttributeIfChanged(record.model, "MaxSpeedKmh", ScooterConfig.GetDriveModeMaxSpeed(record.tuning.maxSpeed, record.driveMode))
+		setAttributeIfChanged(record.model, "DriveMode", record.driveMode)
 	end))
 
 	table.insert(connections, trickRemote.OnServerEvent:Connect(function(player: Player, trickName: unknown, active: unknown)
@@ -895,7 +915,7 @@ function ScooterServer.Start()
 			local velocity = root.AssemblyLinearVelocity
 			local flatVelocity = Vector3.new(velocity.X, 0, velocity.Z)
 			local speed = flatVelocity.Magnitude
-			local maxSpeed = tuning.maxSpeed * ScooterConfig.StudsPerKmH
+			local maxSpeed = ScooterConfig.GetDriveModeMaxSpeed(tuning.maxSpeed, record.driveMode) * ScooterConfig.StudsPerKmH
 			local frontHit, frontGrounded = probeGround(record, record.frontSuspensionPoint)
 			local rearHit, rearGrounded = probeGround(record, record.rearSuspensionPoint)
 			if record.frontGrounded ~= frontGrounded then

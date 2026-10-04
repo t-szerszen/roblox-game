@@ -193,6 +193,7 @@ local function configureModel(model: Model, Config: typeof(Config)): Model
 			instance.CanQuery = false
 			instance.Massless = instance == rig.body or instance == footRest
 				or instance == fender or instance == rig.handleBar or instance == seat
+				or instance:GetAttribute("ScooterDecoration") == true
 		end
 	end
 	rig.frontAxle.Transparency = 1

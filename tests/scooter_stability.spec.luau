@@ -86,6 +86,7 @@ spawn.CFrame = Frame.Angles(0, 0.8, 0)
 services.Workspace.Raycast = function(_, origin)
 	return { Normal = Vector.yAxis, Position = Vector.new(origin.X, 0, origin.Z), Distance = 1, Instance = spawn }
 end
+function services.Workspace:GetServerTimeNow() return testClock end
 local template = services.ServerStorage.ScooterModels.scooter
 local preservedParent = template.Parent
 template.Parent = services.ServerStorage
@@ -119,6 +120,67 @@ end
 local function tick(speed)
 	root.AssemblyLinearVelocity = root.CFrame.LookVector * speed
 	services.RunService.PreSimulation:Fire(0.1)
+end
+
+do
+local modesStart = testCount
+local modeRemote = services.ReplicatedStorage.Remotes[Config.RemoteFolderName].ToggleDriveMode
+check(scooter:GetAttribute("DriveMode") == "SPORT", "New scooters start in SPORT")
+for _, malformed in { "ECO", 25, {}, true, 0 / 0 } do
+	modeRemote.OnServerEvent:Fire(player, malformed)
+	check(scooter:GetAttribute("DriveMode") == "SPORT", "Mode remote rejects client-supplied mode or tuning")
+end
+modeRemote.OnServerEvent:Fire(player, nil)
+check(scooter:GetAttribute("DriveMode") == "SPORT", "Even an extra nil argument is rejected")
+local outsider = makePlayer(8081)
+outsider.Parent = playersService
+modeRemote.OnServerEvent:Fire(outsider)
+check(scooter:GetAttribute("DriveMode") == "SPORT", "A different player cannot change the rider's mode")
+root.AssemblyLinearVelocity = root.CFrame.LookVector * 55 * Config.StudsPerKmH
+local movingVelocity = root.AssemblyLinearVelocity
+modeRemote.OnServerEvent:Fire(player)
+check(scooter:GetAttribute("DriveMode") == "ECO" and scooter:GetAttribute("MaxSpeedKmh") == 25,
+	"A mounted rider can select the authoritative 25 km/h ECO limit while moving")
+check(root.AssemblyLinearVelocity == movingVelocity, "Mode switching never assigns velocity")
+modeRemote.OnServerEvent:Fire(player)
+check(scooter:GetAttribute("DriveMode") == "ECO", "Server cooldown rejects repeated toggles")
+controls(true, false, 0, false)
+services.RunService.PreSimulation:Fire(1 / 60)
+local mass = scooter:GetAttribute("UprightSupportMass")
+local acceleration = root.ScooterDriveForce.Force:Dot(root.CFrame.LookVector) / mass
+check(acceleration < 0 and math.abs(acceleration) <= scooter:GetAttribute("Acceleration") + 1e-6,
+	"ECO overspeed deceleration uses the existing bounded drive force")
+check(root.AssemblyLinearVelocity == movingVelocity, "The drive controller does not teleport the velocity to the ECO cap")
+local speed = 55 * Config.StudsPerKmH
+for _ = 1, 90 do
+	controls(true, false, 0, false)
+	root.AssemblyLinearVelocity = root.CFrame.LookVector * speed
+	services.RunService.PreSimulation:Fire(1 / 60)
+	speed += root.ScooterDriveForce.Force:Dot(root.CFrame.LookVector) / mass / 60
+end
+near(speed / Config.StudsPerKmH, 25, "Actual ECO server forces converge to 25 km/h")
+scooter.DriverSeat.Occupant = nil
+modeRemote.OnServerEvent:Fire(player)
+check(scooter:GetAttribute("DriveMode") == "ECO", "Dismount retains the chosen mode and denies remote toggles")
+scooter.DriverSeat.Occupant = humanoid
+player:SetAttribute("StunnedUntil", services.Workspace:GetServerTimeNow() + 10)
+modeRemote.OnServerEvent:Fire(player)
+check(scooter:GetAttribute("DriveMode") == "ECO", "Stunned riders cannot switch modes")
+player:SetAttribute("StunnedUntil", nil)
+humanoid.Health = 0
+modeRemote.OnServerEvent:Fire(player)
+check(scooter:GetAttribute("DriveMode") == "ECO", "Dead riders cannot switch modes")
+humanoid.Health = 100
+modeRemote.OnServerEvent:Fire(player)
+check(scooter:GetAttribute("DriveMode") == "SPORT" and scooter:GetAttribute("MaxSpeedKmh") == 55,
+	"Remounting retains the mode and the next accepted toggle restores full SPORT tuning")
+for name in Config.Models do
+	local tuned = assert(Config.GetTuning(name, 3))
+	near(Config.GetDriveModeMaxSpeed(tuned.maxSpeed, "ECO"), 25, "All models share the ECO cap after upgrades")
+	near(Config.GetDriveModeMaxSpeed(tuned.maxSpeed, "SPORT"), tuned.maxSpeed, "SPORT preserves each upgraded speed")
+end
+near(Config.GetDriveModeMaxSpeed(20, "ECO"), 20, "ECO does not raise a model's native limit")
+print(string.format("PASS: %d drive mode server assertions", testCount - modesStart))
 end
 controls(true, true, 0, false)
 tick(4.9 * Config.StudsPerKmH)
@@ -257,6 +319,7 @@ incompatibleRest.Parent = preservedParent
 local shiftLimit = Config.FrontRestPose.MaxMountShiftRadiusRatio
 Config.FrontRestPose.MaxMountShiftRadiusRatio = 0
 local fallback = Server.SpawnForPlayer(player)
+check(fallback:GetAttribute("DriveMode") == "SPORT", "Replacing the scooter resets its mode to SPORT")
 Config.FrontRestPose.MaxMountShiftRadiusRatio = shiftLimit
 check(fallback.Parent == services.Workspace[Config.ScooterFolderName], "Rejected optional front correction still spawns a scooter")
 check(fallback:GetAttribute("FrontRestPoseStatus") == "Skipped", "Skipped correction exposes diagnostic status")

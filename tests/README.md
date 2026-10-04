@@ -82,6 +82,18 @@ centering, idempotent collider/weld updates and spawn clearance for wheels below
 
 ## Build and strict type analysis
 
+The dashboard suite checks server-attribute rendering, missing and malformed
+state, three-digit speeds, brake transitions, prediction GUI disposal, script
+exclusion, developer mount restrictions, internal housing welds and decorative
+mass preservation during assembly. It also checks digit centering, mode labels
+and GUI replacement with preservation of placement and backups. Server integration
+checks ECO convergence, unchanged tuning in SPORT, extra/malformed arguments,
+cooldowns, owner/seat/life/stun restrictions, remount and respawn mode behavior.
+Run `tests/scooter_dashboard.studio.luau`
+through the Studio Command Bar after sync for checks using real Roblox Instances.
+Its temporary objects stay outside the DataModel. Complete the mounting and
+first-person acceptance checks in [SCOOTER_DASHBOARD.md](../docs/SCOOTER_DASHBOARD.md).
+
 ```sh
 rojo build default.project.json --output /tmp/scooter-check.rbxlx
 rojo sourcemap default.project.json --output /tmp/scooter-sourcemap.json

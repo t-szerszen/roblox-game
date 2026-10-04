@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="850" viewBox="0 0 1400 850">
+<rect width="1400" height="850" fill="#101720"/>
+<text x="140" y="92" fill="#f2f8ff" font-family="sans-serif" font-size="30">Licznik hulajnogi — projekt 02</text>
+<text x="140" y="130" fill="#94a4b8" font-family="sans-serif" font-size="18">Wyśrodkowana prędkość · hamulec · bateria 67% · ECO / SPORT</text>
+<rect x="562" y="629" width="276" height="84" rx="6" fill="#1b2432"/>
+<path d="M217 200 L1183 200 L1255 272 L1255 572 L1183 644 L217 644 L145 572 L145 272 Z" fill="#1b2432" stroke="#344152" stroke-width="4"/>
+<path d="M230.5 228.5 L1169.5 228.5 L1226.5 285.5 L1226.5 558.5 L1169.5 615.5 L230.5 615.5 L173.5 558.5 L173.5 285.5 Z" fill="#080f19" stroke="#344152" stroke-width="2"/>
+<g transform="translate(176.5 231.5) scale(1.047 0.9525)">
+<rect x="52" y="49" width="34" height="5" fill="#3ddcf0" opacity="1"/>
+<text x="153.0" y="51.0" fill="#3ddcf0" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-weight="700" font-size="22">SPEED</text>
+<text x="845.5" y="54.0" fill="#3ddcf0" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-weight="700" font-size="33">KuKirin</text>
+<text x="794.0" y="238.0" fill="#f2f8ff" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-weight="700" font-size="32">km/h</text>
+<text x="154.0" y="333.0" fill="#ff4654" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-weight="700" font-size="27">(!)  BRAKE</text>
+<text x="848.5" y="333.0" fill="#aa88ff" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-weight="700" font-size="30">SPORT</text>
+<text x="616.0" y="333.0" fill="#f2f8ff" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-weight="700" font-size="26">67%</text>
+<rect x="354" y="322" width="178" height="26" fill="#080f19" opacity="0"/>
+<rect x="354" y="322" width="18" height="26" fill="#f2f8ff" opacity="1"/>
+<rect x="386" y="322" width="18" height="26" fill="#f2f8ff" opacity="1"/>
+<rect x="418" y="322" width="18" height="26" fill="#f2f8ff" opacity="1"/>
+<rect x="450" y="322" width="18" height="26" fill="#f2f8ff" opacity="1"/>
+<rect x="482" y="322" width="18" height="26" fill="#f2f8ff" opacity="0.15000000000000002"/>
+<rect x="514" y="322" width="18" height="26" fill="#f2f8ff" opacity="0.15000000000000002"/>
+<rect x="394.0" y="91" width="80" height="12" rx="3" fill="#f2f8ff" opacity="0.05"/>
+<rect x="474.0" y="107" width="12" height="82" rx="3" fill="#f2f8ff" opacity="1"/>
+<rect x="474.0" y="205" width="12" height="82" rx="3" fill="#f2f8ff" opacity="1"/>
+<rect x="394.0" y="291" width="80" height="12" rx="3" fill="#f2f8ff" opacity="0.05"/>
+<rect x="382.0" y="205" width="12" height="82" rx="3" fill="#f2f8ff" opacity="0.05"/>
+<rect x="382.0" y="107" width="12" height="82" rx="3" fill="#f2f8ff" opacity="1"/>
+<rect x="394.0" y="191" width="80" height="12" rx="3" fill="#f2f8ff" opacity="1"/>
+<rect x="526.0" y="91" width="80" height="12" rx="3" fill="#f2f8ff" opacity="1"/>
+<rect x="606.0" y="107" width="12" height="82" rx="3" fill="#f2f8ff" opacity="1"/>
+<rect x="606.0" y="205" width="12" height="82" rx="3" fill="#f2f8ff" opacity="1"/>
+<rect x="526.0" y="291" width="80" height="12" rx="3" fill="#f2f8ff" opacity="0.05"/>
+<rect x="514.0" y="205" width="12" height="82" rx="3" fill="#f2f8ff" opacity="0.05"/>
+<rect x="514.0" y="107" width="12" height="82" rx="3" fill="#f2f8ff" opacity="0.05"/>
+<rect x="526.0" y="191" width="80" height="12" rx="3" fill="#f2f8ff" opacity="0.05"/>
+</g>
+<text x="140" y="785" fill="#94a4b8" font-family="sans-serif" font-size="18">Podgląd: 47 km/h, SPORT, bateria 67% i aktywny hamulec.</text>
+</svg>
