@@ -7,6 +7,9 @@ local Players = game:GetService("Players")
 local Config = require(ReplicatedStorage.Shared.Scooter.ScooterConfig)
 local AnimationMath = require(ReplicatedStorage.Shared.Scooter.ScooterAnimationMath)
 local RiderPose = require(script.Parent.ScooterRiderPose)
+local LimbSolver = require(script.Parent.ScooterLimbSolver)
+local FirstPerson = require(script.Parent.ScooterFirstPerson)
+type Joint = Motor6D | AnimationConstraint
 
 export type Animator = {
 	mount: (character: Model) -> boolean,
@@ -14,13 +17,18 @@ export type Animator = {
 	getState: () -> AnimationMath.LegState?,
 }
 
-type Arm = { pole: Attachment, side: number, base: Vector3 }
+type Arm = { pole: Attachment, side: number, base: Vector3, grip: Attachment, target: Attachment }
 
 local ScooterAnimator = {}
 
-local function findMotor(character: Model, name: string): Motor6D?
+local function setTransform(joint: Joint, transform: CFrame)
+	if joint:IsA("Motor6D") then joint.Transform = transform
+	else (joint :: AnimationConstraint).Transform = transform end
+end
+
+local function findMotor(character: Model, name: string): Joint?
 	local instance = character:FindFirstChild(name, true)
-	return if instance and instance:IsA("Motor6D") then instance else nil
+	return if instance and (instance:IsA("Motor6D") or instance:IsA("AnimationConstraint")) then (instance :: Joint) else nil
 end
 
 local function animationId(value: string): string?
@@ -31,9 +39,12 @@ end
 function ScooterAnimator.new(scooter: Model): Animator
 	local connections: { RBXScriptConnection } = {}
 	local created: { Instance } = {}
-	local transforms: { [Motor6D]: CFrame } = {}
+	local transforms: { [Joint]: CFrame } = {}
 	local arms: { Arm } = {}
 	local pose: RiderPose.Controller? = nil
+	local limbs: LimbSolver.Controller? = nil
+	local firstPerson: { Destroy: () -> () }? = nil
+	local authoredLegWeight = 0
 	local lean = 0
 	local mounted = false
 	local state: AnimationMath.LegState? = nil
@@ -84,9 +95,11 @@ function ScooterAnimator.new(scooter: Model): Animator
 		state = nil
 		for _, instance in created do instance:Destroy() end
 		table.clear(created)
+		if limbs then limbs.Destroy(); limbs = nil end
+		if firstPerson then firstPerson.Destroy(); firstPerson = nil end
 		if pose then pose:Destroy(); pose = nil end
 		for motor, transform in transforms do
-			if motor.Parent then motor.Transform = transform end
+			if motor.Parent then setTransform(motor, transform) end
 		end
 		table.clear(transforms)
 		table.clear(arms)
@@ -107,6 +120,7 @@ function ScooterAnimator.new(scooter: Model): Animator
 			-- A client-created Animator cannot replicate tracks; the binding retries streamed descendants.
 			return false
 		end
+		if humanoid.RigType == Enum.HumanoidRigType.R15 then limbs = LimbSolver.Start(character) end
 		local waist = findMotor(character, "Waist")
 		local rootJoint = findMotor(character, "RootJoint") or findMotor(character, "Root")
 		for _, motor in { waist, rootJoint } do
@@ -130,12 +144,19 @@ function ScooterAnimator.new(scooter: Model): Animator
 				local side = if sideName == "Left" then -1 else 1
 				local pole = Instance.new("Attachment")
 				pole.Name = "Scooter" .. sideName .. "ElbowPole"
-				local base = root.CFrame:PointToObjectSpace(upperArm.Position)
+				local upperTorso = character:FindFirstChild("UpperTorso")
+				local poleParent = if upperTorso and upperTorso:IsA("BasePart") then upperTorso else root
+				local base = poleParent.CFrame:PointToObjectSpace(upperArm.Position)
 					+ Vector3.new(side * Config.RiderPose.ElbowOutwardOffset, 0, -Config.RiderPose.ElbowForwardOffset)
 				pole.Position = base
-				pole.Parent = root
+				pole.Parent = poleParent
 				table.insert(created, pole)
-				table.insert(arms, { pole = pole, side = side, base = base })
+				local target = Instance.new("Attachment")
+				target.Name = "Local" .. sideName .. "HandTarget"
+				target.Parent = handleBar
+				target.WorldCFrame = CFrame.new(grip.WorldPosition) * root.CFrame.Rotation * CFrame.Angles(math.pi * 0.5, 0, 0)
+				table.insert(created, target)
+				table.insert(arms, { pole = pole, side = side, base = base, grip = grip, target = target })
 				local control = Instance.new("IKControl")
 				control.Name = "Scooter" .. sideName .. "HandIK"
 				control.Type = Enum.IKControlType.Position
@@ -146,6 +167,7 @@ function ScooterAnimator.new(scooter: Model): Animator
 				control.Priority = 100
 				control.SmoothTime = 0
 				control.Weight = 1
+				control.Enabled = not (limbs and limbs.HasLimb(sideName .. "Hand"))
 				control.Parent = humanoid
 				table.insert(created, control)
 			end
@@ -166,6 +188,8 @@ function ScooterAnimator.new(scooter: Model): Animator
 		end
 		pose = RiderPose.Start(character, scooter, preserveAnimations)
 		if not pose then animator.dismount(); return false end
+		if limbs then pose:SetSolvedLimbs({ LeftFoot = limbs.HasLimb("LeftFoot"), RightFoot = limbs.HasLimb("RightFoot") }) end
+		if owner and owner == Players.LocalPlayer then firstPerson = FirstPerson.Start(character) end
 		local characterAnimator = humanoid:FindFirstChildOfClass("Animator")
 		if humanoid.RigType == Enum.HumanoidRigType.R15 and characterAnimator then
 			for clipState, id in ids do
@@ -212,7 +236,7 @@ function ScooterAnimator.new(scooter: Model): Animator
 			if not mounted then return end
 			-- Remove our previous layer before the Animator evaluates, avoiding cumulative lean.
 			for motor in transforms do
-				if motor.Parent then motor.Transform = CFrame.identity end
+				if motor.Parent then setTransform(motor, CFrame.identity) end
 			end
 			local velocity = root.AssemblyLinearVelocity
 			local angleAttribute = scooter:GetAttribute("SteeringAngle")
@@ -226,7 +250,9 @@ function ScooterAnimator.new(scooter: Model): Animator
 			for _, arm in arms do
 				-- A pole lifts the elbow while leaving the hand under the IK solver's control.
 				local lift = math.max(0, steering * arm.side) * Config.RiderPose.ElbowLift
-				arm.pole.Position = arm.base + Vector3.yAxis * lift
+				local poleAlpha = 1 - math.exp(-Config.RiderPose.ElbowBlendSpeed * math.clamp(deltaTime, 0, 0.1))
+				arm.pole.Position = arm.pole.Position:Lerp(arm.base + Vector3.yAxis * lift, poleAlpha)
+				arm.target.WorldCFrame = CFrame.new(arm.grip.WorldPosition) * root.CFrame.Rotation * CFrame.Angles(math.pi * 0.5, 0, 0)
 			end
 			if pose then
 				local authoredWeight = 0
@@ -234,6 +260,7 @@ function ScooterAnimator.new(scooter: Model): Animator
 					-- Stop begins a fade; its remaining weight still affects legs after playback stops.
 					if track.Length > 0 then authoredWeight += track.WeightCurrent end
 				end
+				authoredLegWeight = authoredWeight
 				pose:SetAuthoredLegWeight(authoredWeight)
 				pose:Update(deltaTime)
 			end
@@ -242,10 +269,27 @@ function ScooterAnimator.new(scooter: Model): Animator
 			if not mounted then return end
 			local rootShare = if waist then Config.RiderPose.RootLeanShare else 1
 			if rootJoint and rootJoint.Parent then
-				rootJoint.Transform = rootJoint.Transform * CFrame.Angles(0, 0, lean * rootShare)
+				setTransform(rootJoint, rootJoint.Transform * CFrame.Angles(0, 0, lean * rootShare))
 			end
 			if waist and waist.Parent then
-				waist.Transform = waist.Transform * CFrame.Angles(0, 0, lean * (if rootJoint then 1 - rootShare else 1))
+				local steeringAttribute = scooter:GetAttribute("SteeringAngle")
+				local steeringAngle = if typeof(steeringAttribute) == "number" then steeringAttribute else 0
+				local forwardShift = Config.RiderPose.WaistForwardShift
+					+ math.abs(steeringAngle / Config.MaxHandlebarAngle) * Config.RiderPose.WaistSteeringForwardShift
+				setTransform(waist, waist.Transform * CFrame.new(0, 0, -forwardShift)
+					* CFrame.Angles(-Config.RiderPose.WaistForwardPitch, -steeringAngle * Config.RiderPose.WaistSteeringYawFactor,
+						lean * (if rootJoint then 1 - rootShare else 1)))
+			end
+			if limbs and pose then
+				local characterRoot = character:FindFirstChild("HumanoidRootPart")
+				local lower = if characterRoot and characterRoot:IsA("BasePart") then LimbSolver.JointPose(rootJoint, characterRoot.CFrame) else nil
+				local upper = if lower then LimbSolver.JointPose(waist, lower) else nil
+				local targets, poles = pose:GetTargets(), pose:GetPoles()
+				for _, arm in arms do
+					local name = if arm.side < 0 then "LeftHand" else "RightHand"
+					targets[name], poles[name] = arm.target, arm.pole
+				end
+				limbs.Apply(upper, lower, targets, poles, authoredLegWeight < 0.001)
 			end
 		end))
 		return true
