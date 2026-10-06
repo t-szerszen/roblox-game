@@ -1,5 +1,28 @@
 # Scooter verification
 
+## Read-only model inspection
+
+After Rojo sync, run `tests/scooter_inspection.studio.luau` in Studio's Command Bar.
+It uses real unparented Roblox Instances to check nested raw MeshParts, repeated
+names, endpoint IDs, external/missing endpoints, CFrames, JSON force limits and
+preservation of transforms, hierarchy and selection. The authored scooter and map
+remain untouched. See [inspection workflow](../docs/SCOOTER_INSPECTION.md).
+
+`tests/scooter_build.studio.luau` verifies the new nested-model draft builder in
+Edit mode using unparented real Instances: uniform scaling, preserved source,
+two central springs, independent wheels, coherent pivots and rigid connectivity.
+It rejects missing components, invalid scales, external/cross-assembly links and
+executable content. This does not test spring forces or rideability; see
+[assembly and runtime verification](../docs/SCOOTER_FINAL_RIG.md).
+
+`tests/scooter_install.studio.luau` runs in Edit mode against the actual approved
+ScooterFinalRig in Workspace or ServerStorage.ScooterAuthoring. It clones fresh
+modules and unparented models, checks unchanged mesh/mount frames, two central
+shocks, calibrated limits and mass, deck/grip targets, runtime cloning and rejection
+of unapproved mounts or cross-assembly decoration welds. It cleans up all fixtures
+and leaves the active template untouched. Real Play observations are recorded in
+[SCOOTER_FINAL_RIG.md](../docs/SCOOTER_FINAL_RIG.md); CLI doubles do not solve physics.
+
 ## Runtime regression suite
 
 Run with Python 3 and the [official Luau CLI](https://github.com/luau-lang/luau/releases):
@@ -51,10 +74,33 @@ self-collision exclusions, and original recovery by matching retained mesh asset
 It exercises the real ScooterServer spawn and unoccupied PreSimulation loop with
 service doubles to check initial yaw/torque, articulated support mass, preserved
 deck collision, subsequent balance torque and cleanup. It does not integrate the
-Roblox constraint/contact solver.
+Roblox constraint/contact solver. The same server fixture also checks malformed
+and extra-argument headlight requests, unauthorized/unmounted riders, cooldown,
+white on/off state, and braking versus reverse lamp semantics. The visual suite
+checks exact restoration of a reused authored PointLight.
+
+The latest refinement run passed 747 CLI assertions. Native Play verification
+for scale 0.30 includes mounted neutral steering, turn/return, ECO acceleration,
+lights, forward starts against 0.65/0.90-stud vertical curbs, reverse against
+a 0.65-stud curb, and fast versus slow wall impacts. Follow-up tests used the
+actual 1-stud map sidewalk: starting against the front tire, starting with the
+front tire already on top and the rear blocked, and a 45-degree approach.
+Stationary A/D reached both 48-degree limits and returned to center. CLI tests
+also cover above-center corners, angled contact, distant-face rejection and
+stationary server steering without chassis yaw. See the recorded limits
+in SCOOTER_FINAL_RIG.md; manual keyboard/mobile and two-client checks remain.
+
+The 2026-10-05 native builder suite additionally covers the remodeled full-front
+steering and the older independent-wheel topology, optional fork/lever/caliper
+mapping, rebuilding a weld-free dashboard, imported pivot normalization and
+idempotent yellow endpoint markers. The installer suite tests a detached copy of
+the actual draft, setting approval only on that copy. It verifies preserved
+meshes/endpoints, both supported steering contracts, marker removal, calibration,
+repeatable cloning and the approval guard without installing or approving the
+user's active draft. This is structural verification, not a new Play test.
 
 The handling suite checks the inclusive 5 km/h W+S threshold, wheelbase-based
-curvature at crawling speeds, bounded heading lead, the reduced handlebar deflection,
+curvature at crawling speeds, bounded heading lead, the bounded 48-degree handlebar deflection,
 smooth wheelie return while moving, frame-rate independence and increased world
 travel speed. Server integration also checks real DriveInput activation without
 a burnout hint, motor torque/acceleration, speed/input expiry shutdown, release
@@ -213,17 +259,17 @@ Avoid changing the production `Workspace.Map` for testing.
    Test different avatar scales and slopes. Confirm missing/unavailable IDs retain
    foot support, and death/dismount/remount leave no owned tracks or state listeners.
 
-10. **Optional brake light and chassis roll.** BrakeLight.Enabled defaults to false;
-    verify S/reverse and W+S leave the authored fender appearance intact and add no
-    brake glow. The following light checks apply only if explicitly enabled for a
-    future lamp test. With two clients, hold S while moving and
-    while reversing, then W+S during burnout: BackFender is red and the brake glow
-    is visible to both. Release S or use W alone: all authored appearance returns.
-    Test expiry, death, dismount, crash and replacement while braking; no light
-    remains enabled or accumulates. Check textured and untextured fenders in daylight
-    and darkness. Drive both turn directions at increasing speed: roll is inward,
-    capped at 16 degrees and smooth. Stop, lose wheel contact and trigger wheelie:
-    roll returns toward neutral without upsetting pitch or spring travel. Test slopes.
+10. **Dedicated lights and chassis roll.** With the central-shock template,
+    S while moving forward shows BRAKE and the red StopLight. Reversing keeps
+    StopLight on and shows R without BRAKE; W brakes reverse motion and shows
+    BRAKE. Test W+S, input expiry, dismount, crash and replacement. L toggles a
+    white front beam; invalid/spam requests must not toggle it. With two clients
+    verify both lamps replicate and no runtime lights accumulate after respawn.
+    The legacy whole-fender effect remains disabled. Check daylight/darkness, HUD
+    cleanup, first-/third-person readability and the enlarged physical screen.
+    Drive both turn directions at increasing speed: roll is inward, capped at
+    16 degrees and smooth. Stop, lose wheel contact and trigger wheelie: roll
+    returns toward neutral without upsetting pitch or spring travel. Test slopes.
     In a test template set asymmetric Servo limits containing zero; inspect TargetAngle
     and Steering to confirm the chassis uses the same reduced steering. Reverse
     Attachment0/Attachment1 and verify the handlebar still follows input. Actual
@@ -263,3 +309,46 @@ sideways or force a wheelie crash and verify the deck proxy stops ground penetra
 Confirm the deck does not touch its own wheel proxies through the entire suspension
 stroke. Repeat on a curb, slope and with rider mount/dismount; real solver behavior
 and visual mounting alignment require Studio checks.
+
+The terrain suite adds 28 checks of real ScooterTerrain/ScooterImpact logic:
+face/top/overhead validation, radius bounds, low-ray fallback, completing the
+last centimeters, mass-scaled support, reverse symmetry, actuator cleanup, recent
+wall contact and speed loss, slow/glancing/ground impacts, stale contact and
+unmounted eligibility. These doubles do not solve suspension. Native build and
+install fixtures also verify the eighth kingpin hinge, deck-fixed swingarms/shock,
+legacy repair compatibility and preservation of authored central-rig mounts.
+
+## Scale comparison acceptance
+
+After generating both templates with `ScooterWorkflow.InstallScaleVariants()`,
+run `tests/scooter_scale_variants.studio.luau` in Studio Edit. It checks both real
+models' joint alignment, calibrated travel, meshes, proportional scaling, mass
+and grip targets. In Play, use the two E comparison prompts by the spawn, then
+the ordinary ride prompt. Drive both sizes through the X=213 painted crossing
+and restart against its one-stud sidewalk at an angle. See
+[SCOOTER_SCALE_TESTS.md](../docs/SCOOTER_SCALE_TESTS.md) for the diagnosed paint
+collision issue and the explicit authoring repair.
+
+## Arcade curb acceptance at 0.25
+
+Current comparisons are disabled after selecting 0.25. The CLI terrain regressions
+cover the 2.5-stud height limit/tolerance, glancing approaches, parallel rejection
+and finite airborne contact grace. Native acceptance used wide temporary ledges
+outside Workspace.Map: forward 2.5 studs at 45 degrees, one stud at 75 degrees,
+reverse 2.4 studs at 45 degrees, and rejection of a three-stud wall from rest.
+Both wheels must reach the top, with the rider mounted and not fallen. See
+[SCOOTER_ARCADE_HANDLING.md](../docs/SCOOTER_ARCADE_HANDLING.md).
+
+## Rider fit and curb momentum
+
+`scooter_rider_pose.spec.luau` covers analytic joint geometry, Motor6D and
+AnimationConstraint reach/cleanup, left-foot balance and idle-ground support,
+first-person arm visibility/cleanup, and non-braking curb assistance. The suite
+currently passes 828 assertions. Native Play acceptance and fixture measurements
+are documented in [SCOOTER_RIDER_POSE.md](../docs/SCOOTER_RIDER_POSE.md).
+
+The rider suite also verifies permanent server leg calibration on Motor6D and
+AnimationConstraint rigs, idempotent appearance setup, unchanged mesh dimensions
+and original RigAttachment frames, ball-socket alignment, and clamping distant
+limb goals without translation. Native Play verifies spawn/respawn consistency,
+full-lock grip reach, deck-centered right support and controlled wheelie.

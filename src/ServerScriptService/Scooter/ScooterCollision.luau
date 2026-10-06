@@ -64,7 +64,7 @@ end
 
 local function deckContact(model: Model, configuration: typeof(Config))
 	local deck = model:FindFirstChild("FootRest")
-	assert(deck and deck:IsA("MeshPart"), "Scooter requires FootRest")
+	assert(deck and deck:IsA("BasePart"), "Scooter requires FootRest")
 	local existing = model:FindFirstChild("DeckCollider")
 	assert(not existing or (existing:IsA("Part") and existing:GetAttribute("RuntimeCollisionProxy") == true),
 		"DeckCollider is reserved for the runtime deck contact")

@@ -26,8 +26,8 @@ end
 check(math.acos(math.clamp(fwd:Dot(held), -1, 1)) <= Config.MaxHeadingLeadAngle + 1e-6,
 	"Blocked chassis cannot wind up several revolutions of desired heading")
 local reducedTarget = Physics.GetServoSteering(1, false, false, -90, 90)
-check(math.abs(reducedTarget) <= 30 and math.abs(reducedTarget) < 45,
-	"Handlebar no longer reaches the excessive former 45-degree deflection")
+near(math.abs(reducedTarget), math.deg(Config.MaxHandlebarAngle), "Low-speed steering uses the configured maneuvering angle")
+check(math.abs(reducedTarget) < 55, "Maneuvering angle remains below 55 degrees")
 
 local pitch = math.rad(50)
 local dropped = Physics.AdvanceWheeliePitch(pitch, 0, 20, 0.1)
@@ -42,8 +42,12 @@ for _ = 1, 180 do pitch = Physics.AdvanceWheeliePitch(pitch, 0, 20, 1 / 60) end
 near(pitch, 0, "Released wheelie reaches the riding pose without stopping the scooter")
 
 local tuning = assert(Config.GetTuning(Config.DefaultModel, 0))
+check(tuning.maxSpeed * Config.StudsPerKmH / tuning.acceleration > 3,
+	"SPORT acceleration takes over three seconds to reach the flat-ground cap")
+check(Config.GetDriveModeAcceleration(tuning.acceleration, "ECO") < tuning.acceleration,
+	"ECO acceleration is gentler than SPORT")
 local velocity = Vector.zero
-for _ = 1, 120 do
+for _ = 1, 240 do
 	local force = Physics.ComputeDriveForce({ velocity = velocity, forward = fwd, groundUp = Vector.yAxis,
 		gravity = 196.2, mass = 10, maxSpeed = tuning.maxSpeed * Config.StudsPerKmH, acceleration = tuning.acceleration,
 		throttleHeld = true, brakeHeld = false, burnout = false, grounded = true, fallen = false, deltaTime = 1 / 60 })
@@ -68,15 +72,15 @@ end
 local reverseLimit = Config.MaxReverseSpeedKmh * Config.StudsPerKmH
 check(integrateManeuver(0, false, true, 1 / 60, 60, fwd, Vector.yAxis) < -12 * Config.StudsPerKmH,
 	"Reverse accelerates beyond the former 12 km/h limit")
-near(integrateManeuver(0, false, true, 1 / 60, 60, fwd, Vector.yAxis), -reverseLimit,
+near(integrateManeuver(0, false, true, 1 / 60, 120, fwd, Vector.yAxis), -reverseLimit,
 	"Held S settles at the new reverse speed cap")
-near(integrateManeuver(20, false, true, 1 / 30, 30, fwd, Vector.yAxis), -reverseLimit,
+near(integrateManeuver(20, false, true, 1 / 30, 60, fwd, Vector.yAxis), -reverseLimit,
 	"Continuous S transitions from braking into reverse without another press")
-near(integrateManeuver(20, false, true, 1 / 120, 120, fwd, Vector.yAxis), -reverseLimit,
+near(integrateManeuver(20, false, true, 1 / 120, 240, fwd, Vector.yAxis), -reverseLimit,
 	"Braking into reverse also reaches its cap at higher frame rate")
-check(1 + maneuver(1, false, true, 1 / 60, fwd, Vector.yAxis) / 60 < 0,
+check(integrateManeuver(1, false, true, 1 / 60, 6, fwd, Vector.yAxis) < 0,
 	"Crawling forward transitions into reverse without waiting at near-zero speed")
-check(-1 + maneuver(-1, true, false, 1 / 60, fwd, Vector.yAxis) / 60 > 0,
+check(integrateManeuver(-1, true, false, 1 / 60, 6, fwd, Vector.yAxis) > 0,
 	"W switches a reverse crawl smoothly back to forward drive")
 near(maneuver(-reverseLimit, false, true, 1 / 60, fwd, Vector.yAxis), 0,
 	"Reverse does not keep accelerating at its cap")
@@ -91,8 +95,8 @@ local slopeUp = Vector.new(0, math.sqrt(3) / 2, -0.5)
 check(20 + (maneuver(20, false, true, 1 / 60, downhill, slopeUp)
 	+ Vector.new(0, -196.2, 0):Dot(downhill)) / 60 < 20,
 	"S can brake downhill even when slope gravity exceeds the raw brake deceleration")
-check(integrateManeuver(20, false, true, 1 / 60, 120, downhill, slopeUp) < -12 * Config.StudsPerKmH,
+check(integrateManeuver(20, false, true, 1 / 60, 240, downhill, slopeUp) < -12 * Config.StudsPerKmH,
 	"Held S can stop a downhill roll and then reverse uphill")
-check(integrateManeuver(-20, true, false, 1 / 60, 120, -downhill, slopeUp) > 0,
+check(integrateManeuver(-20, true, false, 1 / 60, 240, -downhill, slopeUp) > 0,
 	"W can stop a reverse slope roll and reengage forward drive")
 print(string.format("PASS: %d handling assertions (%d total)", testCount - start, testCount))

@@ -20,6 +20,39 @@ export type DriveInput = {
 
 local ScooterPhysics = {}
 
+function ScooterPhysics.IsCollisionImpact(previous: Vector3, current: Vector3, normal: Vector3): boolean
+	local settings = ScooterConfig.Impact
+	local approachSpeed = -previous:Dot(normal)
+	return math.abs(normal.Y) <= settings.MaxNormalY
+		and approachSpeed >= settings.MinSpeedKmh * ScooterConfig.StudsPerKmH
+		and (current - previous):Dot(normal) >= settings.MinSpeedLoss
+end
+
+function ScooterPhysics.ComputeStepForce(tangent: Vector3, velocity: Vector3, mass: number, gravity: number, forwardTarget: number?): Vector3
+	if mass <= 0 or gravity <= 0 or tangent.Y <= 0 then return Vector3.zero end
+	local settings = ScooterConfig.StepTraction
+	local acceleration = math.clamp((settings.ClimbSpeed - velocity.Y) * settings.Response,
+		-settings.Acceleration, settings.Acceleration)
+	local planar = Vector3.new(tangent.X, 0, tangent.Z)
+	local push = Vector3.zero
+	if planar.Magnitude > 0.001 then
+		local forward = planar.Unit
+		local target = forwardTarget or settings.MinimumForwardSpeed
+		local forwardAcceleration = math.clamp((target - velocity:Dot(forward)) * settings.ForwardResponse,
+			0, settings.ForwardAcceleration)
+		push = forward * forwardAcceleration
+	end
+	-- Bound vertical climbing speed without braking horizontal approach momentum.
+	return (Vector3.yAxis * math.max(0, gravity + acceleration) + push) * mass * settings.SupportMassFraction
+end
+
+function ScooterPhysics.IsBraking(forwardSpeed: number, throttleHeld: boolean, brakeHeld: boolean): boolean
+	-- S drives reverse once forward motion stops; W brakes a reverse roll.
+	return (throttleHeld and brakeHeld)
+		or (brakeHeld and forwardSpeed > ScooterConfig.StopSpeed)
+		or (throttleHeld and forwardSpeed < -ScooterConfig.StopSpeed)
+end
+
 function ScooterPhysics.ProjectOntoPlane(vector: Vector3, normal: Vector3): Vector3
 	return vector - normal * vector:Dot(normal)
 end
@@ -30,11 +63,8 @@ function ScooterPhysics.SmoothSteering(current: number, target: number, deltaTim
 	return if target == 0 and math.abs(steering) < 0.001 then 0 else steering
 end
 
-function ScooterPhysics.GetEffectiveSteering(steering: number, forwardSpeed: number, burnout: boolean?): number
+function ScooterPhysics.GetEffectiveSteering(steering: number, forwardSpeed: number, _burnout: boolean?): number
 	local speed = math.abs(forwardSpeed)
-	if speed < ScooterConfig.MinSteeringSpeed and not burnout then
-		return 0
-	end
 	local speedKmh = speed / ScooterConfig.StudsPerKmH
 	local fade = math.clamp(
 		(speedKmh - ScooterConfig.SteeringFadeStartKmh)

@@ -122,7 +122,10 @@ model:SetAttribute("SteeringAngle", Config.MaxHandlebarAngle)
 model.PrimaryPart.AssemblyLinearVelocity = Vector.new(0, 0, -30)
 services.RunService.PreAnimation:Fire(1 / 60)
 services.RunService.PreSimulation:Fire()
-check(waist.Transform.z < 0 and rootJoint.Transform.z < 0, "Waist and Root apply turn lean")
+local torsoPosture = Frame.Angles(-Config.RiderPose.WaistForwardPitch,
+	-Config.MaxHandlebarAngle * Config.RiderPose.WaistSteeringYawFactor, 0)
+check((torsoPosture:Inverse() * waist.Transform).z < 0 and rootJoint.Transform.z < 0,
+	"Waist and Root apply turn lean over the forward and steering posture")
 check(rightIK.Pole.Position.Y > leftIK.Pole.Position.Y, "Right turn raises right elbow pole")
 local firstLean = waist.Transform.z
 services.RunService.PreAnimation:Fire(0)

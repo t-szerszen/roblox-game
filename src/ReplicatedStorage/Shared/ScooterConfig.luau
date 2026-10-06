@@ -12,10 +12,18 @@ local ScooterConfig = {}
 
 -- Secondary systems remain parked while validating the drivable Studio MVP.
 ScooterConfig.GarageEnabled = false
+ScooterConfig.StudioScaleComparisonEnabled = false -- 0.25 selected after comparison.
+
+-- Developer comparisons reuse the owned scooter's tuning; they are not shop products.
+ScooterConfig.StudioScaleVariants = {
+	{ Id = "scale020", Scale = 0.20, TemplateName = "scooter_scale020", Label = "KuKirin 0,20", Offset = Vector3.new(-10, 0, 9) },
+	{ Id = "scale025", Scale = 0.25, TemplateName = "scooter", Label = "KuKirin 0,25", Offset = Vector3.new(10, 0, 9) },
+}
 
 ScooterConfig.DriveModes = {
 	Default = "SPORT",
 	EcoMaxSpeedKmh = 25,
+	EcoAccelerationScale = 0.7,
 	ToggleCooldown = 0.4,
 	ToggleRemoteName = "ToggleDriveMode",
 }
@@ -23,31 +31,31 @@ ScooterConfig.DriveModes = {
 ScooterConfig.Models = {
 	["KuKirin G2 Pro"] = {
 		maxSpeed = 55,
-		acceleration = 135,
+		acceleration = 25,
 		turnTorque = 6200,
 		wheelieTorque = 5200,
 	},
 	["KuKirin G2 Max"] = {
 		maxSpeed = 65,
-		acceleration = 145,
+		acceleration = 28,
 		turnTorque = 6500,
 		wheelieTorque = 5700,
 	},
 	["KuKirin G2 Master"] = {
 		maxSpeed = 72,
-		acceleration = 155,
+		acceleration = 31,
 		turnTorque = 6800,
 		wheelieTorque = 6100,
 	},
 	["KuKirin G3 Pro"] = {
 		maxSpeed = 80,
-		acceleration = 170,
+		acceleration = 35,
 		turnTorque = 7200,
 		wheelieTorque = 6500,
 	},
 	["KuKirin G4"] = {
 		maxSpeed = 90,
-		acceleration = 185,
+		acceleration = 40,
 		turnTorque = 7600,
 		wheelieTorque = 7000,
 	},
@@ -80,6 +88,14 @@ ScooterConfig.BrakeLight = {
 	Range = 4,
 	EmissiveStrength = 1,
 }
+ScooterConfig.StopLight = {
+	Enabled = true, Color = Color3.fromRGB(255, 28, 35),
+	OffColor = Color3.fromRGB(85, 10, 14), Brightness = 1.5, Range = 4, EmissiveStrength = 1,
+}
+ScooterConfig.Headlight = {
+	ToggleRemoteName = "ToggleHeadlight", ToggleCooldown = 0.35,
+	Color = Color3.new(1, 1, 1), Brightness = 3, Range = 36, Angle = 65, EmissiveStrength = 1,
+}
 ScooterConfig.BurnoutMotorTorque = 100
 ScooterConfig.BurnoutMotorForceScale = 0.6
 ScooterConfig.BurnoutMotorAcceleration = 120
@@ -92,7 +108,7 @@ ScooterConfig.CoastingDeceleration = 10
 ScooterConfig.BrakingDeceleration = 40
 ScooterConfig.DirectionChangeBrakingDeceleration = 60
 ScooterConfig.DirectionChangeSpeedKmh = 2
-ScooterConfig.ReverseAcceleration = 75
+ScooterConfig.ReverseAcceleration = 25
 ScooterConfig.MaxReverseSpeedKmh = 18
 ScooterConfig.TurnRate = math.rad(165)
 ScooterConfig.MaxHeadingLeadAngle = math.rad(12)
@@ -100,8 +116,8 @@ ScooterConfig.HeadingLeadSeconds = 0.15
 ScooterConfig.MinSteeringSpeed = 0.5
 ScooterConfig.StopSpeed = 0.25
 ScooterConfig.SteerSmoothSpeed = 14
-ScooterConfig.SteeringFadeStartKmh = 40
-ScooterConfig.SteeringFadeEndKmh = 90
+ScooterConfig.SteeringFadeStartKmh = 25
+ScooterConfig.SteeringFadeEndKmh = 80
 ScooterConfig.HighSpeedSteeringScale = 0.55
 ScooterConfig.LateralGripDeceleration = 100
 ScooterConfig.HillAssistGravityScale = 0.85
@@ -110,8 +126,8 @@ ScooterConfig.WheelieMinSpeed = ScooterConfig.WheelieMinSpeedKmh * ScooterConfig
 ScooterConfig.WheelieKickAngle = math.rad(14)
 ScooterConfig.WheeliePitchRate = math.rad(34)
 ScooterConfig.WheelieBrakeDropRate = math.rad(125)
-ScooterConfig.WheelieNaturalDropRate = math.rad(45)
-ScooterConfig.WheelieReturnSpeed = 2.5
+ScooterConfig.WheelieNaturalDropRate = math.rad(58)
+ScooterConfig.WheelieReturnSpeed = 3.2
 ScooterConfig.WheelieBrakeReturnSpeed = 8
 ScooterConfig.WheelieRestAngle = math.rad(0.25)
 ScooterConfig.WheelieLowSpeedDropStart = 6
@@ -122,6 +138,11 @@ ScooterConfig.WheelieRecoveryDelay = 1.5
 ScooterConfig.CrashStunDuration = 2
 ScooterConfig.CrashEjectUpVelocity = 7
 ScooterConfig.CrashEjectSideVelocity = 9
+ScooterConfig.Impact = {
+	MinSpeedKmh = 24, MinSpeedLoss = 12, MemorySeconds = 0.2,
+	ProbePadding = 0.15, MaxNormalY = 0.3, MinOpposition = 0.65,
+	TipImpulsePerMass = 6,
+}
 ScooterConfig.UprightResponsiveness = 18
 ScooterConfig.UprightTorqueStiffness = 180
 ScooterConfig.UprightTorqueDamping = 26
@@ -133,7 +154,7 @@ ScooterConfig.PredictionCameraLead = 0.35
 ScooterConfig.PredictionCameraBlendSpeed = 12
 ScooterConfig.MaxSteeringLean = math.rad(16)
 ScooterConfig.SteeringLeanSmoothSpeed = 8
-ScooterConfig.MaxHandlebarAngle = math.rad(30)
+ScooterConfig.MaxHandlebarAngle = math.rad(48)
 ScooterConfig.HandlebarSmoothSpeed = 18
 ScooterConfig.HandlebarInputExponent = 0.72
 ScooterConfig.WheelBase = 4.5
@@ -173,13 +194,19 @@ ScooterConfig.GroundProbeTolerance = 0.45
 ScooterConfig.SuspensionProbeLift = 1.25
 ScooterConfig.GroundNormalSmoothSpeed = 14
 ScooterConfig.StepProbeDistance = 1.8
-ScooterConfig.StepProbeHeight = 0.02
-ScooterConfig.MaxStepHeight = 1.6
-ScooterConfig.StepMinUpVelocity = 4
-ScooterConfig.StepMaxUpVelocity = 28
-ScooterConfig.StepVelocityScale = 1.05
-ScooterConfig.StepForwardVelocity = 8
-ScooterConfig.StepCooldown = 0.18
+ScooterConfig.StepProbeHeight = 0.14
+ScooterConfig.StepProbeLowerHeight = 0.02
+ScooterConfig.MaxStepHeight = 2.5
+ScooterConfig.StepTraction = {
+	-- Arcade curb assistance: a contacted ledge can be taller than the tire.
+	MaxRadiusRatio = 3.5, ContactPadding = 0.18, MinForwardTangentRatio = 0.15,
+	MinFaceOpposition = 0.12,
+	ClimbSpeed = 5.5, Response = 16, Acceleration = 100, SupportMassFraction = 0.85,
+	AirContactGraceSeconds = 1.25,
+	HeightTolerance = 0.06, -- Solver penetration must not reject a ledge at the configured limit.
+	ForwardAcceleration = 80, ForwardResponse = 8, MinimumForwardSpeed = 8, SpeedRetention = 0.9,
+	MaxChassisPitch = math.rad(20),
+}
 ScooterConfig.ParkingLinearDamping = 4.5
 ScooterConfig.ParkingAngularDamping = 7
 ScooterConfig.ParkingGroundProbeDistance = 4
@@ -206,9 +233,23 @@ ScooterConfig.RiderPose = {
 	FootPlantClearance = 0.01,
 	FootTargetSink = 0.08,
 	WheelieRearFootShift = 0.15,
-	BalanceFootOffset = Vector3.new(0.2, 0, 0.2),
-	BalanceFootSwing = Vector3.new(0.08, 0, 0.08),
-	BalanceFootFrequency = 7,
+	BalanceFootOffset = Vector3.new(-0.6, 0.35, 0),
+	BalanceFootSwing = Vector3.new(0.12, 0.35, 1.6),
+	BalanceFootFrequency = 3.8,
+	RightFootForwardShift = 0.55,
+	RiderForwardShift = 0.65,
+	RiderCrouch = 0.35,
+	ReferenceStandingHeight = 4.67,
+	WaistForwardPitch = math.rad(20),
+	WaistForwardShift = 0.15,
+	WaistSteeringYawFactor = 1,
+	WaistSteeringForwardShift = 0.45,
+	IdleFootSideOffset = 1.35,
+	IdleScooterLean = math.rad(6),
+	IdleProbeLift = 3,
+	IdleProbeDepth = 8,
+	IdleProbeInterval = 0.08,
+	ElbowBlendSpeed = 6,
 	MaxBodyLean = math.rad(22),
 	LeanFullSpeed = 24,
 	LateralLeanFullSpeed = 10,
@@ -216,9 +257,10 @@ ScooterConfig.RiderPose = {
 	RootLeanShare = 0.3,
 	ElbowOutwardOffset = 1.2,
 	ElbowForwardOffset = 0.6,
-	ElbowLift = 0.7,
+	ElbowLift = 0.25,
 	GripHalfWidth = 0.58,
 }
+ScooterConfig.FirstPersonArms = { Enabled = true, HeadDistance = 1.5 }
 ScooterConfig.RiderAnimations = {
 	-- Supply R15 clips that key the legs/pelvis and leave the arms to hand IK.
 	IdleFootAnim = "",
@@ -265,6 +307,10 @@ end
 
 function ScooterConfig.GetDriveModeMaxSpeed(sportMaxSpeed: number, mode: string): number
 	return if mode == "ECO" then math.min(sportMaxSpeed, ScooterConfig.DriveModes.EcoMaxSpeedKmh) else sportMaxSpeed
+end
+
+function ScooterConfig.GetDriveModeAcceleration(sportAcceleration: number, mode: string): number
+	return sportAcceleration * (if mode == "ECO" then ScooterConfig.DriveModes.EcoAccelerationScale else 1)
 end
 
 return ScooterConfig

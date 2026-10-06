@@ -88,6 +88,11 @@ services.Workspace.Raycast = function(_, origin)
 end
 function services.Workspace:GetServerTimeNow() return testClock end
 local template = services.ServerStorage.ScooterModels.scooter
+local frontLamp = make(corrected, "MeshPart", "FrontLight")
+frontLamp.Massless = true
+local rearLamp = make(corrected, "Part", "StopLight")
+rearLamp.Massless = true
+make(rearLamp, "PointLight", "PointLight").Enabled = true
 local preservedParent = template.Parent
 template.Parent = services.ServerStorage
 corrected.Parent = preservedParent
@@ -123,6 +128,57 @@ local function tick(speed)
 end
 
 do
+	local lampStart = testCount
+	local remote = services.ReplicatedStorage.Remotes[Config.RemoteFolderName].ToggleHeadlight
+	local beam = scooter.FrontLight.HeadlightBeamAttachment.HeadlightBeam
+	check(not beam.Enabled and not scooter.StopLight.PointLight.Enabled, "Front/rear lights start off despite authored rear glow")
+	for _, value in { true, "on", 1, {}, 0 / 0 } do
+		remote.OnServerEvent:Fire(player, value)
+		check(not beam.Enabled, "Headlight remote rejects client state/invalid payload")
+	end
+	remote.OnServerEvent:Fire(player, nil)
+	check(not beam.Enabled, "Headlight rejects even an extra nil argument")
+	local outsider = makePlayer(8082)
+	outsider.Parent = playersService
+	remote.OnServerEvent:Fire(outsider)
+	check(not beam.Enabled, "Headlight denies another player's scooter")
+	remote.OnServerEvent:Fire(player)
+	check(beam.Enabled and scooter:GetAttribute("HeadlightEnabled") == true, "Mounted owner toggles white front beam")
+	check(beam.Color == Config.Headlight.Color and scooter.FrontLight.Material == enumMock.Material.Neon, "Beam and lamp use white emission")
+	remote.OnServerEvent:Fire(player)
+	check(beam.Enabled, "Headlight server cooldown blocks spam")
+	testClock += Config.Headlight.ToggleCooldown
+	remote.OnServerEvent:Fire(player)
+	check(not beam.Enabled and scooter:GetAttribute("HeadlightEnabled") == false, "Valid second toggle turns beam off")
+	scooter.DriverSeat.Occupant = nil
+	testClock += 1
+	remote.OnServerEvent:Fire(player)
+	check(not beam.Enabled, "Unmounted owner cannot switch headlight")
+	scooter.DriverSeat.Occupant = humanoid
+	controls(false, true, 0, false)
+	tick(10)
+	check(scooter:GetAttribute("BrakeActive") and scooter.StopLight.PointLight.Enabled, "S during forward roll lights BRAKE and stop")
+	controls(false, true, 0, false)
+	tick(-10)
+	check(not scooter:GetAttribute("BrakeActive") and scooter:GetAttribute("StopLightActive"), "Reverse drive lights stop without BRAKE")
+	controls(false, false, 0, false)
+	tick(-5)
+	check(not scooter:GetAttribute("BrakeActive") and scooter.StopLight.PointLight.Enabled, "Reverse coasting retains stop")
+	controls(true, false, 0, false)
+	tick(-10)
+	check(scooter:GetAttribute("BrakeActive") and scooter.StopLight.PointLight.Enabled, "W brakes a reverse roll")
+	controls(false, false, 0, false)
+	tick(0)
+	check(not scooter:GetAttribute("BrakeActive") and not scooter.StopLight.PointLight.Enabled, "Idle clears both brake indicators")
+	controls(true, true, 0, false)
+	tick(0)
+	check(scooter:GetAttribute("BrakeActive") and scooter.StopLight.PointLight.Enabled, "W+S retains brake while stationary")
+	controls(false, false, 0, false)
+	tick(0)
+	print(string.format("PASS: %d light, brake semantics and remote validation assertions", testCount - lampStart))
+end
+
+do
 local modesStart = testCount
 local modeRemote = services.ReplicatedStorage.Remotes[Config.RemoteFolderName].ToggleDriveMode
 check(scooter:GetAttribute("DriveMode") == "SPORT", "New scooters start in SPORT")
@@ -152,7 +208,7 @@ check(acceleration < 0 and math.abs(acceleration) <= scooter:GetAttribute("Accel
 	"ECO overspeed deceleration uses the existing bounded drive force")
 check(root.AssemblyLinearVelocity == movingVelocity, "The drive controller does not teleport the velocity to the ECO cap")
 local speed = 55 * Config.StudsPerKmH
-for _ = 1, 90 do
+for _ = 1, 300 do
 	controls(true, false, 0, false)
 	root.AssemblyLinearVelocity = root.CFrame.LookVector * speed
 	services.RunService.PreSimulation:Fire(1 / 60)
@@ -182,6 +238,17 @@ end
 near(Config.GetDriveModeMaxSpeed(20, "ECO"), 20, "ECO does not raise a model's native limit")
 print(string.format("PASS: %d drive mode server assertions", testCount - modesStart))
 end
+controls(false, false, 1, false)
+scooter.ScooterBody.HingeConstraint.CurrentAngle = -48
+tick(0)
+check(math.abs(scooter.ScooterBody.HingeConstraint.TargetAngle) > 0
+	and math.abs(scooter.ScooterBody.HingeConstraint.TargetAngle) <= math.deg(Config.MaxHandlebarAngle),
+	"A stationary mounted rider can steer without throttle or burnout")
+check(upright.CFrame.LookVector:Dot(root.CFrame.LookVector) > 0.999,
+	"Stationary measured steering does not rotate the chassis heading")
+scooter.ScooterBody.HingeConstraint.CurrentAngle = 0
+controls(false, false, 0, false)
+tick(0)
 controls(true, true, 0, false)
 tick(4.9 * Config.StudsPerKmH)
 local rearMotor = scooter.VirtualBackAxle.HingeConstraint
@@ -205,7 +272,7 @@ local servo = scooter.ScooterBody.HingeConstraint
 servo.CurrentAngle = 0
 controls(true, true, 1, false)
 tick(0)
-check(math.abs(servo.TargetAngle) > 0 and math.abs(servo.TargetAngle) <= 30,
+check(math.abs(servo.TargetAngle) > 0 and math.abs(servo.TargetAngle) <= math.deg(Config.MaxHandlebarAngle),
 	"Stationary burnout accepts bounded steering input")
 check(math.abs(upright.CFrame.LookVector:Dot(root.CFrame.RightVector)) < 1e-6,
 	"Burnout also waits for actual Servo deflection")
@@ -214,6 +281,7 @@ tick(0)
 check(upright.CFrame.LookVector:Dot(root.CFrame.RightVector) > 0,
 	"Measured right steering permits a stationary burnout donut")
 local totalYaw = 0
+servo.CurrentAngle = -math.deg(Config.MaxHandlebarAngle)
 for _ = 1, 70 do
 	controls(true, true, 1, false)
 	root.CFrame = Frame.new(root.Position) * upright.CFrame
@@ -225,7 +293,7 @@ end
 check(totalYaw > math.pi * 2 and scooter:GetAttribute("BurnoutActive") == true,
 	"Burnout heading can complete an entire donut without translation or losing the motor")
 servo.CurrentAngle = 20
-tick(0)
+for _ = 1, 3 do tick(0) end
 check(upright.CFrame.LookVector:Dot(root.CFrame.RightVector) < 0, "Left burnout steering reverses the donut")
 controls(true, false, 1, false)
 tick(0)
@@ -278,7 +346,7 @@ local supportMass = scooter:GetAttribute("UprightSupportMass")
 check(1 + root.ScooterDriveForce.Force:Dot(root.CFrame.LookVector) / supportMass * 0.1 < 0,
 	"Server accepts S at forward crawl and immediately supplies reverse drive force")
 local reverseSpeed = 0
-for _ = 1, 10 do
+for _ = 1, 20 do
 	controls(false, true, 0, false)
 	tick(reverseSpeed)
 	reverseSpeed += root.ScooterDriveForce.Force:Dot(root.CFrame.LookVector) / supportMass * 0.1
@@ -343,6 +411,17 @@ check(pcall(Rig.Inspect, rollback) and #Geometry.Check(rollback).errors == 0,
 	"Failure after mesh movement retains mechanically valid baseline welds and attachments")
 rollback:Destroy()
 incompatibleRest.Parent = nil
+local savedStudioCheck = services.RunService.IsStudio
+services.RunService.IsStudio = function() return false end
+check(not Server.RequestStudioScaleForPlayer(player, "scale020"),
+	"Published servers cannot use the Studio scale selection endpoint")
+services.RunService.IsStudio = function() return true end
+check(not Server.RequestStudioScaleForPlayer(player, "arbitrary_template"),
+	"Studio selection rejects template names outside the explicit variant whitelist")
+check(not Server.RequestSpawnForPlayer(player, "scale020"),
+	"Normal spawn requests cannot treat a development scale as an owned shop product")
+check(not fallback.destroyed, "Rejected scale requests preserve the player's working scooter")
+services.RunService.IsStudio = savedStudioCheck
 Server.Stop()
 check(fallback.destroyed, "Server stop cleans up the fallback spawned rig")
 corrected.Parent = nil

@@ -13,6 +13,7 @@ export type Rig = {
 	handleBar: MeshPart,
 	stick: MeshPart,
 	frontAxle: Part,
+	wheelSteering: HingeConstraint?,
 	backAxle: Part,
 	steering: HingeConstraint,
 	frontHinge: HingeConstraint,
@@ -56,8 +57,10 @@ function ScooterRig.Inspect(source: Instance): Rig
 	local backWheel = child(source, "BackWheel", "MeshPart") :: MeshPart
 	local frontAxle = child(source, "VirtualFrontAxle", "Part") :: Part
 	local backAxle = child(source, "VirtualBackAxle", "Part") :: Part
-	child(source, "FootRest", "MeshPart")
-	child(source, "BackFender", "MeshPart")
+	local central = source:GetAttribute("CentralShockRig") == true
+	local independent = source:GetAttribute("IndependentFrontSteering") == true
+	child(source, "FootRest", if central then "BasePart" else "MeshPart")
+	if not central then child(source, "BackFender", "MeshPart") end
 	local steering = child(body, "HingeConstraint", "HingeConstraint") :: HingeConstraint
 	assert(not steering.LimitsEnabled or (steering.LowerAngle <= 0 and steering.UpperAngle >= 0),
 		"ScooterBody.HingeConstraint limits must include neutral steering (0 degrees)")
@@ -66,29 +69,47 @@ function ScooterRig.Inspect(source: Instance): Rig
 	checkWeld(stick, stick, handleBar)
 
 	for _, endName in { "Front", "Back" } do
-		local base = if endName == "Front" then stick else body
+		local base = if endName == "Front" and not independent then stick else body
 		local axle = if endName == "Front" then frontAxle else backAxle
 		for _, side in { "Left", "Right" } do
 			local suffix = endName .. "Suspension" .. side
 			local arm = child(source, suffix, "MeshPart") :: MeshPart
 			local hinge = child(base, "PivotHinge_" .. suffix, "HingeConstraint") :: HingeConstraint
-			local spring = child(base, "ShockAbsorber_" .. suffix, "SpringConstraint") :: SpringConstraint
 			checkLink(hinge, child(base, "PivotAttBase_" .. suffix, "Attachment") :: Attachment,
 				child(arm, "PivotAtt_" .. suffix, "Attachment") :: Attachment)
-			checkLink(spring, child(base, "SpringAttBase_" .. suffix, "Attachment") :: Attachment,
-				child(arm, "SpringAtt_" .. suffix, "Attachment") :: Attachment)
+			if not central then
+				local spring = child(base, "ShockAbsorber_" .. suffix, "SpringConstraint") :: SpringConstraint
+				checkLink(spring, child(base, "SpringAttBase_" .. suffix, "Attachment") :: Attachment,
+					child(arm, "SpringAtt_" .. suffix, "Attachment") :: Attachment)
+			end
 			checkWeld(axle, axle, arm)
 		end
+		if central then
+			local spring = child(base, "ShockAbsorber_" .. endName, "SpringConstraint") :: SpringConstraint
+			checkLink(spring, child(base, "SpringAttBase_" .. endName, "Attachment") :: Attachment,
+				child(axle, "SpringAtt_" .. endName, "Attachment") :: Attachment)
+		end
 	end
-	local frontHinge = child(frontAxle, "HingeConstraint", "HingeConstraint") :: HingeConstraint
+	local carrier = if independent then child(source, "FrontSteeringCarrier", "Part") :: Part else frontAxle
+	local wheelSteering: HingeConstraint? = nil
+	if independent then
+		local kingpin = child(frontAxle, "FrontSteeringHinge", "HingeConstraint") :: HingeConstraint
+		wheelSteering = kingpin
+		checkLink(kingpin, child(frontAxle, "KingpinBase", "Attachment") :: Attachment,
+			child(carrier, "KingpinPivot", "Attachment") :: Attachment)
+		assert(kingpin.ActuatorType == Enum.ActuatorType.Servo and kingpin.LimitsEnabled
+			and kingpin.LowerAngle < 0 and kingpin.UpperAngle > 0, "Front kingpin requires bounded Servo steering")
+	end
+	local frontHinge = child(carrier, "HingeConstraint", "HingeConstraint") :: HingeConstraint
 	local backHinge = child(backAxle, "HingeConstraint", "HingeConstraint") :: HingeConstraint
-	local frontPoint = child(frontAxle, "AxlePivot", "Attachment") :: Attachment
+	local frontPoint = child(carrier, "AxlePivot", "Attachment") :: Attachment
 	local backPoint = child(backAxle, "AxlePivot", "Attachment") :: Attachment
 	checkLink(frontHinge, frontPoint, child(frontWheel, "WheelCenter", "Attachment") :: Attachment)
 	checkLink(backHinge, backPoint, child(backWheel, "WheelCenter", "Attachment") :: Attachment)
 	return {
 		body = body, stick = stick, handleBar = handleBar, frontWheel = frontWheel, backWheel = backWheel,
 		frontAxle = frontAxle, backAxle = backAxle, steering = steering,
+		wheelSteering = wheelSteering,
 		frontHinge = frontHinge, backHinge = backHinge, frontPoint = frontPoint, backPoint = backPoint,
 	}
 end
@@ -130,36 +151,49 @@ local function configureModel(model: Model, Config: typeof(Config)): Model
 	local forward = Vector3.new(direction.X, 0, direction.Z)
 	assert(forward.Magnitude > 0.1, "Wheel axles must have distinct horizontal positions")
 	forward = forward.Unit
+	local central = model:GetAttribute("CentralShockRig") == true
+	local footRest = child(model, "FootRest", "BasePart") :: BasePart
+	local deckPart = if central then footRest else rig.body
 	local root = Instance.new("Part")
 	root.Name = "Root"
 	root.Size = Vector3.new(1.6, 0.24, 1.5)
-	root.CFrame = CFrame.lookAt(rig.body.Position, rig.body.Position + forward, Vector3.yAxis)
+	root.CFrame = CFrame.lookAt(deckPart.Position, deckPart.Position + forward, Vector3.yAxis)
 	root.Transparency = 1
 	root.CanCollide = false
 	root.CanTouch = false
 	root.CanQuery = false
 	root.RootPriority = 127
 	root.CustomPhysicalProperties = PhysicalProperties.new(0.9, 0.1, 0, 10, 10)
+	if central then
+		local mass = model:GetAttribute("RuntimeChassisMass")
+		assert(typeof(mass) == "number" and mass > 0 and mass < math.huge, "Central rig requires positive chassis mass")
+		local density = mass / (root.Size.X * root.Size.Y * root.Size.Z)
+		assert(density <= 100, "Chassis mass exceeds supported density")
+		root.CustomPhysicalProperties = PhysicalProperties.new(density, 0.1, 0, 10, 10)
+	end
 	root.Parent = model
 	model.PrimaryPart = root
 	weld(root, rig.body, "RuntimeBodyWeld")
-	local footRest = child(model, "FootRest", "MeshPart") :: MeshPart
-	local fender = child(model, "BackFender", "MeshPart") :: MeshPart
+	local fender = model:FindFirstChild("BackFender")
 	weld(rig.body, footRest, "RuntimeFootRestWeld")
-	weld(rig.backAxle, fender, "RuntimeFenderWeld")
+	if fender and fender:IsA("BasePart") then weld(rig.backAxle, fender, "RuntimeFenderWeld") end
 
-	local bodySize = rig.body.Size
-	local deckHeight = (math.abs(rig.body.CFrame.RightVector.Y) * bodySize.X
-		+ math.abs(rig.body.CFrame.UpVector.Y) * bodySize.Y
-		+ math.abs(rig.body.CFrame.LookVector.Y) * bodySize.Z) * 0.5
-	local deckCenter = rig.body.Position + Vector3.yAxis * (deckHeight + Config.RiderPose.FootPlantClearance)
+	local bodySize = deckPart.Size
+	local deckHeight = (math.abs(deckPart.CFrame.RightVector.Y) * bodySize.X
+		+ math.abs(deckPart.CFrame.UpVector.Y) * bodySize.Y
+		+ math.abs(deckPart.CFrame.LookVector.Y) * bodySize.Z) * 0.5
+	local deckCenter = deckPart.Position + Vector3.yAxis * (deckHeight + Config.RiderPose.FootPlantClearance)
 	local right = root.CFrame.RightVector
 	attachment(root, "RiderRootAttachment", deckCenter - forward * 0.25)
 	attachment(root, "LeftFootPlant", deckCenter + forward * 0.45 - right * 0.32)
 	attachment(root, "RightFootPlant", deckCenter - forward * 0.55 + right * 0.32)
 	-- Targets live on the moving steering assembly, never on the chassis.
-	attachment(rig.handleBar, "LeftHandGrip", rig.handleBar.Position - right * Config.RiderPose.GripHalfWidth)
-	attachment(rig.handleBar, "RightHandGrip", rig.handleBar.Position + right * Config.RiderPose.GripHalfWidth)
+	for _, side in { "Left", "Right" } do
+		local grip = if central then model:FindFirstChild(side .. "Grip") else nil
+		local position = if grip and grip:IsA("BasePart") then grip.Position
+			else rig.handleBar.Position + right * Config.RiderPose.GripHalfWidth * (if side == "Left" then -1 else 1)
+		attachment(rig.handleBar, side .. "HandGrip", position)
+	end
 	local smokePoint = attachment(rig.backAxle, "RearWheelAttachment", rig.backPoint.WorldPosition)
 	local smoke = Instance.new("ParticleEmitter")
 	smoke.Name = "BurnoutSmoke"
@@ -211,6 +245,11 @@ local function configureModel(model: Model, Config: typeof(Config)): Model
 end
 
 local function tryFrontRest(model: Model, configuration: typeof(Config)): Model
+	-- The new rig's mounts were accepted in Studio; legacy repair must not rebase them.
+	if model:GetAttribute("CentralShockRig") == true then
+		model:SetAttribute("FrontRestPoseStatus", "Authored")
+		return model
+	end
 	if model:GetAttribute("FrontRestPoseRevision") == configuration.FrontRestPose.Revision then return model end
 	-- A guessed rest correction must never invalidate an otherwise usable rig.
 	-- Keep the baseline entirely untouched, including welds and calibrated springs.

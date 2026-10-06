@@ -4,6 +4,7 @@
     { "Name": "RequestSpawn", "ClassName": "RemoteEvent" },
     { "Name": "DriveInput", "ClassName": "RemoteEvent" },
     { "Name": "ToggleDriveMode", "ClassName": "RemoteEvent" },
+    { "Name": "ToggleHeadlight", "ClassName": "RemoteEvent" },
     { "Name": "TrickState", "ClassName": "RemoteEvent" },
     { "Name": "GarageRequest", "ClassName": "RemoteFunction" }
   ]
