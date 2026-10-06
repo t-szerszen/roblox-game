@@ -58,9 +58,11 @@ function frameMethods:Inverse()
 	result.position = result:VectorToWorldSpace(-position(self))
 	return result
 end
+function frameMethods:PointToWorldSpace(point) return self.Position + self:VectorToWorldSpace(point) end
 function frameMethods:PointToObjectSpace(point)
 	return self:Inverse():VectorToWorldSpace(point - position(self))
 end
+function frameMethods:VectorToObjectSpace(vector) return self:Inverse():VectorToWorldSpace(vector) end
 function frameMethods:ToObjectSpace(frame) return self:Inverse() * frame end
 function frameMethods:Lerp(other, alpha)
 	local result = quaternion(self.x + (other.x - self.x) * alpha, self.y + (other.y - self.y) * alpha,
@@ -69,12 +71,14 @@ function frameMethods:Lerp(other, alpha)
 	return result
 end
 
+baseEnvironment.RaycastParams = { new = function() return {} end }
 local enumMock = {
+	RaycastFilterType = { Exclude = "Exclude" },
 	HumanoidRigType = { R15 = "R15", R6 = "R6" },
 	IKControlType = { Position = "Position", Transform = "Transform" },
 	ActuatorType = { None = "None", Motor = "Motor", Servo = "Servo" },
 	AnimationPriority = { Action = "Action" },
-	Material = { Metal = "Metal", Neon = "Neon" },
+	Material = { Metal = "Metal", Neon = "Neon", SmoothPlastic = "SmoothPlastic" },
 	PartType = { Ball = "Ball" },
 }
 function playersService:GetPlayerFromCharacter(character)
@@ -125,6 +129,7 @@ function InstanceMock.new(className)
 	end
 	meta.__newindex = function(self, key, value)
 		if key == "Position" then values.CFrame = Frame.new(value); return end
+		if key == "WorldCFrame" then values.CFrame = self.Parent.CFrame:ToObjectSpace(value); return end
 		if key == "Name" and values.Parent then
 			if values.Parent._children[values.Name] == self then values.Parent._children[values.Name] = nil end
 			values.Parent._children[value] = self
@@ -245,3 +250,6 @@ baseEnvironment.UDim2 = { new = function(xs, xo, ys, yo)
 end }
 baseEnvironment.PhysicalProperties = { new = function(...) return { ... } end }
 services.Workspace = InstanceMock.new("Workspace")
+function services.Workspace:Raycast() return nil end
+
+function vectorMethods:Lerp(other, alpha) return self + (other - self) * alpha end

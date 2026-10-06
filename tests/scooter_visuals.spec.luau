@@ -41,6 +41,16 @@ local plainLight = assert(BrakeLight.Create(visualModel))
 plainLight.SetActive(true)
 check(fender.Material == enumMock.Material.Neon, "Untextured fender supports same brake effect")
 plainLight.Destroy()
+local authoredGlow = make(fender, "PointLight", "AuthoredGlow")
+authoredGlow.Enabled, authoredGlow.Shadows = true, true
+authoredGlow.Color, authoredGlow.Brightness, authoredGlow.Range = originalColor, 4, 12
+local reusedLight = assert(BrakeLight.Create(visualModel))
+check(not authoredGlow.Enabled and not authoredGlow.Shadows, "Existing lamp is reused and starts disabled")
+reusedLight.SetActive(true)
+reusedLight.Destroy()
+check(authoredGlow.Parent == fender and authoredGlow.Enabled and authoredGlow.Shadows
+	and authoredGlow.Color == originalColor and authoredGlow.Brightness == 4 and authoredGlow.Range == 12,
+	"Cleanup preserves the authored light and restores all changed properties")
 Config.BrakeLight.Enabled = false
 check(BrakeLight.Create(visualModel) == nil, "Brake visuals can be disabled in configuration")
 Config.BrakeLight.Enabled = false

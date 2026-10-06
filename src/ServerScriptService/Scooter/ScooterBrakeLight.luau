@@ -11,8 +11,10 @@ export type Controller = {
 local ScooterBrakeLight = {}
 
 function ScooterBrakeLight.Create(model: Model): Controller?
-	local fender = model:FindFirstChild("BackFender")
-	if not Config.BrakeLight.Enabled or not fender or not fender:IsA("MeshPart") then return nil end
+	local dedicated = model:FindFirstChild("StopLight")
+	local settings = if dedicated and dedicated:IsA("BasePart") then Config.StopLight else Config.BrakeLight
+	local fender = dedicated or model:FindFirstChild("BackFender")
+	if not settings.Enabled or not fender or not fender:IsA("BasePart") then return nil end
 	local defaultMaterial, defaultColor = fender.Material, fender.Color
 	local appearance = fender:FindFirstChildOfClass("SurfaceAppearance")
 	local defaultTint = if appearance then appearance.Color else Color3.new(1, 1, 1)
@@ -20,28 +22,32 @@ function ScooterBrakeLight.Create(model: Model): Controller?
 	local defaultEmissionTint = if appearance then appearance.EmissiveTint else defaultTint
 	-- PBR textures can mask the mesh material; a small light keeps braking visible
 	-- without removing the authored SurfaceAppearance or inventing a diode mesh.
-	local glow = Instance.new("PointLight")
-	glow.Name = "ScooterBrakeGlow"
-	glow.Color = Config.BrakeLight.Color
-	glow.Brightness = Config.BrakeLight.Brightness
-	glow.Range = Config.BrakeLight.Range
+	local existing = fender:FindFirstChildOfClass("PointLight")
+	local glow = existing or Instance.new("PointLight")
+	local savedLight = { enabled = glow.Enabled, color = glow.Color, brightness = glow.Brightness, range = glow.Range, shadows = glow.Shadows }
+	if not existing then glow.Name = "ScooterBrakeGlow" end
+	glow.Color = settings.Color
+	glow.Brightness = settings.Brightness
+	glow.Range = settings.Range
 	glow.Shadows = false
 	glow.Enabled = false
 	glow.Parent = fender
-	local active, destroyed = false, false
+	local active: boolean? = nil
+	local destroyed = false
 
 	local function setActive(value: boolean)
 		if destroyed or value == active then return end
 		active = value
-		fender.Material = if value then Enum.Material.Neon else defaultMaterial
-		fender.Color = if value then Config.BrakeLight.Color else defaultColor
+		fender.Material = if value then Enum.Material.Neon else if dedicated then Enum.Material.SmoothPlastic else defaultMaterial
+		fender.Color = if value then settings.Color else if dedicated then Config.StopLight.OffColor else defaultColor
 		if appearance then
-			appearance.Color = if value then Config.BrakeLight.Color else defaultTint
-			appearance.EmissiveTint = if value then Config.BrakeLight.Color else defaultEmissionTint
-			appearance.EmissiveStrength = if value then Config.BrakeLight.EmissiveStrength else defaultEmission
+			appearance.Color = if value then settings.Color else defaultTint
+			appearance.EmissiveTint = if value then settings.Color else defaultEmissionTint
+			appearance.EmissiveStrength = if value then settings.EmissiveStrength else defaultEmission
 		end
 		glow.Enabled = value
 	end
+	setActive(false)
 
 	return {
 		SetActive = setActive,
@@ -49,7 +55,11 @@ function ScooterBrakeLight.Create(model: Model): Controller?
 			if destroyed then return end
 			setActive(false)
 			destroyed = true
-			glow:Destroy()
+			fender.Material, fender.Color = defaultMaterial, defaultColor
+			if existing then
+				glow.Enabled, glow.Color, glow.Brightness, glow.Range = savedLight.enabled, savedLight.color, savedLight.brightness, savedLight.range
+				glow.Shadows = savedLight.shadows
+			else glow:Destroy() end
 		end,
 	}
 end

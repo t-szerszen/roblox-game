@@ -11,6 +11,7 @@ local groups = {
 	ScooterBody = "body", Root = "body", DriverSeat = "body", FootRest = "body", DeckCollider = "body",
 	HandleBarStick = "steering", HandleBar = "steering",
 	VirtualFrontAxle = "front", FrontSuspensionLeft = "front", FrontSuspensionRight = "front",
+	FrontSteeringCarrier = "frontSteering",
 	VirtualBackAxle = "back", BackSuspensionLeft = "back", BackSuspensionRight = "back", BackFender = "back",
 	FrontWheel = "frontWheel", FrontWheelCollider = "frontWheel",
 	BackWheel = "backWheel", BackWheelCollider = "backWheel",
@@ -20,12 +21,13 @@ local function conflictingWeld(weld: WeldConstraint, model: Instance): boolean
 	local first, second = weld.Part0, weld.Part1
 	if not first or not second then return true end
 	if not first:IsDescendantOf(model) or not second:IsDescendantOf(model) then return true end
-	local firstGroup, secondGroup = groups[first.Name], groups[second.Name]
+	local firstGroup = groups[first.Name] or first:GetAttribute("ScooterAssembly")
+	local secondGroup = groups[second.Name] or second:GetAttribute("ScooterAssembly")
 	return firstGroup ~= nil and secondGroup ~= nil and firstGroup ~= secondGroup
 end
 
 local function base(model: Instance, endName: string): BasePart?
-	local part = model:FindFirstChild(if endName == "Front" then "HandleBarStick" else "ScooterBody")
+	local part = model:FindFirstChild(if endName == "Front" and model:GetAttribute("IndependentFrontSteering") ~= true then "HandleBarStick" else "ScooterBody")
 	return if part and part:IsA("BasePart") then part else nil
 end
 
@@ -229,7 +231,8 @@ function ScooterRigGeometry.RepairFront(model: Instance, reference: Instance?, c
 		local hinge = stick:FindFirstChild("PivotHinge_" .. suffix) :: HingeConstraint
 		hinge.ActuatorType = Enum.ActuatorType.None
 	end
-	local axle = assert(model:FindFirstChild("VirtualFrontAxle"))
+	local axle = assert(model:FindFirstChild(if model:GetAttribute("IndependentFrontSteering") == true
+		then "FrontSteeringCarrier" else "VirtualFrontAxle"))
 	local wheelFrame = frameAt(center.WorldPosition, axis)
 	place(namedAttachment(axle, "AxlePivot"), wheelFrame)
 	place(center, wheelFrame)
@@ -243,6 +246,10 @@ end
 -- Match tire bottom heights to the working rear by rotating the entire front linkage.
 function ScooterRigGeometry.AlignFrontRest(model: Model, configuration: typeof(Config)?): { string }
 	local config = configuration or Config
+	if model:GetAttribute("CentralShockRig") == true then
+		model:SetAttribute("FrontRestPoseStatus", "Authored")
+		return {}
+	end
 	if model:GetAttribute("FrontRestPoseRevision") == config.FrontRestPose.Revision then return {} end
 	local stick = assert(base(model, "Front"))
 	local left = namedAttachment(stick, "PivotAttBase_FrontSuspensionLeft")

@@ -1,4 +1,4 @@
-# Licznik na kierownicy
+# Liczniki hulajnogi
 
 Pierwsza wersja nawiązuje do zaakceptowanej grafiki: grafitowa obudowa ze ściętymi
 narożnikami, czarny ekran, duże białe cyfry segmentowe, turkusowy napis KuKirin
@@ -80,13 +80,13 @@ sesję Play, aby skrypty sterowania oraz serwer użyły aktualnych modułów.
 
 Tryby są funkcją hulajnogi, a licznik odzwierciedla ich zatwierdzony stan.
 Po wejściu na własną hulajnogę pojawia się krótki popup
-`P — zmiana trybu ECO / SPORT`. Na urządzeniach dotykowych dostępny jest także
+`P — ECO / SPORT · L — światła`. Na urządzeniach dotykowych dostępny jest także
 przycisk ECO / SPORT. Sterowanie znika po zejściu z hulajnogi; pisanie w czacie,
 brak focusu i otwarte okna blokujące gameplay nie wysyłają zmian trybu.
 
 Nowa hulajnoga startuje w SPORT. ECO ustawia limit napędu 25 km/h (nie podnosi
 niższego bazowego limitu), SPORT przywraca pełną prędkość istniejącego tuningu.
-Obecne ustawienia przyspieszenia i cofania zostają zachowane. Tryb można zmienić
+ECO używa 70% przyspieszenia SPORT; prędkość maksymalna cofania pozostaje 18 km/h. Tryb można zmienić
 podczas ruchu; kod nie zmienia bezpośrednio velocity. Przy gazie istniejący
 kontroler sił stopniowo dochodzi do nowego limitu, a bez gazu zostaje normalne
 wytracanie prędkości. Limit napędu nie zatrzymuje fizycznie zjazdu z górki.
@@ -108,8 +108,9 @@ hulajnóg. Czeka na kompletną replikację elementów ekranu. Wspólny moduł
 - `SpeedKmh`: liczba obliczana przez serwer według istniejącej skali gry.
   Także jazda do tyłu pokazuje dodatnią wartość. Maksymalny odczyt to 999;
   brak lub nieprawidłowe dane pokazują kreskę.
-- `BrakeActive`: zatwierdzony przez serwer stan przytrzymania hamulca,
-  zgodny z obecnym sterowaniem, również podczas jazdy wstecz i W+S.
+- `BrakeActive`: hamowanie przeciw aktualnemu kierunkowi ruchu — S podczas jazdy
+  do przodu lub W podczas cofania — oraz W+S. Sama jazda wstecz nie pokazuje BRAKE.
+  Tylna lampka ma osobny stan `StopLightActive` i świeci również przy cofaniu.
 - `DriveMode`: ECO wyświetla się na zielono, SPORT na fioletowo. Bez
   zatwierdzonego stanu etykieta pokazuje kreskę. Starszy GUI bez etykiety Mode
   nadal pokazuje prędkość i hamulec; użyj Update, aby dodać nowe elementy.
@@ -150,3 +151,24 @@ wstecz, przełączanie P, podpowiedź po wejściu, pamięć trybu przy ponownym 
 blokadę P podczas pisania w czacie, widoczność z drugiego klienta oraz ponowne spawny. Nie przesuwaj
 produkcyjnego `Workspace.Map` podczas tych sprawdzeń. Build i testy logiki
 nie zastępują sprawdzenia rozmiaru oraz kąta na autorskim modelu.
+
+## Licznik na ekranie i światła
+
+`ScooterSpeedometer` tworzy okrągły HUD w prawym dolnym rogu po wejściu na
+hulajnogę. Ma skalę 0–100 km/h, płynną wskazówkę, duże cyfry, oznaczenia D/R/N,
+ECO/SPORT, BRAKE i status światła. Widok dopasowuje rozmiar do rozdzielczości
+i pozostaje dostępny podczas jazdy w obu widokach kamery.
+Atrybuty odczytuje z prawdziwego modelu; nie wysyła prędkości do serwera.
+ScooterClient sprząta GUI oraz połączenia przy zsiadaniu, zniszczeniu modelu
+i zatrzymaniu skryptu. Konfiguracja HUD jest w ScooterDashboardConfig.
+
+L przełącza białe światło przednie; na ekranie dotykowym jest przycisk Światła.
+Żądanie jest bezargumentowe i weryfikowane przez serwer z cooldownem 0,35 s.
+Oba liczniki pokazują BRAKE przy faktycznym hamowaniu. Podczas cofania HUD
+pokazuje R, a tylna czerwona lampka pozostaje włączona bez kontrolki BRAKE.
+
+W modelu ScooterFinal skala testowa wynosi 0,30, a cały fizyczny dashboard
+ma dodatkowy mnożnik 1,48 wokół DisplaySurface. To około 10% większy ekran
+niż przy poprzednim mnożniku 1,35; skala całej hulajnogi pozostaje 0,30. Przebudowa pochodzi z zachowanego źródła i nie
+generuje ani nie duplikuje assetu licznika. HUD sprawdzono wizualnie w Play;
+ręcznie sprawdź jeszcze L, pierwszą osobę oraz sterowanie dotykowe.

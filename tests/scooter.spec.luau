@@ -66,7 +66,7 @@ check(smooth > 0 and smooth < 1, "Steering lerps instead of snapping")
 near(Physics.SmoothSteering(0, 1, 1 / 30),
 	Physics.SmoothSteering(smooth, 1, 1 / 60), "Steering smoothing is framerate independent")
 near(Physics.SmoothSteering(0, 1, 1), Physics.SmoothSteering(0, 1, 0.1), "Long frame steering is bounded")
-near(Physics.GetEffectiveSteering(1, 0), 0, "Scooter cannot turn in place")
+near(Physics.GetEffectiveSteering(1, 0), 1, "Handlebar and wheel steering remain available at rest")
 near(Physics.GetEffectiveSteering(1, 10), 1, "Low speed retains maneuverability")
 near(Physics.GetEffectiveSteering(1, 100 * Config.StudsPerKmH), Config.HighSpeedSteeringScale, "High speed yaw is limited")
 near(Physics.GetEffectiveSteering(1, -100 * Config.StudsPerKmH), Config.HighSpeedSteeringScale, "Reverse steering uses absolute speed")

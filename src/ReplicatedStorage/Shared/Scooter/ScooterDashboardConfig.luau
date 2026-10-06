@@ -17,4 +17,7 @@ return table.freeze({
 	SegmentOffTransparency = 0.95,
 	BrakeOnTransparency = 0,
 	BrakeOffTransparency = 0.84,
+	HudDiameter = 236,
+	HudMaxSpeed = 100,
+	HudNeedleSmoothSpeed = 12,
 })

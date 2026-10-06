@@ -1,5 +1,12 @@
 # Articulated scooter model contract
 
+For a raw imported model that does not yet satisfy this contract, use the
+[read-only hierarchy inspection](SCOOTER_INSPECTION.md) before assembling it.
+The approved nested `ScooterFinal` uses the explicit [preview and runtime installer](SCOOTER_FINAL_RIG.md).
+Its CentralShockRig contract preserves approved mounts, uses two central shocks
+and a generated helper for the riding deck. The legacy assembler/repair commands
+below describe the older direct-child rig; use InstallNewModel for ScooterFinal.
+
 An optional handlebar speedometer is available as a separate, manually mounted
 asset. See [dashboard creation and mounting](SCOOTER_DASHBOARD.md); it is never
 automatically inserted into the authored production template.
@@ -58,7 +65,7 @@ ScooterSuspension bounds both ends using passive suspension HingeConstraints. St
 
 Shared/ScooterConfig.Suspension configures front/back maximum compression/droop angles (22/12 degrees), desired travel relative to tire radius (0.4/0.2), a one-degree safety margin and sampling precision. The geometric checks can reduce those maxima on a particular model. Spring length limits cover the entire safe arc with clearance so they do not lock a shock at the neutral pose.
 
-Spring stiffness is computed at the wheel, using both shocks' actual length change per pivot rotation and the wheel's vertical change. Short and long spring linkages therefore have comparable wheel compliance instead of receiving the same arbitrary raw stiffness. Both ends use half the model's non-massless part mass plus half the configured reference rider mass (default 20 Roblox mass units). This is a starting tune, not measured runtime load distribution.
+Spring stiffness is computed at the wheel, using the actual shocks' length change per pivot rotation and the wheel's vertical change. Short and long spring linkages therefore have comparable wheel compliance instead of receiving the same arbitrary raw stiffness. Both ends use half the model's non-massless part mass plus half the configured reference rider mass (default 20 Roblox mass units). This is a starting tune, not measured runtime load distribution.
 
 The default tune preloads 80% of that reference load and targets sag of 40% of safe compression travel at the front and 30% at the rear for the remaining load. This deliberately gives the front a softer target. DampingRatio is 0.8, and maximum spring force includes configurable headroom. Increase Front.SagFraction or Back.SagFraction to soften that end's supported wheel response; front/back travel settings can be adjusted separately. Original Stiffness, Damping and FreeLength remain in AuthoredStiffness/AuthoredDamping/AuthoredFreeLength attributes, while SuspensionRestLength and SuspensionRestAngle identify the calibrated pose.
 
@@ -139,17 +146,35 @@ Set a finite positive `WheelRadius` attribute (studs) on each wheel or the templ
 
 The steering hinge runs as a Servo, using the existing bounded, speed-dependent steering input. Authored positive ServoMaxTorque and AngularSpeed are preserved; centralized defaults supply zero values. Limits remain authored and must include neutral (0 degrees). `SteeringServoSign` configures the authored axis convention. Wheels roll physically rather than using Motor6D visual rotation. The front hinge is passive; the rear hinge becomes a Motor during server-accepted W+S burnout at up to 5 km/h with rear contact, then returns to passive rolling. Its AngularVelocity is 55 rad/s with endpoint/axis sign correction, MotorMaxAcceleration is 120 rad/s², and MotorMaxTorque is at least 100, otherwise supportedMass * gravity * backWheelRadius * 0.6. These settings follow the [HingeConstraint motor contract](https://create.roblox.com/docs/physics/constraints/hinge). BurnoutSmoke is attached to VirtualBackAxle, so it follows suspension travel without spinning with the wheel. Tuning the new mechanical assembly still requires Studio playtests.
 
-StudsPerKmH = 1.6 raises world travel speed 60% from the previous 1.0 scale without changing catalog speed ratings. A wheelie starts on the Shift/C rising edge above WheelieMinSpeedKmh (10 km/h). The trick key only triggers the state: afterward W raises the front, releasing W lowers it, and adding W again before landing regains pitch without another trigger. Once the front lands and the state ends, W alone cannot restart wheelie. Natural return is capped at WheelieNaturalDropRate (45 degrees/s), then eases exponentially at WheelieReturnSpeed (2.5/s) near landing. S uses the faster brake return. The existing low-speed drop and crash limits remain active; WheelieRestAngle (0.25 degrees) ends the residual pitch.
+StudsPerKmH = 1.6 raises world travel speed 60% from the previous 1.0 scale without changing catalog speed ratings. A wheelie starts on the Shift/C rising edge above WheelieMinSpeedKmh (10 km/h). The trick key only triggers the state: afterward W raises the front, releasing W lowers it, and adding W again before landing regains pitch without another trigger. Once the front lands and the state ends, W alone cannot restart wheelie. Natural return is capped at WheelieNaturalDropRate (58 degrees/s), then eases exponentially at WheelieReturnSpeed (3.2/s) near landing. S uses the faster brake return. The existing low-speed drop and crash limits remain active; WheelieRestAngle (0.25 degrees) ends the residual pitch.
 
-Direction changes are controlled by the existing authoritative VectorForce. S brakes forward motion at DirectionChangeBrakingDeceleration (60 studs/s²), engages reverse below DirectionChangeSpeedKmh (2 km/h) and accelerates at ReverseAcceleration (75 studs/s²) toward MaxReverseSpeedKmh (18). W similarly engages forward drive during a reverse crawl. The existing hill assistance compensates slope gravity during both braking and powered travel. The force calculation bounds speed changes by the configured acceleration and frame time; it does not teleport velocity. Coasting, normal steering and W+S burnout keep their separate behavior.
+Direction changes are controlled by the existing authoritative VectorForce. S brakes forward motion at DirectionChangeBrakingDeceleration (60 studs/s²), engages reverse below DirectionChangeSpeedKmh (2 km/h) and accelerates at ReverseAcceleration (25 studs/s²) toward MaxReverseSpeedKmh (18). W similarly engages forward drive during a reverse crawl. The existing hill assistance compensates slope gravity during both braking and powered travel. The force calculation bounds speed changes by the configured acceleration and frame time; it does not teleport velocity. Coasting, normal steering and W+S burnout keep their separate behavior.
 
 ## Scooter brake light and cornering lean
 
-`ScooterServer` is this repository's scooter controller. BrakeLight.Enabled defaults to false: no red fender, emission changes or brake glow are currently created. The implementation is retained for a future dedicated lamp. When explicitly enabled, it creates one `ScooterBrakeLight` controller on the existing direct child `BackFender`. Accepted brake intent (S/down/reverse, including W+S) from the authorized rider turns the mesh bright red Neon and enables a small red PointLight. Release, throttle without brake, expired input, dismount, death and crash restore the authored Material, Color and SurfaceAppearance tints/emission. Cleanup destroys the generated light. No new input endpoint or premium entitlement is involved. `BrakeActive` is a server-published boolean; `ScooterConfig.BrakeLight` controls enablement, color, brightness, range and emission.
+`ScooterServer` creates a dedicated rear `StopLight` controller when the model
+contains that lamp. Braking, held S, or occupied reverse motion illuminates its
+red surface and PointLight. `BrakeActive` is separate: S while moving forward, W
+while moving backward, or W+S is braking; reversing with S alone is not. Both
+physical dashboard and HUD read this server state. Dismount/crash disables the
+rear lamp. Cleanup restores authored material, color, PBR and PointLight settings.
+`ScooterConfig.StopLight` holds the dedicated settings. The optional legacy
+whole-fender effect remains disabled via `BrakeLight.Enabled = false`.
 
-The authored [SurfaceAppearance](https://create.roblox.com/docs/reference/engine/classes/SurfaceAppearance) can override a mesh's material appearance. Its existing Color tint and emissive tint/strength are adjusted without replacing textures. Emission uses any authored emissive mask; the PointLight supports meshes without one. A dark texture can limit the red surface tint, so final appearance needs a Studio check. There is no separate diode in the supplied hierarchy: the effect uses the whole BackFender.
+Mounted L toggles a white front beam through the zero-argument `ToggleHeadlight`
+remote. The server validates the owner, occupied seat, life/state and 0.35-second
+cooldown; the client never supplies lamp state or properties. `ScooterHeadlight`
+orients a SpotLight attachment along the scooter's forward direction on FrontLight,
+so the beam follows steering. It restores appearance and destroys its attachment
+on cleanup. Shared `Headlight` configuration controls beam color/range/brightness.
 
-Servo target degrees are `sign * effectiveInput * deg(MaxHandlebarAngle)`, with sign inverted when Attachment0 belongs to HandleBarStick. MaxHandlebarAngle is 30 degrees. Effective input retains existing smoothing and speed fade. Below MinSteeringSpeed it is zero outside server-accepted burnout; active burnout retains handlebar input at rest. Authored LowerAngle/UpperAngle clamp the target. Chassis steering uses CurrentAngle divided by the signed full angle, so a blocked Servo cannot rotate the chassis from requested input alone. The [HingeConstraint Servo contract](https://create.roblox.com/docs/reference/engine/classes/HingeConstraint) specifies TargetAngle in degrees. Actual movement still depends on AngularSpeed/ServoMaxTorque; SteeringAngle publishes the measured angle in radians for rider IK/lean.
+The authored [SurfaceAppearance](https://create.roblox.com/docs/reference/engine/classes/SurfaceAppearance)
+can mask mesh material changes. Existing tint and emission are adjusted without
+replacing textures; the lamps also emit actual PointLight/SpotLight illumination.
+
+Servo target degrees are `sign * effectiveInput * deg(MaxHandlebarAngle)`, with sign inverted when Attachment0 belongs to HandleBarStick. MaxHandlebarAngle is 48 degrees; speed fade spans 25–80 km/h. Effective input retains existing smoothing and speed fade, including at zero speed: a mounted rider can steer without throttle or burnout. MinSteeringSpeed gates normal chassis yaw, not the Servo target. Authored LowerAngle/UpperAngle clamp the target. When accepted steering input is neutral, chassis yaw ignores residual Servo noise.
+Otherwise chassis steering uses the wheel kingpin CurrentAngle when present,
+or the legacy column CurrentAngle, divided by the signed full angle, so a blocked Servo cannot rotate the chassis from requested input alone. The [HingeConstraint Servo contract](https://create.roblox.com/docs/reference/engine/classes/HingeConstraint) specifies TargetAngle in degrees. Actual movement still depends on AngularSpeed/ServoMaxTorque; SteeringAngle publishes the measured angle in radians for rider IK/lean.
 
 The bicycle turn model is `yawRate = -abs(speed) * tan(turnInput * MaxHandlebarAngle) / actualWheelbase`, with reverse travel inverting turnInput and magnitude capped by TurnRate. Wheelbase is the initial separation of the virtual axle pivots. No wheel contact produces zero yaw; outside burnout, speed below MinSteeringSpeed also produces zero yaw. Unlike a minimum turn-rate floor, this keeps a finite radius while crawling. Desired heading stays within `min(MaxHeadingLeadAngle, abs(yawRate) * HeadingLeadSeconds)` of the actual planar chassis heading (12 degrees maximum, 0.15 seconds of lead), preventing orientation windup against obstacles. During accepted burnout, yaw instead uses `-measuredSteeringInput * BurnoutTurnRate` (90 degrees/s maximum), independent of travel speed. This allows sustained donuts without weakening normal low-speed steering rules. Releasing either W/S, stale input, losing rear contact, or exceeding 5 km/h disables that mode. The same heading lead bounds still prevent winding up against obstacles, and cornering roll is disabled during burnout. Outside burnout, cornering roll is `atan2(signedSpeed * yawRate, Workspace.Gravity)`, capped by MaxSteeringLean (16 degrees). This ties lean to centripetal acceleration and gives right turns negative roll. Exponential smoothing at SteeringLeanSmoothSpeed eases entry/exit independent of frame rate. Only an occupied, upright chassis with both wheel contacts requests roll; wheelie, airborne and parked states request zero.
 
@@ -168,7 +193,7 @@ local state = animator.getState() -- IDLE / RIDING / WHEELIE, or nil when unmoun
 
 ScooterRiderVisualizer binds an animator to every replicated scooter's DriverSeat.Occupant on each client. Missing streamed model/character descendants are retried through events, without per-frame hierarchy scans. Existing ScooterRiderPose supplies foot IK, wheelie foot balance and the R6 standing fallback. It no longer creates hand IK.
 
-For R15, two IKControls target attachments directly on HandleBar, so physical steering moves the hands. Elbow poles lift the arm on the corresponding turn side while preserving the hand target; writing Shoulder.Transform would compete with the arm IK chain. The [IKControl contract](https://create.roblox.com/docs/reference/engine/classes/IKControl) documents moving targets, chain overrides and pole control.
+For R15, two IKControls target attachments directly on HandleBar, so physical steering moves the hands. Elbow poles lift the arm on the corresponding turn side. Complete Motor6D/AnimationConstraint chains now use ScooterLimbSolver after the torso layer, with their competing IKControls disabled; incomplete chains retain IK fallback. Fixed joint lengths, original rest-bone axes and a steering torso twist keep hands on the grips even at full lock. See [current rider pose](SCOOTER_RIDER_POSE.md). The [IKControl contract](https://create.roblox.com/docs/reference/engine/classes/IKControl) documents moving targets, chain overrides and pole control.
 
 Body lean blends forward speed, lateral speed (`velocity:Dot(root.CFrame.RightVector)`) and the measured steering angle. The server publishes `SteeringAngle` in radians with positive values representing right input, because HingeConstraint.CurrentAngle is [not replicated](https://create.roblox.com/docs/reference/engine/classes/HingeConstraint). Lean is bounded and shared between Root/RootJoint and Waist. PreAnimation updates IK targets and removes the previous procedural torso layer; PreSimulation applies torso transforms. R6 uses its RootJoint and existing procedural standing pose, as it lacks R15 hands.
 
@@ -181,7 +206,7 @@ The client derives leg states only from controller-published attributes. `Wheeli
 | State | Entry | Legs |
 | --- | --- | --- |
 | `IDLE` | Speed at/below `IdleEnterSpeedKmh`; retains idle up to `IdleExitSpeedKmh` | Play `IdleFootAnim`, with one foot removed from the support/deck and resting on the ground. |
-| `RIDING` | Speed above the exit threshold or unsuitable ground-foot state | Fade out state clips; both feet return to the existing deck IK targets. |
+| `RIDING` | Speed above the exit threshold or unsuitable ground-foot state | Fade out state clips; left foot returns to the deck, right foot stays near the middle of the deck. |
 | `WHEELIE` | Authoritative `WheelieActive = true`, unless fallen | Play `WheelieBalanceAnim` for rearward body balance and the moving balance leg. |
 
 Set your R15 animation IDs in `Shared/ScooterConfig.RiderAnimations.IdleFootAnim` and `.WheelieBalanceAnim`, using either a numeric **string** or `rbxassetid://<ID>`. Both default to an empty string, which deliberately loads no asset. Until the IDs are supplied, or while a clip is unavailable/not yet loaded, the existing procedural foot/wheelie pose remains active. R6 retains its procedural standing/balance fallback; these clips are intended for R15.
@@ -190,6 +215,16 @@ Author both clips with the legs and pelvis keyed; in idle, key the supporting le
 
 Clips load once per mount and loop at matching Action priority. Attribute-change events drive transitions: entering a state calls `AnimationTrack:Play(FadeTime, Weight, PlaybackSpeed)` once, while the outgoing clip uses `Stop(FadeTime)`. The defaults are a 0.25-second fade, weight 1, playback speed 1 and idle thresholds of 0.5/1.5 km/h. Change these in the same configuration table. Stable states never restart a track every frame; see [AnimationTrack blending](https://create.roblox.com/docs/reference/engine/classes/AnimationTrack).
 
-PreAnimation sums the loaded tracks' current blend weights, then reduces foot IK by that amount. Fully blended clips disable foot IK entirely so poles cannot pin animated feet to the deck; fading back to riding restores both foot chains. Hand IK stays fully active. The character owner's client starts clips; observers follow the owner's replicated tracks through Animator.AnimationPlayed and never load or play a second copy. Existing replicated state clips are preserved when attaching an observer. A player character waits for its server-created Animator, because a client-created Animator cannot replicate tracks; see [Animator replication](https://create.roblox.com/docs/reference/engine/classes/Animator).
+PreAnimation sums the loaded tracks' current blend weights, then reduces foot IK by that amount. Fully blended clips disable foot IK entirely so poles cannot pin animated feet to the deck; fading back to riding restores the procedural foot pose. Hands stay on the grips through the manual solver or IK fallback. The character owner's client starts clips; observers follow the owner's replicated tracks through Animator.AnimationPlayed and never load or play a second copy. Existing replicated state clips are preserved when attaching an observer. A player character waits for its server-created Animator, because a client-created Animator cannot replicate tracks; see [Animator replication](https://create.roblox.com/docs/reference/engine/classes/Animator).
 
 Dismount stops/destroys the locally owned tracks and animation objects, disconnects state/animation listeners and resets `getState()` to nil. Observers release their references without stopping or destroying the owner's tracks. Asset load/play errors fall back to procedural foot support.
+
+The current central-shock template is rebuilt at scale 0.30 with a 1.48 dashboard
+scale multiplier. Native steering Servo tuning and the 0.65-stud threshold test
+are recorded in [SCOOTER_FINAL_RIG.md](SCOOTER_FINAL_RIG.md). Forward acceleration
+is 25–40 studs/s² by tier, multiplied by 0.7 in ECO; existing top speeds and
+upgrade economics are preserved. Step assistance uses the inset collision sphere bottom and both wheels, with
+continuous wheel-local support and radius/height/force limits. It does not apply
+chassis launch impulses. The central rig now has deck-mounted front swingarms and
+a separate steering carrier at the front axle. Wall impacts use actual approach
+speed loss and existing rider crash recovery. See [SCOOTER_TERRAIN.md](SCOOTER_TERRAIN.md).

@@ -70,7 +70,7 @@ end
 local function planEnd(model: Model, endName: string, mass: number, configuration: typeof(Config)): EndPlan
 	local settings = configuration.Suspension
 	local tune = if endName == "Front" then settings.Front else settings.Back
-	local base = child(model, if endName == "Front" then "HandleBarStick" else "ScooterBody")
+	local base = child(model, if endName == "Front" and model:GetAttribute("IndependentFrontSteering") ~= true then "HandleBarStick" else "ScooterBody")
 	local wheel = child(model, endName .. "Wheel") :: MeshPart
 	local radius = Collision.ResolveRadius(model, wheel)
 	local leftPoint = child(base, "PivotAttBase_" .. endName .. "SuspensionLeft") :: Attachment
@@ -84,22 +84,32 @@ local function planEnd(model: Model, endName: string, mass: number, configuratio
 		wheelDerivative = wheelDerivative, compression = 0, droop = 0, stiffness = 0, damping = 0,
 		loadTorque = 0, derivativesSquared = 0,
 	}
-	for _, side in { "Left", "Right" } do
-		local suffix = endName .. "Suspension" .. side
-		local spring = child(base, "ShockAbsorber_" .. suffix) :: SpringConstraint
-		local fixed = child(base, "SpringAttBase_" .. suffix) :: Attachment
-		local moving = child(child(model, suffix), "SpringAtt_" .. suffix) :: Attachment
+	local function addSpring(spring: SpringConstraint, fixed: Attachment, moving: Attachment)
 		local delta = moving.WorldPosition - fixed.WorldPosition
 		local offset = moving.WorldPosition - pivot
 		local derivative = delta.Unit:Dot(axis:Cross(offset))
 		assert(math.abs(derivative / wheelDerivative) >= settings.MinimumLeverageRatio,
-			suffix .. ": spring has insufficient leverage; move its authored mounting attachments")
+			spring.Name .. ": spring has insufficient leverage; move its authored mounting attachments")
 		table.insert(plan.springs, {
 			spring = spring, fixed = fixed.WorldPosition, offset = offset, derivative = derivative, length = delta.Magnitude,
 		})
+		plan.derivativesSquared += derivative * derivative
+	end
+	local central = model:GetAttribute("CentralShockRig") == true
+	for _, side in { "Left", "Right" } do
+		local suffix = endName .. "Suspension" .. side
 		table.insert(plan.hinges, child(base, "PivotHinge_" .. suffix) :: HingeConstraint)
 		table.insert(plan.basePoints, child(base, "PivotAttBase_" .. suffix) :: Attachment)
-		plan.derivativesSquared += derivative * derivative
+		if not central then
+			addSpring(child(base, "ShockAbsorber_" .. suffix) :: SpringConstraint,
+				child(base, "SpringAttBase_" .. suffix) :: Attachment,
+				child(child(model, suffix), "SpringAtt_" .. suffix) :: Attachment)
+		end
+	end
+	if central then
+		addSpring(child(base, "ShockAbsorber_" .. endName) :: SpringConstraint,
+			child(base, "SpringAttBase_" .. endName) :: Attachment,
+			child(child(model, "Virtual" .. endName .. "Axle"), "SpringAtt_" .. endName) :: Attachment)
 	end
 	local compressionDirection = if wheelDerivative > 0 then 1 else -1
 	plan.compression = safeRange(plan, compressionDirection, tune.MaxCompressionDegrees,
@@ -113,7 +123,7 @@ local function planEnd(model: Model, endName: string, mass: number, configuratio
 	local gravity = Workspace.Gravity
 	assert(gravity > 0 and sag > 0, "Suspension tuning requires gravity and positive wheel travel")
 	local endMass = mass * 0.5
-	-- Tune at the wheel, then divide by the actual linkage leverage of both shocks.
+	-- Tune at the wheel, then divide by the actual linkage leverage of its shocks.
 	-- This avoids a short front spring appearing rigid while a long rear one folds.
 	local frequencySquared = gravity * (1 - settings.PreloadSupportFraction) / sag
 	local leverageScale = wheelDerivative * wheelDerivative / plan.derivativesSquared
@@ -172,7 +182,7 @@ function ScooterSuspension.ConfigureFront(model: Model, configuration: typeof(Co
 	local mass = model:GetAttribute("SuspensionReferenceMass")
 	assert(typeof(mass) == "number" and mass > 0 and mass < math.huge, "Template is missing calibrated reference mass")
 	applyPlan(planEnd(model, "Front", mass, config), config.Suspension)
-	local stick = child(model, "HandleBarStick")
+	local stick = child(model, if model:GetAttribute("IndependentFrontSteering") == true then "ScooterBody" else "HandleBarStick")
 	for _, instance in stick:GetChildren() do
 		if instance:IsA("Constraint") then instance.Visible = config.Suspension.ShowConstraints end
 	end
@@ -186,6 +196,11 @@ function ScooterSuspension.Configure(model: Model, configuration: typeof(Config)
 	-- Clones retain calibrated rest limits; never use a compressed live pose as a new rest pose.
 	if model:GetAttribute("SuspensionRevision") == config.Suspension.Revision then return end
 	local mass = config.Suspension.ReferenceRiderMass
+	if model:GetAttribute("CentralShockRig") == true then
+		local riderMass = model:GetAttribute("SuspensionRiderMass")
+		assert(typeof(riderMass) == "number" and riderMass > 0 and riderMass < math.huge, "Central rig requires positive reference rider mass")
+		mass = riderMass
+	end
 	for _, instance in model:GetDescendants() do
 		if instance:IsA("BasePart") and not instance.Massless then mass += instance:GetMass() end
 	end
