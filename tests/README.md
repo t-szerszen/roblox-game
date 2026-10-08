@@ -407,3 +407,26 @@ three installed points passed 19 checks: exactly three models after repeat insta
 unique IDs/tags, collision properties, distance from spawn, unchanged pivots and
 moving a detached model clone together with its zone. All three placements were
 visually inspected; this does not replace multiplayer Play acceptance.
+
+## NPC traffic
+
+```sh
+python3 tests/run_traffic_tests.py --luau /path/to/luau
+```
+
+The traffic CLI suite executes actual graph, trajectory, configuration, reservation
+and city snapshot modules: 2,655 assertions cover enabled references, bounded routes,
+curve tangents, disconnected components, spawn eligibility, invalid data, FIFO
+right of way and cleanup. Vector/service doubles do not simulate Roblox collision
+or networking.
+
+Paste `tests/traffic.studio.luau` into the Studio Command Bar after Rojo sync. The
+72 native assertions use fresh modules and unparented model fixtures, real CFrames
+and controlled sensor responses for vehicle movement, plus explicit scooter body
+checks through the real sensor module. Retention cases include four simulated
+minutes of continuous loop driving, route-end grace, restored connections,
+short-trip rejection and progress-aware intersection expiry. They do not start
+Play or alter the map.
+See [traffic testing and manual Play checklist](../docs/TRAFFIC_SYSTEM.md) for actual
+road-generation evidence and the outstanding physics, replication and multiplayer
+acceptance checks.

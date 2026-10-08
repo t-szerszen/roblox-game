@@ -171,3 +171,16 @@ TerritoryService colors opted-in BaseParts (`TerritoryTint = true`) using the
 owner's palette color, resets neutral ownership and restores authored colors on
 cleanup. Visual parts add no capture or damage authority. No runtime flag generator
 or second territory script is introduced.
+
+# NPC road traffic
+
+`ServerScriptService.Traffic` owns a shared server fleet with continuous kinematic
+Bezier trajectories, explicit swept collision/road-support checks, cached scooter
+bodies, safe distributed spawns, FIFO intersection reservations and bounded recovery.
+It reads an approved city-derived road graph; it never invokes the map builder or
+regenerates roads at startup. `TrafficWorkflow` is the explicit Edit-mode inspection,
+generation, correction, validation and export entry point. The initial graph was
+built from the actual Studio `Workspace.Map.Drogi` road surfaces, rather than the
+older mock `MapData`. Traffic assets preserve authored replacement models during
+Rojo sync. Scooter mechanics and remotes are unchanged. See
+[traffic architecture, workflow, validation and limitations](TRAFFIC_SYSTEM.md).
