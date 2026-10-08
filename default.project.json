@@ -27,6 +27,14 @@
     "StarterGui": {
       "$className": "StarterGui",
       "$path": "src/StarterGui"
+    },
+
+    "ServerStorage": {
+      "$className": "ServerStorage",
+      "$ignoreUnknownInstances": true,
+      "TerritoryFlagTemplate": {
+        "$path": "assets/territory/TerritoryFlag.rbxmx"
+      }
     }
   }
 }

@@ -3,6 +3,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("MinimapConfig"))
+local DzordzConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("DzordzQuestConfig"))
 local player = Players.LocalPlayer
 local connections: {RBXScriptConnection} = {}
 local zoom = 1
@@ -88,7 +89,7 @@ local colors = {
 	fire = Color3.fromRGB(250, 115, 103),
 }
 local markers = {}
-local function marker(label: string, icon: string, x: number, z: number, color: Color3, questId: string?)
+local function marker(label: string, icon: string, x: number, z: number, color: Color3, questId: string?, stage: string?)
 	local pin = text(map, questId or label, icon, UDim2.fromOffset(19, 19), UDim2.fromScale(0.5, 0.5))
 	pin.AnchorPoint = Vector2.new(0.5, 0.5)
 	pin.BackgroundColor3 = color
@@ -100,7 +101,7 @@ local function marker(label: string, icon: string, x: number, z: number, color: 
 	round.Parent = pin
 	table.insert(connections, pin.MouseEnter:Connect(function() hovered = label end))
 	table.insert(connections, pin.MouseLeave:Connect(function() hovered = nil end))
-	table.insert(markers, {pin = pin, x = x, z = z, id = questId, label = label})
+	table.insert(markers, {pin = pin, x = x, z = z, id = questId, label = label, stage = stage})
 end
 for _, point in Config.Landmarks do
 	marker(point.label, point.icon, point.x, point.z, colors[point.kind], nil)
@@ -108,6 +109,9 @@ end
 for index, point in Config.QuestPoints do
 	marker("Plakat • przystanek " .. index, tostring(index), point.x, point.z, Color3.fromRGB(255, 204, 83), point.id)
 end
+marker("Dzordz Automatowicz", "D", DzordzConfig.NpcPosition.X, DzordzConfig.NpcPosition.Z, Color3.fromRGB(209, 184, 249), nil)
+marker("Torba Dzordza", "T", DzordzConfig.BagPosition.X, DzordzConfig.BagPosition.Z, Color3.fromRGB(255, 204, 83), "DzordzBagPickup", "seeking")
+marker("Oddaj torbę Dzordzowi", "D", DzordzConfig.NpcPosition.X, DzordzConfig.NpcPosition.Z, Color3.fromRGB(255, 204, 83), "DzordzBagReturn", "carrying")
 local arrow = text(map, "Player", "▲", UDim2.fromOffset(22, 22), UDim2.fromScale(0.5, 0.5))
 arrow.AnchorPoint = Vector2.new(0.5, 0.5)
 arrow.TextSize = 20
@@ -134,6 +138,7 @@ table.insert(connections, RunService.Heartbeat:Connect(function(dt)
 	arrow.Position = UDim2.fromScale(0.5 + (root.Position.X - centerX) / span, 0.5 + (root.Position.Z - centerZ) / span)
 	arrow.Rotation = math.deg(math.atan2(root.CFrame.LookVector.X, -root.CFrame.LookVector.Z))
 	local active = player:GetAttribute("PosterQuestStatus") == "active"
+	local dzordzStatus = player:GetAttribute("DzordzQuestStatus")
 	local nearest = math.huge
 	local nearestName = ""
 	local edgePositions = {}
@@ -142,6 +147,9 @@ table.insert(connections, RunService.Heartbeat:Connect(function(dt)
 		local x, y = 0.5 + dx / span, 0.5 + dz / span
 		local inside = x >= 0.06 and x <= 0.94 and y >= 0.15 and y <= 0.83
 		local visible = if item.id then active and player:GetAttribute("PosterQuest_" .. item.id) ~= true else inside
+		if item.stage then
+			visible = dzordzStatus == item.stage or (item.stage == "seeking" and dzordzStatus == "picking")
+		end
 		item.pin.Visible = visible
 		if not visible then continue end
 		if item.id then
@@ -161,7 +169,7 @@ table.insert(connections, RunService.Heartbeat:Connect(function(dt)
 		end
 		item.pin.Position = UDim2.fromScale(x, y)
 	end
-	footer.Text = hovered or (if active and nearest < math.huge then "PLAKAT " .. nearestName .. "  •  " .. math.round(nearest) .. " studów" else "P policja  •  $ sklep  •  R remiza")
+	footer.Text = hovered or (if nearest < math.huge then "CEL " .. nearestName .. "  •  " .. math.round(nearest) .. " studów" else "P policja  •  $ sklep  •  R remiza")
 end))
 
 script.Destroying:Connect(function()

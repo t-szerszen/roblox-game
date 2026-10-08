@@ -352,3 +352,58 @@ AnimationConstraint rigs, idempotent appearance setup, unchanged mesh dimensions
 and original RigAttachment frames, ball-socket alignment, and clamping distant
 limb goals without translation. Native Play verifies spawn/respawn consistency,
 full-lock grip reach, deck-centered right support and controlled wheelie.
+
+## Gangs, territories and protection
+
+```sh
+python3 tests/run_gang_tests.py --luau /path/to/luau
+```
+
+The suite executes actual GangService, GangRequests, name filtering, CombatService,
+TerritoryCapture, TerritoryService, TerritoryRewards, PhoneServer and PlayerData
+with controlled service doubles. It currently passes 138 assertions: malformed
+payloads/NaN/infinity/extra keys, filtering failure, duplicate names/colors,
+server-size limits, owner permissions, concurrent membership revalidation,
+multiple invites and join requests, stale/replayed/wrong-recipient responses,
+cooldowns, offline leader return/timeout and oldest-member succession, disband,
+net capture advantage, gradual decay, stun/protection, old-character stun callbacks,
+integer reward remainder, zone cleanup and GetState throttling. It uses no live
+DataStore and awards no currency to real profiles.
+
+`tests/gang_native.studio.luau` exports `Run()`. In Edit mode, load its source into
+a temporary ModuleScript, require it and call `Run()`, then destroy the module.
+The fixture uses unparented native Instances and cleans its scopes on failure. It
+passes 17 assertions for gang tags and Humanoid display restoration, real phone
+controls and palette availability, invite/request forms, owner-only actions,
+protection while in a gang, busy-state guards, page cleanup, capture math and
+rotated zone CFrames. It leaves the production map, players and profiles untouched.
+CLI doubles and this Edit fixture do not test real multiplayer replication or
+Humanoid fall/seating physics.
+
+After authoring flags with [TerritoryWorkflow](../docs/GANG_SYSTEM.md), use a
+separate test place with several clients for the remaining Play acceptance:
+
+1. Create differently colored gangs, invite/accept/reject, request/approve/reject,
+   rename and recolor; verify all clients see consistent labels and roster limits.
+2. Capture on foot and mounted. Compare 1, 2v1, 3v1, 2v2 and three competing gangs.
+   Leave a partial capture empty and verify gradual decay. Eliminate defenders,
+   respawn and return; ownership changes only when capture finishes.
+3. Enable protection in a gang: no incoming/outgoing attacks and no capture or
+   contest influence. Check the combat lock and toggle cooldown.
+4. Pepper an enemy: no HP loss, fall/stun for three seconds; a living enemy still
+   counts if its root remains in the zone. Verify normal death/respawn separately.
+5. Capture two flags with three online members; each earns 40 Coins at the next
+   minute boundary. Check integer carry with a group not dividing 60 evenly.
+6. Disconnect an ordinary member, then a leader; verify immediate ordinary removal,
+   leader's reserved slot, return cancellation and succession after 30 minutes.
+   Empty the gang and verify its flags become neutral. Restart and verify session
+   gang/flag state disappears while legitimately awarded Coins remain in profiles.
+
+
+The gang suite also verifies neutral/captured flag colors, immediate recoloring
+when the owner changes palette, rival takeover, disband neutralization and
+restoration of authored appearance on unregister. Native Edit verification of the
+three installed points passed 19 checks: exactly three models after repeat install,
+unique IDs/tags, collision properties, distance from spawn, unchanged pivots and
+moving a detached model clone together with its zone. All three placements were
+visually inspected; this does not replace multiplayer Play acceptance.

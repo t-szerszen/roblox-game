@@ -1,17 +1,8 @@
 --!strict
 
 export type Page = "Home" | "Scooters" | "Delivery" | "Gang" | "Daily" | "Protection"
-export type GangState = {
-	canCreate: boolean,
-	gangId: string?,
-	gangName: string?,
-	gangColor: Color3?,
-	isLeader: boolean,
-	members: { { userId: number, displayName: string, isLeader: boolean } },
-	maxMembers: number,
-	invite: { gangName: string, inviterName: string, expiresAt: number }?,
-	candidates: { { userId: number, displayName: string } },
-}
+local GangTypes = require(script.Parent.Parent.Gang.GangTypes)
+export type GangState = GangTypes.State
 export type State = {
 	passiveEnabled: boolean,
 	passiveAvailable: boolean,
