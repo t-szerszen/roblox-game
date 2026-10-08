@@ -60,6 +60,7 @@ type ScooterRecord = {
 	fallenAt: number,
 	crashToken: number,
 	displaySpeedKmh: number,
+	speedKmh: number,
 	frontGrounded: boolean,
 	rearGrounded: boolean,
 	burnoutActive: boolean,
@@ -82,6 +83,7 @@ local toggleDriveModeRemote: RemoteEvent
 local toggleHeadlightRemote: RemoteEvent
 local connections: { Connection } = {}
 local started = false
+local mountLocks: { [Player]: {} } = {}
 
 local function getOrCreateFolder(parent: Instance, name: string): Folder
 	local existing = parent:FindFirstChild(name)
@@ -344,6 +346,15 @@ local function resetControls(record: ScooterRecord)
 	record.model:SetAttribute("BurnoutActive", false)
 end
 
+local function dismount(record: ScooterRecord)
+ local rider=record.seat.Occupant
+ resetControls(record)
+ if rider then rider.Sit=false end
+ -- This exact seat weld is owned by the scooter; suspension and rider rigs survive.
+ local seatWeld=record.seat:FindFirstChild("SeatWeld")
+ if seatWeld and seatWeld:IsA("Weld") then seatWeld:Destroy() end
+end
+
 local function cleanupRecord(record: ScooterRecord)
 	if record.cleaning then
 		return
@@ -529,6 +540,7 @@ local function spawnForPlayer(player: Player, requestedModel: string?, templateN
 		fallenAt = 0,
 		crashToken = 0,
 		displaySpeedKmh = 0,
+		speedKmh = 0,
 		frontGrounded = false,
 		rearGrounded = false,
 		burnoutActive = false,
@@ -555,7 +567,7 @@ local function spawnForPlayer(player: Player, requestedModel: string?, templateN
 			local occupant = seat.Occupant
 			releaseRider(record)
 			resetControls(record)
-			if occupant and (occupant.Parent ~= player.Character or occupant.Health <= 0) then
+			if occupant and (occupant.Parent ~= player.Character or occupant.Health <= 0 or mountLocks[player] ~= nil) then
 				occupant.Sit = false
 				local seatWeld = seat:FindFirstChild("SeatWeld")
 				if seatWeld then seatWeld:Destroy() end
@@ -600,7 +612,7 @@ local function spawnForPlayer(player: Player, requestedModel: string?, templateN
 	table.insert(
 		record.connections,
 		ridePrompt.Triggered:Connect(function(triggeringPlayer: Player)
-			if triggeringPlayer ~= player or seat.Occupant ~= nil or seat.Disabled then
+			if triggeringPlayer ~= player or seat.Occupant ~= nil or seat.Disabled or mountLocks[player] ~= nil then
 				return
 			end
 
@@ -657,7 +669,7 @@ end
 
 local function playerOwnsOccupiedScooter(player: Player, record: ScooterRecord): boolean
 	local occupant = record.seat.Occupant
-	if not occupant or occupant.Health <= 0 or record.owner ~= player or player.Parent ~= Players then
+	if not occupant or occupant.Health <= 0 or record.owner ~= player or player.Parent ~= Players or mountLocks[player] ~= nil then
 		return false
 	end
 	local stunnedUntil = player:GetAttribute("StunnedUntil")
@@ -770,6 +782,7 @@ function ScooterServer.SpawnForPlayer(player: Player, modelName: string?): Model
 end
 
 local function requestSpawn(player: Player, modelName: string, templateName: string?): (boolean, string)
+	if mountLocks[player] then return false, "Poczekaj na zakończenie zatrzymania." end
 	if player.Parent ~= Players or ScooterConfig.Models[modelName] == nil or not playerOwnsModel(player, modelName) then
 		return false, "Nie posiadasz tej hulajnogi."
 	end
@@ -869,11 +882,7 @@ function ScooterServer.Start()
 		if not record or not playerOwnsOccupiedScooter(player, record) then return end
 		if trickName == "Dismount" then
 			if active then
-				local rider = record.seat.Occupant
-				resetControls(record)
-				if rider then rider.Sit = false end
-				local seatWeld = record.seat:FindFirstChild("SeatWeld")
-				if seatWeld then seatWeld:Destroy() end
+				dismount(record)
 			end
 			return
 		end
@@ -897,6 +906,7 @@ function ScooterServer.Start()
 		local record = recordsByPlayer[player]
 		if record then cleanupRecord(record) end
 		lastSpawnByPlayer[player] = nil
+		mountLocks[player] = nil
 	end))
 
 	table.insert(connections, RunService.PreSimulation:Connect(function(deltaTime: number)
@@ -953,6 +963,7 @@ function ScooterServer.Start()
 			local actualHeading = if flatHeading.Magnitude > 0.01 then flatHeading.Unit else record.desiredForward
 			local headingSpeed = flatVelocity:Dot(actualHeading)
 			local motionAlongScooter = math.abs(headingSpeed)
+			record.speedKmh=motionAlongScooter / ScooterConfig.StudsPerKmH
 			local displaySpeedKmh = if motionAlongScooter < ScooterConfig.StopSpeed
 				then 0
 				else math.floor(motionAlongScooter / ScooterConfig.StudsPerKmH + 0.5)
@@ -1140,6 +1151,30 @@ function ScooterServer.Start()
 	end))
 end
 
+export type RidingState = {model: Model, root: BasePart, speedKmh: number, wheelie: boolean}
+function ScooterServer.GetRidingState(player: Player): RidingState?
+ local record=recordsByPlayer[player]
+ if not record or record.cleaning or not record.model.Parent or not record.root.Parent
+  or record.fallen or not playerOwnsOccupiedScooter(player,record) then return nil end
+ return {model=record.model,root=record.root,speedKmh=record.speedKmh,
+  wheelie=record.wheelieActive and record.rearGrounded and not record.frontGrounded
+   and math.abs(record.root.AssemblyLinearVelocity.Y)<=ScooterConfig.MaxGroundedVerticalSpeed}
+end
+function ScooterServer.LockMount(player: Player, owner: {}): boolean
+ if mountLocks[player] then return false end
+ mountLocks[player]=owner; return true
+end
+function ScooterServer.ReleaseMount(player: Player, owner: {})
+ if mountLocks[player]==owner then mountLocks[player]=nil end
+end
+function ScooterServer.DismountForPlayer(player: Player): boolean
+ local record=recordsByPlayer[player]
+ if not record or record.cleaning or not record.model.Parent or record.owner~=player then return false end
+ local rider=record.seat.Occupant
+ if not rider or rider.Health<=0 or rider.Parent~=player.Character then return false end
+ dismount(record); return true
+end
+
 function ScooterServer.Stop()
 	if not started then return end
 	started = false
@@ -1148,6 +1183,7 @@ function ScooterServer.Stop()
 
 	for _, record in recordsByPlayer do cleanupRecord(record) end
 	table.clear(lastSpawnByPlayer)
+	table.clear(mountLocks)
 end
 
 return ScooterServer
