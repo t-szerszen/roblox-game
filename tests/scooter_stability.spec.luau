@@ -128,6 +128,32 @@ local function tick(speed)
 end
 
 do
+ local policeStart=testCount
+ controls(true,false,0,false);tick(80)
+ local riding=Server.GetRidingState(player)
+ check(riding and riding.model==scooter,"Police reads the actual owned, occupied server record")
+ near(riding.speedKmh,50,"Police uses existing precise 1.6 stud/s per km/h conversion")
+ check(not riding.wheelie,"Grounded normal riding is not wheelie")
+ local owner,other={},{}
+ check(Server.LockMount(player,owner),"Server detention can acquire a mount lock")
+ check(not Server.LockMount(player,other),"Mount lock has one owner")
+ check(Server.GetRidingState(player)==nil,"Locked rider cannot supply fresh violation state")
+ check(not Server.RequestSpawnForPlayer(player,Config.DefaultModel),"Detained player cannot replace the scooter")
+ Server.ReleaseMount(player,other)
+ check(not Server.LockMount(player,other),"Wrong owner cannot release a mount lock")
+ Server.ReleaseMount(player,owner)
+ check(Server.LockMount(player,other),"Authorized release permits reuse")
+ Server.ReleaseMount(player,other)
+ local ownedWeld=make(scooter.DriverSeat,"Weld","SeatWeld")
+ check(Server.DismountForPlayer(player),"Authorized server dismount uses existing scooter lifecycle")
+ check(ownedWeld.destroyed and humanoid.Sit==false,"Only owned seat weld is removed")
+ check(not scooter.destroyed and scooter.VirtualFrontAxle.HingeConstraint.Parent~=nil,"Dismount preserves the articulated scooter")
+ check(not Server.DismountForPlayer(makePlayer(8081)),"A player without a scooter cannot force a dismount")
+ tick(0)
+ print(string.format("PASS: %d police/scooter integration assertions",testCount-policeStart))
+end
+
+do
 	local lampStart = testCount
 	local remote = services.ReplicatedStorage.Remotes[Config.RemoteFolderName].ToggleHeadlight
 	local beam = scooter.FrontLight.HeadlightBeamAttachment.HeadlightBeam
