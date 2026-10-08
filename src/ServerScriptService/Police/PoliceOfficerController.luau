@@ -11,6 +11,7 @@ export type Controller=typeof(setmetatable({} :: {
  waypoints: {PathWaypoint}, cursor: number, generation: number, busy: boolean,
  destroyed: boolean, path: Path?, pathConnection: RBXScriptConnection?,
  joints: {Joint}, collisions: {[BasePart]: boolean}, phase: number,
+ exitStarted: number?, exitFrom: CFrame?, exitTo: CFrame?,
 },Officer))
 function Officer.CreateTemplate(): Model
  local description=Instance.new("HumanoidDescription")
@@ -23,6 +24,15 @@ function Officer.CreateTemplate(): Model
  for _,v in rig:GetDescendants() do if v:IsA("LuaSourceContainer") then v:Destroy() end end
  rig.PrimaryPart=rig:FindFirstChild("HumanoidRootPart") :: BasePart
  assert(rig.PrimaryPart and rig:FindFirstChildOfClass("Humanoid"),"Invalid R15 officer")
+ local human=rig:FindFirstChildOfClass("Humanoid") :: Humanoid
+ local footBottom=math.huge
+ for _,name in {"LeftFoot","RightFoot"} do
+  local foot=rig:FindFirstChild(name) :: BasePart
+  assert(foot,"R15 officer foot missing")
+  footBottom=math.min(footBottom,foot.Position.Y-foot.Size.Y/2)
+ end
+ -- Generated default descriptions can have HipHeight=0 before character setup.
+ human.HipHeight=math.max(0,rig.PrimaryPart.Position.Y-rig.PrimaryPart.Size.Y/2-footBottom)
  local torso=rig:FindFirstChild("UpperTorso") :: BasePart
  local badge=Instance.new("Part");badge.Name="PoliceBadge";badge.Size=Vector3.new(0.3,0.35,0.05)
  badge.Color=Color3.fromRGB(218,197,107);badge.Material=Enum.Material.Metal
@@ -46,12 +56,14 @@ function Officer.new(template: Model, car: Model): Controller
  root.Anchored=true;model.Parent=car
  local self=setmetatable({model=model,root=root,humanoid=human,car=car,outside=false,door=nil,goal=nil,
   nextPath=0,waypoints={},cursor=1,generation=0,busy=false,destroyed=false,path=nil,pathConnection=nil,
-  joints=joints,collisions=collisions,phase=0},Officer)
+  joints=joints,collisions=collisions,phase=0,exitStarted=nil,exitFrom=nil,exitTo=nil},Officer)
  self:Board()
  return self
 end
 function Officer.Board(self: Controller)
+ if self.destroyed or not self.model.Parent or not self.root.Parent or not self.car.Parent then return end
  self.generation+=1;self.busy=false;self:ClearPath()
+ self.exitStarted=nil;self.exitFrom=nil;self.exitTo=nil
  self.outside=false;self.goal=nil;self.root.Anchored=true
  for p in self.collisions do if p.Parent then p.CanCollide=false end end
  self.model.Parent=self.car
@@ -60,8 +72,8 @@ function Officer.Board(self: Controller)
  -- Derived from this car's envelope; the original Kia seat is below its chassis.
  self.model:PivotTo(chassis.CFrame*CFrame.new(-size.X*0.18,-size.Y*0.22,-size.Z*0.12))
 end
-function Officer.Exit(self: Controller, parent: Instance): boolean
- if self.destroyed or not self.car.Parent then return false end
+function Officer.Exit(self: Controller, parent: Instance, now: number): boolean
+ if self.destroyed or not self.model.Parent or not self.root.Parent or not self.car.Parent then return false end
  local chassis=self.car.PrimaryPart :: BasePart;local size=chassis.Size
  local cast=RaycastParams.new();cast.FilterType=Enum.RaycastFilterType.Exclude
  cast.FilterDescendantsInstances={self.car,self.model};cast.RespectCanCollide=true
@@ -77,12 +89,10 @@ function Officer.Exit(self: Controller, parent: Instance): boolean
   local door=chassis.CFrame:PointToWorldSpace(Vector3.new(side*(size.X/2+0.2),0,-size.Z*0.12))
   local passage=Workspace:Raycast(door,clearance-door,cast)
   if passage then continue end
+  local from=self.model:GetPivot()
   self.model.Parent=parent
   local p=hit.Position+Vector3.yAxis*(self.humanoid.HipHeight+self.root.Size.Y/2)
-  self.model:PivotTo(CFrame.lookAt(p,p+chassis.CFrame.LookVector))
-  self.root.Anchored=false
-  for part,collision in self.collisions do if part.Parent then part.CanCollide=collision end end
-  if self.root:CanSetNetworkOwnership() then self.root:SetNetworkOwner(nil) end
+  self.exitStarted=now;self.exitFrom=from;self.exitTo=CFrame.lookAt(p,p+chassis.CFrame.LookVector)
   self.outside=true;self.door=p;return true
  end
  return false
@@ -93,7 +103,10 @@ function Officer.ClearPath(self: Controller)
  table.clear(self.waypoints)
 end
 function Officer.Navigate(self: Controller, goal: Vector3, now: number)
- if self.destroyed or not self.outside or self.humanoid.Health<=0 then return end
+ if self.destroyed or not self.outside or self.exitStarted or self.humanoid.Health<=0 then return end
+ if self.goal and (goal-self.goal).Magnitude>Config.OfficerWaypointTolerance*2 then
+  self.generation+=1;self.busy=false;self:ClearPath();self.nextPath=0
+ end
  self.goal=goal
  if not self.busy and now>=self.nextPath then
   self.nextPath=now+Config.OfficerRepathInterval;self.busy=true
@@ -111,12 +124,22 @@ function Officer.Navigate(self: Controller, goal: Vector3, now: number)
   end)
  end
  local waypoint=self.waypoints[self.cursor]
- if waypoint and (self.root.Position-waypoint.Position).Magnitude<Config.OfficerWaypointTolerance then
+ local delta=if waypoint then self.root.Position-waypoint.Position else Vector3.zero
+ if waypoint and Vector3.new(delta.X,0,delta.Z).Magnitude<Config.OfficerWaypointTolerance and math.abs(delta.Y)<Config.OfficerClearance.Y then
   self.cursor+=1;waypoint=self.waypoints[self.cursor]
  end
  if waypoint then self.humanoid:MoveTo(waypoint.Position) else self.humanoid:MoveTo(self.root.Position) end
 end
 function Officer.Animate(self: Controller, now: number, arresting: boolean)
+ if self.exitStarted then
+  local alpha=math.clamp((now-self.exitStarted)/Config.OfficerExitDuration,0,1)
+  self.model:PivotTo((self.exitFrom :: CFrame):Lerp(self.exitTo :: CFrame,alpha))
+  if alpha>=1 then
+   self.exitStarted=nil;self.exitFrom=nil;self.exitTo=nil;self.root.Anchored=false
+   for part,collision in self.collisions do if part.Parent then part.CanCollide=collision end end
+   if self.root:CanSetNetworkOwnership() then self.root:SetNetworkOwner(nil) end
+  end
+ end
  -- C0 replicates from the server; this fallback needs no uploaded animation asset.
  local speed=self.root.AssemblyLinearVelocity.Magnitude
  for _,entry in self.joints do

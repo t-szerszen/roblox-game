@@ -1,6 +1,8 @@
 --!strict
 local Players=game:GetService("Players")
 local ServerStorage=game:GetService("ServerStorage")
+local ReplicatedStorage=game:GetService("ReplicatedStorage")
+local ScooterConfig=require(ReplicatedStorage.Shared.Scooter.ScooterConfig)
 local Traffic=script.Parent.Parent.Traffic
 local TrafficConfig=require(Traffic.TrafficConfiguration)
 local Types=require(Traffic.TrafficTypes)
@@ -35,13 +37,23 @@ local function characterRoot(character: Model?): BasePart?
 end
 function Police.new(context: Context): Service
  local registry=Pursuits.new()
+ local units: {[number]: Unit}={}
  local officers=context.root:FindFirstChild("PoliceOfficers")
  assert(not officers or officers:IsA("Folder"),"PoliceOfficers must be Folder")
  local folder=(officers or Instance.new("Folder")) :: Folder
  folder.Name="PoliceOfficers";folder.Parent=context.root
  for _,v in folder:GetChildren() do if v:GetAttribute("PoliceOwned")==true then v:Destroy() end end
- local self: Service=setmetatable({context=context,units={},templates={},officerTemplate=nil,pursuits=registry,
-  arrests=Arrest.new(function(player,owner) return registry:Owns(player,owner) end),
+ local self: Service=setmetatable({context=context,units=units,templates={},officerTemplate=nil,pursuits=registry,
+  arrests=Arrest.new(function(player,owner,officer,vehicle)
+   if not registry:Owns(player,owner) then return false end
+   for _,unit in units do
+    if unit==owner then
+     return unit.machine.state=="ARRESTING" and unit.officer.model==officer and unit.car.vehicle.model==vehicle
+      and not unit.car.remove and not unit.officer.destroyed
+    end
+   end
+   return false
+  end),
   now=0,destroyed=false,nextSpawn=0,nextScan=0,templateIndex=0,officers=folder,connections={}},Police)
  if not Config.Enabled then return self end
  local assets=ServerStorage:FindFirstChild("PoliceVehicleModels")
@@ -71,6 +83,7 @@ function Police.Finish(self: Service, unit: Unit, now: number, reason: string, r
  unit.resume=resume
  unit.sequenceSince=nil;unit.slowSince=nil;unit.observed=nil;unit.evidence=nil
  if not resume and unit.target then
+  Debug.Write(unit.car.vehicle.model,{LastPursuitEndReason=reason,LastPursuitUserId=unit.target.UserId})
   Debug.Signal(unit.target,nil);self.pursuits:Release(unit.target,unit)
   unit.target=nil;unit.character=nil
  end
@@ -122,7 +135,7 @@ function Police.Intervene(self: Service, unit: Unit, root: BasePart, speed: numb
   if state~="PURSUIT" and memory and now-memory.lastSeen>Config.LostSightTolerance then self:Finish(unit,now,"TargetHidden",true) end
   return
  end
- local stopped=speed<=Config.MaxStoppedSpeed
+ local stopped=speed<=Config.StopSpeedKmh*ScooterConfig.StudsPerKmH
  local path=car:Path()
  if state=="PURSUIT" and stopped and distance<=Config.InterventionDistance
   and path and not path.edge.intersection and not next(car.reservations) then
@@ -140,8 +153,8 @@ function Police.Intervene(self: Service, unit: Unit, root: BasePart, speed: numb
   end
  elseif state=="OFFICER_EXITING" then
   if not stopped or distance>Config.InterventionDistance*1.5 then self:Finish(unit,now,"TargetFleeing",true);return end
-  if not unit.officer.outside then unit.officer:Exit(self.officers) end
-  if unit.officer.outside then self:Transition(unit,"ARRESTING",now,"OfficerApproaching")
+  if not unit.officer.outside then unit.officer:Exit(self.officers,now) end
+  if unit.officer.outside and not unit.officer.exitStarted then self:Transition(unit,"ARRESTING",now,"OfficerApproaching")
   elseif now-unit.machine.since>Config.OfficerExitTimeout then self:Finish(unit,now,"ExitObstructed",false) end
  elseif state=="ARRESTING" then
   if not stopped or distance>Config.InterventionDistance*1.5 then self:Finish(unit,now,"TargetFleeing",true);return end

@@ -11,7 +11,7 @@ local Sensors=require(Traffic.TrafficSensors)
 local Spawner={}
 function Spawner.Target(): number
  local night=Lighting.ClockTime>=Config.NightStart or Lighting.ClockTime<Config.NightEnd
- return if night then math.max(1,math.floor(Config.VehicleCount*(1-Config.NightReduction))) else Config.VehicleCount
+ return if night then math.max(0,math.floor(Config.VehicleCount*(1-Config.NightReduction))) else Config.VehicleCount
 end
 function Spawner.Spawn(id: number, template: Model, network: Types.Network, sensor: Sensors.Sensor,
  cars: {Controller.Vehicle}, parent: Instance, random: Random): Controller.Vehicle?

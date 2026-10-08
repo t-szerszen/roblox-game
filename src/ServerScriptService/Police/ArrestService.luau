@@ -1,6 +1,8 @@
 --!strict
 local Players=game:GetService("Players")
 local Workspace=game:GetService("Workspace")
+local ReplicatedStorage=game:GetService("ReplicatedStorage")
+local ScooterConfig=require(ReplicatedStorage.Shared.Scooter.ScooterConfig)
 local Config=require(script.Parent.PoliceConfig)
 local Scooter=require(script.Parent.Parent.Scooter.ScooterServer)
 local Rules=require(script.Parent.TrafficViolationDetector)
@@ -9,14 +11,14 @@ type Hold={owner: {}, character: Model, humanoid: Humanoid, root: BasePart,
  expires: number, separatingUntil: number, scooterRoot: BasePart?,
  anchored: boolean, walkSpeed: number, jumpPower: number, jumpHeight: number, autoRotate: boolean,
  connections: {RBXScriptConnection}, applied: boolean}
-export type Service=typeof(setmetatable({} :: {holds: {[Player]: Hold}, owns: (Player,{}) -> boolean},Arrest))
-function Arrest.new(owns: (Player,{}) -> boolean): Service
+export type Service=typeof(setmetatable({} :: {holds: {[Player]: Hold}, owns: (Player,{},Model,Model) -> boolean},Arrest))
+function Arrest.new(owns: (Player,{},Model,Model) -> boolean): Service
  return setmetatable({holds={},owns=owns},Arrest)
 end
 function Arrest.Validate(self: Service, player: Player, owner: {}, character: Model,
  officer: Model, vehicle: Model): (boolean,string)
  if self.holds[player] or player:GetAttribute("PoliceState")=="ARRESTED" then return false,"AlreadyArrested" end
- if player.Parent~=Players or player.Character~=character or not self.owns(player,owner) then return false,"InvalidAuthority" end
+ if player.Parent~=Players or player.Character~=character or not self.owns(player,owner,officer,vehicle) then return false,"InvalidAuthority" end
  local human=character:FindFirstChildOfClass("Humanoid")
  local root=character:FindFirstChild("HumanoidRootPart")
  local officerHuman=officer:FindFirstChildOfClass("Humanoid")
@@ -30,7 +32,7 @@ function Arrest.Validate(self: Service, player: Player, owner: {}, character: Mo
  local riding=Scooter.GetRidingState(player)
  if human.SeatPart and not riding then return false,"UnsupportedSeat" end
  local velocity=if riding then riding.root.AssemblyLinearVelocity else root.AssemblyLinearVelocity
- if Vector3.new(velocity.X,0,velocity.Z).Magnitude>Config.MaxStoppedSpeed then return false,"TargetMoving" end
+ if Vector3.new(velocity.X,0,velocity.Z).Magnitude>Config.StopSpeedKmh*ScooterConfig.StudsPerKmH then return false,"TargetMoving" end
  local params=RaycastParams.new();params.FilterType=Enum.RaycastFilterType.Exclude
  local ignored: {Instance}={officer,vehicle}
  if riding then table.insert(ignored,riding.model) end

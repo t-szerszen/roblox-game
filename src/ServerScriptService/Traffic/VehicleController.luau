@@ -42,6 +42,7 @@ function Controller.Fail(self: Vehicle, reason: string)
 	self.remove=true; self.exitReason=reason; self.speed=0; self.target=0; self.reason=reason
 end
 function Controller.Sense(self: Vehicle, sensor: Sensors.Sensor, intersections: Intersections.State, now: number)
+ if not self.vehicle.root:IsDescendantOf(self.vehicle.model) or self.vehicle.model.PrimaryPart~=self.vehicle.root then self:Fail("RemovedRoot");return end
 	local path=self:Path()
 	if not path or path.edge.enabled==false then self:Fail("InvalidRoute"); return end
 	self.target=math.min(self.driving.maxSpeed,path.edge.speed*self.driving.edgeSpeedMultiplier); self.reason="Driving"; self.obstacle=nil
@@ -121,6 +122,7 @@ end
 function Controller.Step(self: Vehicle, dt: number, sensor: Sensors.Sensor, intersections: Intersections.State)
 	if self.remove then return end
 	if not self.vehicle.model.Parent then self:Fail("RemovedModel"); return end
+ if not self.vehicle.root:IsDescendantOf(self.vehicle.model) or self.vehicle.model.PrimaryPart~=self.vehicle.root then self:Fail("RemovedRoot");return end
 	local root=self.vehicle.root
 	if root.Position.Y<Config.FallY then self:Fail("BelowMap"); return end
 	local displacement=(root.Position-self.lastFrame.Position).Magnitude
