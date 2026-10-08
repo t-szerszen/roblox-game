@@ -430,3 +430,32 @@ Play or alter the map.
 See [traffic testing and manual Play checklist](../docs/TRAFFIC_SYSTEM.md) for actual
 road-generation evidence and the outstanding physics, replication and multiplayer
 acceptance checks.
+
+## NPC police
+
+```sh
+python3 tests/run_police_tests.py --luau /path/to/luau
+```
+
+The 809 assertions execute the actual directed destination search, state machine,
+exclusive pursuit ownership, last-seen/timeouts and sustained violation rules.
+Service doubles supply scooter/combat eligibility for these rule tests. The
+scooter regression suite also exercises the real server module's precise riding
+state, owner-scoped mount locks and exact owned-seat dismount (841 total assertions).
+
+After syncing police scripts and ServerStorage.PoliceVehicleModels, paste
+`tests/police.studio.luau` into the Edit Command Bar. Its 305 native assertions
+check both authored vehicle envelopes, sanitized models, R15 exit/navigation
+prerequisites, real FOV/LOS obstruction, shared controller overrides and detention
+validation/restoration. Temporary far-away support fixtures are removed; authored
+map and vehicles are retained.
+
+`tests/police.play.studio.luau` and `tests/police.edge.play.studio.luau` must run as
+temporary normal **server Scripts in a one-player Play session**, sharing the
+actual traffic/scooter module cache. They reposition test actors and the first
+pauses civilian spawning; the lifecycle fixture respawns the player and restarts
+traffic. Stop Play after testing to discard these temporary runtime fixtures.
+The normal and wheelie/escape scenarios use genuine client controls and server
+physics. The lifecycle script uses authorized fixture interventions to isolate
+removal, respawn and restart behavior (52 checks).
+See [exact startup, inputs, results and remaining manual checks](../docs/POLICE_VALIDATION.md).

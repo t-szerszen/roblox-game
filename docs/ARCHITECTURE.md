@@ -184,3 +184,19 @@ built from the actual Studio `Workspace.Map.Drogi` road surfaces, rather than th
 older mock `MapData`. Traffic assets preserve authored replacement models during
 Rojo sync. Scooter mechanics and remotes are unchanged. See
 [traffic architecture, workflow, validation and limitations](TRAFFIC_SYSTEM.md).
+
+# NPC police
+
+`ServerScriptService.Police` joins the existing traffic fleet with adapted native
+Kia and Fiat Ducato Policja templates. Directed destinations and per-car tuning
+extend the shared trajectory controller without changing civilian defaults.
+Server scooter records supply precise speed and accepted, grounded wheelie;
+bounded FOV/LOS evidence and exclusive claims authorize pursuits. R15 officers
+exit supported car doors, navigate on foot and request a separately validated
+arrest. The shared scooter dismount and an owner-scoped mount lock make ten-second
+detention reversible on expiry, actor removal, death, respawn, disconnect or stop.
+The client only renders replicated notices. No new remote, economy penalty or
+production map generator is introduced. A server BindableEvent under TrafficSystem
+stops the previous fleet when development creates a fresh manager require context.
+See [police architecture and configuration](POLICE_SYSTEM.md) and
+[executed validation and remaining acceptance](POLICE_VALIDATION.md).

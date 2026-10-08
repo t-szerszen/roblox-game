@@ -120,15 +120,14 @@ Konfiguracja, architektura i ręczne przygotowanie flag: [GANG_SYSTEM.md](GANG_S
 
 Policja jest obsługiwana w pełni przez sztuczną inteligencję (NPC). Brak podziału na klasy jednostek. Należy dbać o optymalizację zdarzeń logicznych jednostek, unikając sprawdzania wszystkich graczy co klatkę (Performance rules)[cite: 4].
 
-- **Wyzwalacze Pościgu:**
-  1. Jazda z prędkością powyżej **20 km/h**.
-  2. Skoki (robienie ewolucji/skoków na hulajnodze blisko policji).
-  3. Rozwalenie rogatki/szlabanu.
-  4. Zaatakowanie innego gracza (PvP).
-  5. Misje specjalne.
-- **Logika Pościgu (Wydajność):** System pościgu uaktywnia się **tylko u lokalnych jednostek** w promieniu ok. 100 studów od popełnienia wykroczenia. Inne patrole ignorują gracza, dopóki ten nie wjedzie w ich promień.
-- **Zatrzymanie (Areszt):** Gdy policjant dogoni gracza, następuje odliczanie **10 sekund**.
-- **Kary za mandat:** Po odliczeniu 10 sekund gracz otrzymuje mandat karny w wysokości **50 Coins**. Jeśli gracz ma 0 Coins (lub brakuje mu środków), nic się nie dzieje – po prostu traci czas spędzony w areszcie, po czym jest wolny (brak ujemnego salda).
+Zakres pierwszej implementacji został zaktualizowany zgodnie z zadaniem NPC policji z 2026-10-08:
+
+- **Wyzwalacze Pościgu:** Utrzymana jazda powyżej **50 km/h** albo potwierdzone wheelie na własnej hulajnodze. Zwykły skok lub przypadkowe pochylenie nie stanowią wykroczenia.
+- **Logika Pościgu (Wydajność):** Jednostka musi widzieć gracza w swoim polu widzenia, w konfigurowalnym zasięgu (początkowo 220 studów). Serwer potwierdza wykroczenie przez 0,8 sekundy i przydziela jedną jednostkę do jednego celu. Domyślnie działają dwa radiowozy i najwyżej dwa pościgi; w nocy liczba patroli spada do jednego.
+- **Zatrzymanie (Areszt):** Samo dogonienie gracza nie wystarcza. Gracz musi się zatrzymać, policjant wysiąść i podejść, a serwer zweryfikować interakcję. Bezpieczne zsiadanie rozpoczyna **10 sekund** zatrzymania, po których sterowanie wraca. Ucieczka przed zakończeniem interwencji pozwala wznowić pościg.
+- **Kary:** Ten etap nie pobiera Coins ani nie zmienia danych gracza. Poprzedni próg 20 km/h, wykrywanie skoków i mandat 50 Coins zostały zastąpione powyższym zakresem.
+
+Rogatki, PvP, specjalne misje i grywalna frakcja policji pozostają kierunkami dalszego rozwoju poza tą implementacją. Architektura, strojenie i wyniki testów: [POLICE_SYSTEM.md](POLICE_SYSTEM.md), [POLICE_VALIDATION.md](POLICE_VALIDATION.md).
 
 ---
 

@@ -33,6 +33,9 @@ settings are changed. See the [Roblox WorldRoot query reference](https://create.
 spawning schedules, player relevance, cleanup and debugging. Movement runs at
 30 Hz, sensing at 10 Hz, and diagnostics at 2 Hz. Server stalls are limited to a
 small movement step instead of advancing a car across a large unchecked distance.
+NPC police use this same fleet, Heartbeat, sensor bodies and reservations. Their
+controller overrides supply directed destinations and pursuit tuning; omitted
+overrides preserve civilian behavior. See [NPC police](POLICE_SYSTEM.md).
 Road curves are cached. Look-ahead obstacle queries use the validated trajectory;
 full ground probes run at movement and spawn time. Workspace is scanned at startup
 or explicit authoring, never once per car per frame. With ten cars, a linear cached
@@ -194,7 +197,7 @@ Set `Debug` false to clear the drawing. Authoring nodes are hidden during Play.
 
 ## Fleet defaults and recovery
 
-Defaults are target **6**, hard maximum **10**, one spawn attempt every **3 seconds**,
+Civilian defaults are target **6**, hard maximum **10**, one spawn attempt every **3 seconds**,
 up to **3 vehicles within 100 studs**, and up to **3 on a road tile**. Spawns must
 be 120–650 studs from the nearest player, at least 32 studs from another car,
 have a clear expanded footprint and a usable route of at least two edges and
@@ -207,6 +210,12 @@ fleet serves all players. Cars beyond 850 studs of every player expire after
 120 seconds; cars inside that boundary reset the timer. These conservative settings
 match the large inspected city and cap the initial query/replication cost; they
 have not yet been tuned with live performance measurements.
+
+Police add a separate global budget of two (one at night), with at most two
+pursuits. The civilian count excludes police; shared area/road density and body
+checks include both. The combined configured maximum is twelve, with the ordinary
+daytime target eight. Police spawn attempts run every five seconds and use
+additional separation and cooldown rules.
 
 Vehicles brake behind cars, scooters, characters and static obstacles. Scooter
 models are read from the existing configured `Workspace.Scooters` folder, with
@@ -245,6 +254,12 @@ Removal disposes the model, route, reservation queue entries and debug objects.
 Manager stop disconnects its single Heartbeat connection and disposes every owned
 car. Shutdown and script destruction both stop the manager. Failures log once per
 removed car or spawn attempt, rather than every frame.
+
+`TrafficSystem.RuntimeStop` is an owned server BindableEvent retained between
+starts. A fresh manager require context fires it before publishing a replacement
+fleet, so the previous manager disconnects its Heartbeat and disposes police and
+civilians. Unknown authoring children are preserved. The Play lifecycle test
+verifies repeated starts and a fresh-context reload.
 
 ## Replacing the car
 
