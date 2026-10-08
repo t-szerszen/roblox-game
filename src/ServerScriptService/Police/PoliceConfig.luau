@@ -3,6 +3,7 @@ return table.freeze({
  Enabled=true, Debug=false,
  VehicleCount=2, MaxPursuits=2, SpawnInterval=5, RespawnCooldown=20,
  MaxSpawnAttempts=12, SpawnSeparation=60, MinRouteDistance=384,
+ SpawnMinDistance=120, SpawnMaxDistance=650,
  NightStart=20, NightEnd=6, NightReduction=0.3,
  SpeedLimitKmh=50, DetectionRange=140, FieldOfView=140,
  SpeedConfirmation=1.2, WheelieConfirmation=0.8, OcclusionTolerance=0.6,

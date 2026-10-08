@@ -59,9 +59,11 @@ function PoliceVehicle.Template(source: Model, scale: number): Model
 end
 function PoliceVehicle.Signals(model: Model, active: boolean, now: number)
  local flashing=active and math.floor(now*4)%2==0
+ local changed=model:GetAttribute("PoliceSignalsActive")~=active
+ if changed then model:SetAttribute("PoliceSignalsActive",active) end
  for _,v in model:GetDescendants() do
   if v:IsA("Light") then v.Enabled=flashing
-  elseif v:IsA("Sound") then
+  elseif v:IsA("Sound") and changed then
    if active and v.Name=="Wail" then
     v.Looped=true; if not v.IsPlaying then v:Play() end
    else v:Stop() end

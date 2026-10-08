@@ -197,6 +197,18 @@ function Controller.SetDestination(self: Vehicle, position: Vector3): number
  local path=self:Path(); assert(path,"Missing current route")
  local route,distance,gap=RoadNetwork.Destination(self.network,path.edge.id,self.distance,position)
  self.route=route; self.index=1; self.destinationDistance=distance; self.managed=true
+ -- A changed turn can lengthen a reserved crossing. Never release it using the
+ -- shorter, previous route's clearance distance.
+ local offset=0
+ for _,id in route do
+  local nextPath=self.network.paths[id]
+  local zone=nextPath.edge.intersection
+  local length=nextPath.length-(if id==route[1] then self.distance else 0)
+  if zone and self.reservations[zone] then
+   self.reservations[zone]=math.max(self.reservations[zone],self.traveled+offset+length+self.vehicle.bounds.Z/2+Config.IntersectionClearance)
+  end
+  offset+=length
+ end
  self.routeEndSince=nil
  return gap
 end

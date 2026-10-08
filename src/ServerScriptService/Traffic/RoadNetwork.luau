@@ -81,6 +81,7 @@ function RoadNetwork.Destination(network: Types.Network, current: string, distan
  local bestGap=math.huge
  local bestCost=math.huge
  local function consider(path: Types.Path, start: number, cost: number)
+  if path.edge.intersection then return end
   for _,sample in path.samples do
    if sample.distance<start then continue end
    local gap=(sample.position-position).Magnitude
@@ -108,6 +109,7 @@ function RoadNetwork.Destination(network: Types.Network, current: string, distan
    end
   end
  end
+ if bestGap==math.huge then return {current},first.length,bestGap end
  if bestEdge==current then return {current},bestDistance,bestGap end
  local reverse={bestEdge}
  local node=network.paths[bestEdge].edge.from
