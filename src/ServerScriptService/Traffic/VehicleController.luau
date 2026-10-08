@@ -7,16 +7,19 @@ local Adapter=require(script.Parent.VehicleAdapter)
 local Sensors=require(script.Parent.TrafficSensors)
 local Intersections=require(script.Parent.IntersectionManager)
 local Controller={}; Controller.__index=Controller
+export type Driving = {maxSpeed: number, acceleration: number, braking: number, emergencyBraking: number, edgeSpeedMultiplier: number}
 export type Vehicle = typeof(setmetatable({} :: {
+	driving: Driving, managed: boolean, hold: boolean, destinationDistance: number?, role: string?,
 	id: number, vehicle: Adapter.Vehicle, network: Types.Network, route: {string}, index: number,
 	distance: number, traveled: number, speed: number, target: number, reason: string,
 	obstacle: Instance?, targetPoint: Vector3, blockedTime: number, recoveryAttempts: number,
 	blockedSince: number?, routeEndSince: number?, stoppedTime: number, irrelevantSince: number?, random: Random,
 	reservations: {[string]: number}, lastFrame: CFrame, remove: boolean, exitReason: string?,
 },Controller))
-function Controller.new(id: number, vehicle: Adapter.Vehicle, network: Types.Network, route: {string}, random: Random): Vehicle
+function Controller.new(id: number, vehicle: Adapter.Vehicle, network: Types.Network, route: {string}, random: Random, driving: Driving?): Vehicle
 	assert(#route>0,"Vehicle requires route")
-	return setmetatable({id=id,vehicle=vehicle,network=network,route=route,index=1,distance=0,traveled=0,
+	return setmetatable({driving=driving or {maxSpeed=Config.MaxSpeed,acceleration=Config.Acceleration,
+		braking=Config.Braking,emergencyBraking=Config.EmergencyBraking,edgeSpeedMultiplier=1},managed=false,hold=false,destinationDistance=nil,role=nil,id=id,vehicle=vehicle,network=network,route=route,index=1,distance=0,traveled=0,
 		speed=0,target=0,reason="Starting",obstacle=nil,targetPoint=vehicle.root.Position,blockedTime=0,
 		recoveryAttempts=0,blockedSince=nil,routeEndSince=nil,stoppedTime=0,irrelevantSince=nil,random=random,
 		reservations={},lastFrame=vehicle.root.CFrame,remove=false,exitReason=nil},Controller)
@@ -41,9 +44,9 @@ end
 function Controller.Sense(self: Vehicle, sensor: Sensors.Sensor, intersections: Intersections.State, now: number)
 	local path=self:Path()
 	if not path or path.edge.enabled==false then self:Fail("InvalidRoute"); return end
-	self.target=math.min(Config.MaxSpeed,path.edge.speed); self.reason="Driving"; self.obstacle=nil
+	self.target=math.min(self.driving.maxSpeed,path.edge.speed*self.driving.edgeSpeedMultiplier); self.reason="Driving"; self.obstacle=nil
 	-- Refill only from connected exits; work is bounded by MaxRouteHops.
-	if #self.route-self.index<3 then
+	if not self.managed and #self.route-self.index<3 then
 		local tail=self.network.paths[self.route[#self.route]]
 		if tail then
 			local extension=RoadNetwork.Route(self.network,tail.edge.to,self.random)
@@ -54,12 +57,12 @@ function Controller.Sense(self: Vehicle, sensor: Sensors.Sensor, intersections: 
 	for i=self.index,#self.route do
 		local remainingPath=self.network.paths[self.route[i]]
 		if not remainingPath or remainingPath.edge.enabled==false then self:Fail("InvalidRoute"); return end
-		remaining+=remainingPath.length-(if i==self.index then self.distance else 0)
+		remaining+=(if i==#self.route and self.destinationDistance then self.destinationDistance else remainingPath.length)-(if i==self.index then self.distance else 0)
 	end
-	local endSpeed=Trajectory.SafeSpeed(remaining,self.vehicle.bounds.Z/2+Config.SafeGap,Config.Braking)
+	local endSpeed=Trajectory.SafeSpeed(remaining,(if self.managed then 0 else self.vehicle.bounds.Z/2+Config.SafeGap),self.driving.braking)
 	if endSpeed<=self.target then self.target=endSpeed; self.reason="RouteEnd" end
 	local range=math.min(Config.ObstacleRange,math.max(Config.LookAhead,
-		self.speed^2/(2*Config.Braking)+self.speed*Config.Headway+self.vehicle.bounds.Z))
+		self.speed^2/(2*self.driving.braking)+self.speed*Config.Headway+self.vehicle.bounds.Z))
 	local gateDistance=0
 	for i=self.index,math.min(#self.route,self.index+3) do
 		local nextPath=self.network.paths[self.route[i]]
@@ -75,7 +78,7 @@ function Controller.Sense(self: Vehicle, sensor: Sensors.Sensor, intersections: 
 			if granted then
 				self.reservations[zone]=self.traveled+gateDistance+nextPath.length+self.vehicle.bounds.Z/2+Config.IntersectionClearance
 			else
-				self.target=math.min(self.target,Trajectory.SafeSpeed(gateDistance,self.vehicle.bounds.Z/2+Config.SafeGap,Config.Braking))
+				self.target=math.min(self.target,Trajectory.SafeSpeed(gateDistance,self.vehicle.bounds.Z/2+Config.SafeGap,self.driving.braking))
 				self.reason=if mustStop then "StopSign" else "IntersectionYield"
 			end
 		end
@@ -87,25 +90,26 @@ function Controller.Sense(self: Vehicle, sensor: Sensors.Sensor, intersections: 
 		if not sample or not lookPath then
 			break
 		end
-		local curveLimit=if sample.curvature>0.0001 then math.min(math.sqrt(Config.LateralAcceleration/sample.curvature),Config.MaxYawRate/sample.curvature) else Config.MaxSpeed
-		local speedAtPoint=math.min(curveLimit,lookPath.edge.speed)
-		self.target=math.min(self.target,math.sqrt(speedAtPoint^2+2*Config.Braking*d))
+		local curveLimit=if sample.curvature>0.0001 then math.min(math.sqrt(Config.LateralAcceleration/sample.curvature),Config.MaxYawRate/sample.curvature) else self.driving.maxSpeed
+		local speedAtPoint=math.min(curveLimit,lookPath.edge.speed*self.driving.edgeSpeedMultiplier)
+		self.target=math.min(self.target,math.sqrt(speedAtPoint^2+2*self.driving.braking*d))
 		local frame=Sensors.Frame(sample.position,sample.direction,self.vehicle.bounds)
 		local clear,obstacle=sensor:Clear(self.vehicle.model,frame,self.vehicle.bounds,
 			math.min(Config.Headway,d/math.max(self.speed,Config.MinTurnSpeed)))
 		if not clear then
-			local limit=Trajectory.SafeSpeed(d,Config.SafeGap+self.speed*Config.Headway,Config.Braking)
+			local limit=Trajectory.SafeSpeed(d,Config.SafeGap+self.speed*Config.Headway,self.driving.braking)
 			if limit<self.target then self.target=limit; self.reason=if frame then "Obstacle" else "NoRoadSupport"; self.obstacle=obstacle end
 			break
 		end
 	end
+	if self.hold then self.target=0; self.reason="CommandedStop"; self.blockedSince=nil end
 	local look=self:Preview(Config.LookAhead+self.speed*Config.SpeedLookAhead)
 	self.targetPoint=if look then look.position else path.samples[#path.samples].position
 	if self.reason=="RouteEnd" and self.target<0.1 and self.speed<0.1 then
 		-- Start the short retirement grace only after stopping at the actual boundary.
 		self.blockedSince=nil
 		if not self.routeEndSince then self.routeEndSince=now end
-		if now-(self.routeEndSince :: number)>=Config.RouteEndGrace then self:Fail("DeadEnd") end
+		if not self.managed and now-(self.routeEndSince :: number)>=Config.RouteEndGrace then self:Fail("DeadEnd") end
 		return
 	end
 	self.routeEndSince=nil
@@ -122,10 +126,11 @@ function Controller.Step(self: Vehicle, dt: number, sensor: Sensors.Sensor, inte
 	local displacement=(root.Position-self.lastFrame.Position).Magnitude
 	if displacement>Config.MaxLaneError then self:Fail("LaneDisplacement"); return end
 	local path=self:Path(); if not path then self:Fail("MissingRoute"); return end
-	local rate=if self.target<self.speed then (if self.target==0 and self.obstacle then Config.EmergencyBraking else Config.Braking) else Config.Acceleration
+	local rate=if self.target<self.speed then (if self.target==0 and self.obstacle then self.driving.emergencyBraking else self.driving.braking) else self.driving.acceleration
 	local previousSpeed=self.speed
 	self.speed=Trajectory.Approach(self.speed,self.target,rate,dt)
 	local advance=(previousSpeed+self.speed)*0.5*dt
+	if self.destinationDistance and self.index==#self.route then advance=math.min(advance,math.max(0,self.destinationDistance-self.distance)) end
 	local sample,nextPath=self:Preview(advance)
 	if not sample or not nextPath then
 		self.speed=0; self.target=0; self.reason="RouteEnd"; advance=0
@@ -173,6 +178,8 @@ function Controller.Step(self: Vehicle, dt: number, sensor: Sensors.Sensor, inte
 		self.blockedTime=0; self.recoveryAttempts=0
 		return
 	end
+	if self.hold then self.blockedTime=0; return end
+	if self.managed then return end
 	if self.blockedTime>Config.StuckTimeout then
 		self.blockedTime=0; self.recoveryAttempts+=1
 		if self.recoveryAttempts>Config.MaxRecoveryAttempts then self:Fail("Stuck")
@@ -185,6 +192,18 @@ function Controller.Step(self: Vehicle, dt: number, sensor: Sensors.Sensor, inte
 			self.reason="RecoveryWaiting"
 		end
 	end
+end
+function Controller.SetDestination(self: Vehicle, position: Vector3): number
+ local path=self:Path(); assert(path,"Missing current route")
+ local route,distance,gap=RoadNetwork.Destination(self.network,path.edge.id,self.distance,position)
+ self.route=route; self.index=1; self.destinationDistance=distance; self.managed=true
+ self.routeEndSince=nil
+ return gap
+end
+function Controller.Patrol(self: Vehicle)
+ local path=self:Path(); if not path then return end
+ self.route={path.edge.id}; self.index=1; self.destinationDistance=nil; self.managed=false; self.hold=false
+ self.routeEndSince=nil; self.blockedSince=nil
 end
 function Controller.Destroy(self: Vehicle, intersections: Intersections.State)
 	intersections:Release(self.id); table.clear(self.reservations); table.clear(self.route)
