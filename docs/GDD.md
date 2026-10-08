@@ -37,7 +37,7 @@ Moduł ten wymaga ścisłej walidacji serwerowej każdego uderzenia[cite: 4]. Wa
   - Efekt uboczny: Atak jest celowo osłabiony karą ruchu – powoduje wywrócenie (stun) obu graczy (atakującego i ofiary) na **2 sekundy**.
 - **Gaz Pieprzowy (Premium):**
   - Obrażenia: **0 HP**.
-  - Efekt: Obezwładnia i wywraca zaatakowanego gracza na **5 sekund**, pozwalając na zadawanie mu obrażeń wręcz.
+  - Efekt: Obezwładnia i wywraca zaatakowanego gracza na **3 sekundy**, pozwalając na zadawanie mu obrażeń wręcz.
 
 ---
 
@@ -104,13 +104,15 @@ Walidacja musi odbywać się przez natywne API (Developer Products / Gamepasses)
 
 ## 6. Gangi (System Frakcji)
 
-- **Zarządzanie:** Gracz może na stałe wykupić możliwość założenia gangu za walutę Coins. Limit wielkości pojedynczego gangu wynosi około **33% maksymalnej pojemności serwera**.
-- **Brak systemów zaawansowanych:** Brak rang wewnątrz gangu (tylko lider i członkowie). Brak wspólnego budżetu i wspólnej bazy. Lider posiada uprawnienie do wyrzucania członków.
-- **Identyfikacja wizualna:** Nickname gracza (Tag) nad głową postaci przyjmuje oficjalny kolor założonego gangu.
-- **Zasady PvP i Ryzyko:**
-  - Członkowie gangu mają **całkowicie zablokowaną możliwość używania Trybu Ochronnego (Pasywnego)** z poziomu telefonu, co oznacza, że zawsze ryzykują atak PvP (np. taranowanie czy gaz).
-  - Gracze niezrzeszeni mogą swobodnie włączać/wyłączać ochronę PvP w telefonie.
-  - **Friendly Fire:** Bezwzględnie wyłączony. Członkowie tego samego gangu nie mogą zadawać sobie obrażeń.
+- **Tworzenie i trwałość:** Każdy gracz może bezpłatnie założyć gang. Gangi i własność flag istnieją tylko w bieżącej sesji jednego serwera. Limit członków to `max(1, floor(Players.MaxPlayers / 3))`, np. 30 → 10, 27 → 9, 21 → 7.
+- **Telefon:** Tworzenie, zaproszenia, prośby o dołączenie, akceptacja/odrzucenie, lista członków, wyrzucanie przez lidera, opuszczanie, zmiana nazwy i koloru oraz podgląd flag. Zaproszenia i prośby wygasają po 30 sekundach.
+- **Przywództwo:** Po świadomym opuszczeniu lidera rolę przejmuje najstarszy obecny członek według kolejności dołączenia. Rozłączony lider zachowuje miejsce przez 30 minut; powrót anuluje licznik. Po upływie tego czasu zostaje usunięty, a rolę przejmuje najstarszy obecny członek. Pozostali rozłączeni członkowie są usuwani od razu. Gang bez obecnych członków zostaje rozwiązany, a jego flagi stają się niczyje.
+- **Identyfikacja:** Unikalna nazwa sprawdzana i filtrowana przez serwer, kolor z palety RGB zarezerwowany dla jednego gangu na serwerze oraz nazwa gangu i nick nad głową postaci. Paleta rozszerza się z pojemnością serwera.
+- **Ochrona i PvP:** Każdy może korzystać z ochrony w telefonie. Chroniony gracz nie walczy i nie bierze udziału w przejmowaniu ani blokowaniu flag. Zmiana ochrony ma cooldown 3 sekundy; włączenie wymaga 5 sekund od ostatniej skutecznej interakcji bojowej. Friendly fire jest wyłączony.
+- **Przejmowanie:** Żywi, niechronieni członkowie w strefie liczą się także podczas jazdy i 3-sekundowego ogłuszenia gazem. Śmierć usuwa ich z liczenia do powrotu po zwykłym respawnie. Samotny gracz przejmuje flagę w 45 sekund. Szybkość wynika z przewagi nad sumą przeciwników: 2v1 → 45 sekund, 3v1 → 22,5 sekundy, 4v2v1 → 45 sekund. Remis lub brak uczestników stopniowo zmniejsza postęp o 0,5 osobosekundy na sekundę. Nowy przejmujący musi najpierw wyzerować postęp poprzednika. Dotychczasowy właściciel zachowuje flagę do pełnego przejęcia; eliminacja obrońców sama nie neutralizuje flagi.
+- **Ekonomia:** Co 60 sekund gang otrzymuje pulę 60 Coins za każdą posiadaną flagę, dzieloną po równo między obecnych członków z poprawnie załadowanym profilem. Reszta z dzielenia przechodzi na następny okres. Offline nie zarabia; restart zeruje własność flag i reszty. Brak wspólnej bazy, budżetu do wydawania i dodatkowych rang.
+
+Konfiguracja, architektura i ręczne przygotowanie flag: [GANG_SYSTEM.md](GANG_SYSTEM.md).
 
 ---
 
@@ -138,7 +140,7 @@ Telefon to główne menu interakcji, pozbawione jednak czatu, wewnętrznej mapy 
 - Aplikacji Dostawczej (śledzenie misji).
 - Aplikacji Gangu (zarządzanie).
 - Śledzenia Misji Dziennych.
-- Przełączania Trybu Ochronnego (Pasywnego) dla graczy bez gangu.
+- Przełączania Trybu Ochronnego (Pasywnego) dla wszystkich graczy.
 
 **Mechanika Wyścigów 1v1:**
 

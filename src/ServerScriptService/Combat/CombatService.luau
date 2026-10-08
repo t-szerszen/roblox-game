@@ -19,6 +19,7 @@ local characterConnections: { [Player]: RBXScriptConnection } = {}
 local lastRemoteAt: { [Player]: number } = {}
 local lastMeleeAt: { [Player]: number } = {}
 local lastPepperAt: { [Player]: number } = {}
+local lastPassiveAt: { [Player]: number } = {}
 local ramCooldowns: { [string]: number } = {}
 local stunTokens: { [Humanoid]: number } = setmetatable({}, { __mode = "k" }) :: any
 local stunExpiresAt: { [Humanoid]: number } = setmetatable({}, { __mode = "k" }) :: any
@@ -93,6 +94,35 @@ end
 local function isStunned(player: Player): boolean
 	local expiresAt = player:GetAttribute("StunnedUntil")
 	return typeof(expiresAt) == "number" and expiresAt > Workspace:GetServerTimeNow()
+end
+
+function CombatService.GetTerritoryPosition(player: Player): Vector3?
+	if player.Parent ~= Players or player:GetAttribute("PassiveMode") == true then return nil end
+	local _, _, root = getCharacterState(player)
+	-- A living stunned rider still occupies the territory, including after a fall.
+	return if root then root.Position else nil
+end
+
+function CombatService.SetPassive(player: Player, enabled: boolean): (boolean, string)
+	local _, humanoid = getCharacterState(player)
+	if player.Parent ~= Players or not humanoid then return false, "Poczekaj na odrodzenie postaci." end
+	local timestamp = Workspace:GetServerTimeNow()
+	if timestamp - (lastPassiveAt[player] or -math.huge) < CombatConfig.ProtectionToggleCooldown then
+		return false, "Odczekaj chwilę przed zmianą ochrony."
+	end
+	local combatUntil = player:GetAttribute("CombatUntil")
+	if enabled and typeof(combatUntil) == "number" and combatUntil > timestamp then
+		return false, "Ochronę możesz włączyć 5 sekund po zakończeniu walki."
+	end
+	lastPassiveAt[player] = timestamp
+	player:SetAttribute("PassiveMode", enabled)
+	return true, if enabled then "Ochrona włączona: nie walczysz ani nie przejmujesz flag." else "Ochrona wyłączona."
+end
+
+local function markCombat(attacker: Player, target: Player)
+	local deadline = Workspace:GetServerTimeNow() + CombatConfig.ProtectionCombatLock
+	attacker:SetAttribute("CombatUntil", deadline)
+	target:SetAttribute("CombatUntil", deadline)
 end
 
 function CombatService.CanDamage(attacker: Player, target: Player): boolean
@@ -181,7 +211,7 @@ function CombatService.StunPlayer(player: Player, duration: number)
 			humanoid.AutoRotate = true
 			humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
 		end
-		if player.Parent == Players then
+		if player.Parent == Players and player.Character == character then
 			player:SetAttribute("StunnedUntil", nil)
 		end
 	end)
@@ -196,6 +226,7 @@ local function applyDamage(attacker: Player, target: Player, amount: number): bo
 		return false
 	end
 	humanoid:TakeDamage(amount)
+	markCombat(attacker, target)
 	return true
 end
 
@@ -255,6 +286,7 @@ local function handlePepper(player: Player)
 	emitPepperSpray(player)
 	local target = findTarget(player, CombatConfig.PepperRange, CombatConfig.PepperFacingDot)
 	if target then
+		markCombat(player, target)
 		CombatService.StunPlayer(target, CombatConfig.PepperStunDuration)
 	end
 end
@@ -324,11 +356,13 @@ end
 
 local function setupCharacter(player: Player, character: Model)
 	local humanoid = character:WaitForChild("Humanoid", 10)
-	if not humanoid or not humanoid:IsA("Humanoid") then
+	if not humanoid or not humanoid:IsA("Humanoid") or player.Parent ~= Players or player.Character ~= character then
 		return
 	end
 	humanoid.MaxHealth = CombatConfig.MaxHealth
 	humanoid.Health = CombatConfig.MaxHealth
+	player:SetAttribute("StunnedUntil", nil)
+	player:SetAttribute("CombatUntil", nil)
 	local protectionEnds = Workspace:GetServerTimeNow() + CombatConfig.SpawnProtectionDuration
 	player:SetAttribute("InvulnerableUntil", protectionEnds)
 	local forceField = Instance.new("ForceField")
@@ -394,6 +428,7 @@ function CombatService.Start()
 		lastRemoteAt[player] = nil
 		lastMeleeAt[player] = nil
 		lastPepperAt[player] = nil
+		lastPassiveAt[player] = nil
 	end))
 
 	local accumulated = 0

@@ -6,6 +6,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local PhoneConfig = require(ReplicatedStorage.Shared.Phone.PhoneConfig)
 local ShopConfig = require(ReplicatedStorage.Shared.Shop.ShopConfig)
 local GangService = require(script.Parent.Parent.Gang.GangService)
+local GangRequests = require(script.Parent.Parent.Gang.GangRequests)
+local CombatService = require(script.Parent.Parent.Combat.CombatService)
 local ScooterServer = require(script.Parent.Parent.Scooter.ScooterServer)
 
 type GangState = GangService.GangState
@@ -33,6 +35,7 @@ type PhoneState = {
 }
 
 local lastRequestAt: { [Player]: number } = {}
+local pendingRequests: { [Player]: boolean } = {}
 
 local remotes = ReplicatedStorage:FindFirstChild(PhoneConfig.RemoteFolderName)
 if not remotes then
@@ -94,10 +97,7 @@ local function getState(player: Player): PhoneState
 		})
 	end
 
-	local passiveAvailable = gangName == nil
-	if not passiveAvailable and player:GetAttribute("PassiveMode") == true then
-		player:SetAttribute("PassiveMode", false)
-	end
+	local passiveAvailable = true
 
 	return {
 		passiveEnabled = passiveAvailable and player:GetAttribute("PassiveMode") == true,
@@ -120,80 +120,49 @@ local function response(success: boolean, message: string, player: Player)
 	return success, message, getState(player)
 end
 
-request.OnServerInvoke = function(player: Player, action: unknown, payload: unknown)
-	if typeof(action) ~= "string" then
-		return response(false, "Nieprawidlowe zadanie.", player)
-	end
+local function handleRequest(player: Player, action: string, payload: unknown)
 	if action == "GetState" then
+		if payload ~= nil then return response(false, "Nieprawidłowe żądanie.", player) end
 		return response(true, "", player)
 	end
-
-	local now = os.clock()
-	if now - (lastRequestAt[player] or 0) < PhoneConfig.RequestCooldown then
-		return response(false, "Zwolnij na moment.", player)
-	end
-	lastRequestAt[player] = now
-
 	if action == "SetPassive" then
-		if typeof(payload) ~= "boolean" then
-			return response(false, "Nieprawidlowy tryb ochrony.", player)
-		end
-		if optionalStringAttribute(player, "GangName") ~= nil then
-			player:SetAttribute("PassiveMode", false)
-			return response(false, "Czlonkowie gangu nie moga wlaczyc ochrony.", player)
-		end
-		player:SetAttribute("PassiveMode", payload)
-		return response(true, if payload then "Tryb ochronny wlaczony." else "Tryb ochronny wylaczony.", player)
+		if typeof(payload) ~= "boolean" then return response(false, "Nieprawidłowy tryb ochrony.", player) end
+		local success, message = CombatService.SetPassive(player, payload)
+		GangService.NotifyAll()
+		return response(success, message, player)
 	end
-
 	if action == "SpawnScooter" then
-		if typeof(payload) ~= "string" or #payload > 64 then
-			return response(false, "Nieprawidlowy model.", player)
-		end
+		if typeof(payload) ~= "string" or #payload > 64 then return response(false, "Nieprawidłowy model.", player) end
 		local success, message = ScooterServer.RequestSpawnForPlayer(player, payload)
 		return response(success, message, player)
 	end
-
-	if action == "CreateGang" then
-		if typeof(payload) ~= "string" or #payload > 64 then
-			return response(false, "Nieprawidlowa nazwa.", player)
-		end
-		local success, message = GangService.Create(player, payload)
+	if GangRequests.IsCommand(action) then
+		local success, message = GangRequests.Handle(player, action, payload)
 		return response(success, message, player)
 	end
-
-	if action == "InviteGangMember" then
-		if typeof(payload) ~= "number" or payload ~= math.floor(payload) or payload < 1 or payload > 9_007_199_254_740_991 then
-			return response(false, "Nieprawidlowy gracz.", player)
-		end
-		local success, message = GangService.Invite(player, payload)
-		return response(success, message, player)
-	end
-
-	if action == "RespondGangInvite" then
-		if typeof(payload) ~= "boolean" then
-			return response(false, "Nieprawidlowa odpowiedz.", player)
-		end
-		local success, message = GangService.RespondInvite(player, payload)
-		return response(success, message, player)
-	end
-
-	if action == "KickGangMember" then
-		if typeof(payload) ~= "number" or payload ~= math.floor(payload) or payload < 1 or payload > 9_007_199_254_740_991 then
-			return response(false, "Nieprawidlowy gracz.", player)
-		end
-		local success, message = GangService.Kick(player, payload)
-		return response(success, message, player)
-	end
-
-	if action == "LeaveGang" then
-		local success, message = GangService.Leave(player)
-		return response(success, message, player)
-	end
-
 	return response(false, "Nieznana operacja.", player)
+end
+
+request.OnServerInvoke = function(player: Player, action: unknown, payload: unknown, ...: unknown)
+	if player.Parent ~= Players or select("#", ...) ~= 0 or typeof(action) ~= "string" or #action > 32 then
+		return false, "Nieprawidłowe żądanie.", nil
+	end
+	local now = os.clock()
+	if now - (lastRequestAt[player] or -math.huge) < PhoneConfig.RequestCooldown or pendingRequests[player] then
+		return false, if action == "GetState" then "" else "Zwolnij na moment.", nil
+	end
+	lastRequestAt[player] = now
+	pendingRequests[player] = true
+	local ok, success, message, state = pcall(handleRequest, player, action, payload)
+	pendingRequests[player] = nil
+	if not ok then
+		warn("PhoneServer: request failed: " .. tostring(success))
+		return false, "Telefon jest chwilowo niedostępny.", nil
+	end
+	return success, message, state
 end
 
 Players.PlayerRemoving:Connect(function(player: Player)
 	lastRequestAt[player] = nil
+	pendingRequests[player] = nil
 end)

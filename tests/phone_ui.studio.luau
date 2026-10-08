@@ -34,7 +34,7 @@ function Tests.InstallTransport()
 		assert(action == "GetState", "Fixture refuses gameplay mutations")
 		return true, "", {
 			passiveEnabled = false, passiveAvailable = true,
-			gang = { canCreate = true, isLeader = false, members = {}, maxMembers = 5, candidates = {} },
+			gang = { canCreate = true, isLeader = false, members = {}, maxMembers = 5, candidates = {}, invites = {}, requests = {}, directory = {}, colors = { { id = 1, color = Color3.fromRGB(224, 76, 70), available = true } }, flagsOwned = 0, incomePerMinute = 0 },
 			delivery = { active = false, destination = "", distance = 0 },
 			daily = {}, ownedScooters = {}, loginStreak = 0, loginReward = 0,
 		}
@@ -114,7 +114,7 @@ function Tests.View(): number
 	})
 	local state: Types.State = {
 		passiveEnabled = false, passiveAvailable = true,
-		gang = { canCreate = false, isLeader = false, members = {}, maxMembers = 5, candidates = {} },
+		gang = { canCreate = false, isLeader = false, members = {}, maxMembers = 5, candidates = {}, invites = {}, requests = {}, directory = {}, colors = { { id = 1, color = Color3.fromRGB(224, 76, 70), available = true } }, flagsOwned = 0, incomePerMinute = 0 },
 		delivery = { active = false, destination = "", distance = 0 },
 		daily = { { id = "distance", progress = 2.5, target = 5 } },
 		ownedScooters = { "KuKirin G2 Pro" }, loginStreak = 3, loginReward = 0,
@@ -156,7 +156,7 @@ function Tests.View(): number
 		check(find("Destination"):IsA("Frame") and find("Distance"):IsA("Frame"), "Active delivery retains destination and distance")
 		state.passiveAvailable = false
 		view.Render("Protection", state, draft, false, true)
-		check(not button("TogglePassive").Active, "Gang restriction disables passive mode")
+		check(not button("TogglePassive").Active, "Unavailable transport state disables protection")
 		state.passiveAvailable = true
 		view.Render("Protection", state, draft, false, true)
 		task.wait(0.05)
@@ -170,8 +170,9 @@ function Tests.View(): number
 		local restored = view.Render("Protection", state, draft, false, true)
 		check(restored == button("TogglePassive"), "State refresh can restore the same action's gamepad focus")
 		view.Render("Gang", state, draft, false, true)
-		check(find("NoGang"):IsA("Frame"), "Gang creation entitlement is respected")
-		state.gang.invite = { gangName = "Test", inviterName = "Gracz", expiresAt = os.time() + 30 }
+		check(find("NoGang"):IsA("Frame"), "Membership cooldown disables creation")
+		state.gang.invite = { id = "invite-test", gangId = "test", gangName = "Test", inviterName = "Gracz", expiresAt = workspace:GetServerTimeNow() + 30 }
+		state.gang.invites = { assert(state.gang.invite) }
 		view.Render("Gang", state, draft, false, true)
 		check(button("Accept").Active and button("Decline").Active, "Invite supports both responses")
 		state.gang.canCreate = true
@@ -184,7 +185,7 @@ function Tests.View(): number
 		state.gang.gangId = "test"
 		state.gang.gangName = "Test"
 		state.gang.isLeader = true
-		state.gang.members = { { userId = 1, displayName = "Lider", isLeader = true }, { userId = 2, displayName = "Członek", isLeader = false } }
+		state.gang.members = { { userId = 1, displayName = "Lider", isLeader = true, online = true }, { userId = 2, displayName = "Członek", isLeader = false, online = true } }
 		state.gang.candidates = { { userId = 3, displayName = "Kandydat" } }
 		view.Render("Gang", state, draft, false, true)
 		check(find("Member_1"):FindFirstChild("Kick", true) == nil, "Leader cannot kick themselves")

@@ -35,7 +35,7 @@ local releaseInput: (() -> ())? = nil
 local navigation: Navigation.Lease? = nil
 local state: Types.State = {
 	passiveEnabled = false, passiveAvailable = false,
-	gang = { canCreate = false, isLeader = false, members = {}, maxMembers = 1, candidates = {} },
+	gang = { canCreate = false, isLeader = false, members = {}, maxMembers = 1, candidates = {}, invites = {}, requests = {}, directory = {}, colors = {}, flagsOwned = 0, incomePerMinute = 0 },
 	delivery = { active = false, destination = "", distance = 0 },
 	daily = {}, ownedScooters = {}, loginStreak = 0, loginReward = 0,
 }

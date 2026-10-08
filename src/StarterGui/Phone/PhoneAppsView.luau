@@ -8,6 +8,7 @@ local Theme = require(ReplicatedStorage.Shared.UI.Theme)
 local Scope = require(ReplicatedStorage.Shared.UI.Scope)
 local Style = require(ReplicatedStorage.Shared.Phone.PhoneTheme)
 local Components = require(script.Parent.PhoneComponents)
+local GangAppView = require(script.Parent.GangAppView)
 
 export type Actions = { Action: (string, unknown) -> (), Draft: (string) -> () }
 local AppsView = {}
@@ -52,6 +53,7 @@ function AppsView.Render(parent: Instance, scope: Scope.Scope, page: Types.Page,
 			label.AutomaticSize = Enum.AutomaticSize.Y
 			label.TextWrapped = true
 			label.LayoutOrder = index
+			if index == 2 then label.Name = "Detail" end
 			if not muted then label.Font = Enum.Font.GothamBold end
 		end
 		text(title, 16, false, 1)
@@ -62,8 +64,8 @@ function AppsView.Render(parent: Instance, scope: Scope.Scope, page: Types.Page,
 		local button = Components.Button(row, text, scope, function() actions.Action(command, payload) end, primary, if palette then palette.Bottom else accent)
 		button.BackgroundColor3 = if command == "SpawnScooter" then (if available then Color3.fromRGB(0, 140, 200) else Color3.fromRGB(50, 50, 55))
 			elseif command == "SetPassive" then (if not available then Color3.fromRGB(70, 70, 75) elseif state.passiveEnabled then Style.Error else Style.Success)
-			elseif command == "KickGangMember" or command == "LeaveGang" or (command == "RespondGangInvite" and payload == false) then Style.Error
-			elseif command == "InviteGangMember" or command == "RespondGangInvite" then Color3.fromRGB(40, 180, 60)
+			elseif command == "KickGangMember" or command == "LeaveGang" or ((command == "RespondGangInvite" or command == "RespondGangRequest") and primary == false) then Style.Error
+			elseif command == "InviteGangMember" or command == "RespondGangInvite" or command == "RespondGangRequest" then Color3.fromRGB(40, 180, 60)
 			else button.BackgroundColor3
 		button.Name = name
 		button.LayoutOrder = 4
@@ -105,63 +107,11 @@ function AppsView.Render(parent: Instance, scope: Scope.Scope, page: Types.Page,
 		end
 	elseif page == "Protection" then
 		local row = card("Protection", if state.passiveEnabled then "Ochrona włączona" else "Ochrona wyłączona",
-			if state.passiveAvailable then "Tryb pasywny blokuje udział w PvP." else "Ochrona jest niedostępna dla członków gangu.",
+			if state.passiveAvailable then "Ochrona blokuje walkę i udział w przejmowaniu flag, także w gangu." else "Poczekaj na wczytanie danych.",
 			if not state.passiveAvailable then Style.Error elseif state.passiveEnabled then Style.Success else Color3.fromRGB(130, 130, 135))
 		action(row, "TogglePassive", if state.passiveEnabled then "Wyłącz ochronę" else "Włącz ochronę", "SetPassive", not state.passiveEnabled, state.passiveAvailable, true)
 	elseif page == "Gang" then
-		local gang = state.gang
-		if gang.invite and not gang.gangId then
-			local row = card("Invite", gang.invite.gangName, "Zaprasza: " .. gang.invite.inviterName)
-			local accept = action(row, "Accept", "Dołącz", "RespondGangInvite", true, true, true)
-			accept.LayoutOrder = 3
-			action(row, "Decline", "Odrzuć", "RespondGangInvite", false, true)
-		end
-		if not gang.gangId then
-			if not gang.canCreate then
-				card("NoGang", "Nie należysz do gangu", "Prawo do założenia gangu możesz odblokować w sklepie.")
-				return nil
-			end
-			local row = card("CreateGang", "Załóż gang", "Podaj unikalną nazwę swojego gangu.")
-			local input = Instance.new("TextBox")
-			input.Name = "GangName"
-			input.LayoutOrder = 3
-			input.Size = UDim2.new(1, 0, 0, Theme.TouchTarget)
-			input.BackgroundColor3 = Style.Raised
-			input.BorderSizePixel = 0
-			input.Font = Theme.Font
-			input.TextSize = 14
-			input.TextColor3 = Style.White
-			input.PlaceholderColor3 = Style.Dimmed
-			input.PlaceholderText = "Nazwa gangu…"
-			input.Text = draft
-			input.ClearTextOnFocus = false
-			input.Parent = row
-			Components.Corner(input, 10)
-			Components.Stroke(input)
-			scope:Give(input:GetPropertyChangedSignal("Text"):Connect(function() actions.Draft(input.Text) end))
-			local button = Components.Button(row, "Utwórz gang", scope, function() actions.Action("CreateGang", input.Text) end, true, Color3.fromRGB(180, 30, 90))
-			button.Name = "Create"
-			button.LayoutOrder = 4
-			button.Size = UDim2.new(1, 0, 0, Theme.TouchTarget)
-			button:SetAttribute("PhoneAction", true)
-			button:SetAttribute("Available", true)
-			return input
-		end
-		card("GangSummary", gang.gangName or "Twój gang", string.format("%d / %d członków", #gang.members, gang.maxMembers))
-		for _, member in gang.members do
-			local row = card("Member_" .. member.userId, member.displayName, if member.isLeader then "Lider" else "Członek", if member.isLeader then accent else Color3.fromRGB(80, 80, 85))
-			if gang.isLeader and not member.isLeader then
-				action(row, "Kick", "Usuń z gangu", "KickGangMember", member.userId, true)
-			end
-		end
-		if gang.isLeader and #gang.members < gang.maxMembers then
-			for _, candidate in gang.candidates do
-				local row = card("Candidate_" .. candidate.userId, candidate.displayName, "Gracz w pobliżu", Color3.fromRGB(40, 180, 60))
-				action(row, "InviteMember", "Zaproś do gangu", "InviteGangMember", candidate.userId, true)
-			end
-		end
-		local row = card("LeaveGang", "Zarządzanie gangiem", if gang.isLeader then "Rozwiązanie gangu usunie jego członków." else "Możesz opuścić swój obecny gang.")
-		action(row, "Leave", if gang.isLeader then "Rozwiąż gang" else "Opuść gang", "LeaveGang", nil, true)
+		return GangAppView.Render(scope, state, draft, actions, card, action)
 	end
 	return nil
 end

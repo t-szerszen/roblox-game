@@ -107,7 +107,7 @@ ShopConfig.RobuxProducts = {
 	{
 		id = "pepper_spray",
 		name = "Gaz Pieprzowy",
-		description = "Obezwladnia wroga na 5 sek",
+		description = "Obezwladnia wroga na 3 sek",
 		price = 250,
 		currency = "Robux",
 		kind = "GamePass",
