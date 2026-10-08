@@ -28,7 +28,7 @@ type Unit={car: Controller.Vehicle, machine: Machine.State, officer: Officer.Con
  scanCursor: number}
 export type Service=typeof(setmetatable({} :: {context: Context, units: {[number]: Unit},
  templates: {Model}, officerTemplate: Model?, pursuits: Pursuits.Registry, arrests: Arrest.Service,
- now: number, destroyed: boolean, nextSpawn: number, nextScan: number, templateIndex: number,
+ now: number, destroyed: boolean, nextSpawn: number, nextScan: number, scanOffset: number, templateIndex: number,
  officers: Folder, connections: {RBXScriptConnection}},Police))
 local function characterRoot(character: Model?): BasePart?
  local root=if character then character:FindFirstChild("HumanoidRootPart") else nil
@@ -54,7 +54,7 @@ function Police.new(context: Context): Service
    end
    return false
   end),
-  now=0,destroyed=false,nextSpawn=0,nextScan=0,templateIndex=0,officers=folder,connections={}},Police)
+  now=0,destroyed=false,nextSpawn=0,nextScan=0,scanOffset=0,templateIndex=0,officers=folder,connections={}},Police)
  if not Config.Enabled then return self end
  local assets=ServerStorage:FindFirstChild("PoliceVehicleModels")
  for _,entry in Config.Vehicles do
@@ -187,6 +187,9 @@ function Police.UpdateUnit(self: Service, unit: Unit, now: number)
    if not visible and unit.officer.outside then
     visible=Rules.Visible(unit.officer.model,unit.officer.root.CFrame,unit.character :: Model,if riding then riding.model else nil)
    end
+   if visible then
+    unit.speed=if riding then riding.speedKmh else 0;unit.wheelie=riding~=nil and riding.wheelie
+   end
    self.pursuits:Observe(player,unit,if visible then root.Position else nil,now)
    local memory=self.pursuits.memories[player]
    local expired=if memory then Pursuits.Expired(memory,car.vehicle.root.Position,now) else "AuthorityLost"
@@ -248,18 +251,24 @@ function Police.Update(self: Service, now: number)
  self.now=now;self.arrests:Update(now)
  if now<self.nextScan then return end
  self.nextScan=now+1/Config.ObservationRate
- local players=Players:GetPlayers();local budget=Config.MaxScansPerTick;local count=0
- for _ in self.units do count+=1 end
+ local players=Players:GetPlayers();local budget=Config.MaxScansPerTick;local ordered: {Unit}={}
+ for _,unit in self.units do table.insert(ordered,unit) end
+ local count=#ordered;local initialCount=count
  local desired=Spawner.Target()
- for _,unit in self.units do
+ for offset=1,initialCount do
+  local unit=ordered[(self.scanOffset+offset-1)%initialCount+1]
   if count>desired and unit.machine.state=="PATROL" then unit.car:Fail("NightReduction");count-=1 end
   if unit.car.remove or not unit.car.vehicle.model.Parent then continue end
   local ok,err=pcall(function()
-   if unit.machine.state=="PATROL" or unit.machine.state=="OBSERVING" then self:Observe(unit,players,now,math.max(1,math.floor(budget/math.max(1,count)))) end
+   if budget>0 and (unit.machine.state=="PATROL" or unit.machine.state=="OBSERVING") then
+    local allocation=math.min(budget,math.max(1,math.floor(Config.MaxScansPerTick/math.max(1,count))))
+    budget-=allocation-self:Observe(unit,players,now,allocation)
+   end
    self:UpdateUnit(unit,now)
   end)
   if not ok then warn("[Police] unit error: "..tostring(err));unit.car:Fail("PoliceError") end
  end
+ self.scanOffset=if initialCount>0 then (self.scanOffset+math.min(Config.MaxScansPerTick,initialCount))%initialCount else 0
  if count<desired and self.officerTemplate and #self.templates>0 and #players>0 and now>=self.nextSpawn then
   self.nextSpawn=now+Config.SpawnInterval;self.templateIndex=self.templateIndex%#self.templates+1
   local car=Spawner.Spawn(self.context.nextId(),self.templates[self.templateIndex],self.context.network,

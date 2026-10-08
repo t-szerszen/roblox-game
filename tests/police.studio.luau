@@ -18,6 +18,19 @@ local ok,result=pcall(function()
  local Arrest=require(root.Police.ArrestService)
  local Officers=require(root.Police.PoliceOfficerController)
  local Intersections=require(root.Traffic.IntersectionManager)
+ local Police=require(root.Police.PoliceService)
+ local Config=require(root.Police.PoliceConfig)
+ local scans,updates=0,0;local seen: {[any]: boolean}={}
+ local bounded: any={destroyed=false,nextScan=0,scanOffset=0,units={},arrests={Update=function() end},context={root=fixtures},officerTemplate=nil}
+ function bounded:Observe(unit,_,_,allocation) scans+=allocation;seen[unit]=true;return 0 end
+ function bounded:UpdateUnit() updates+=1 end
+ for i=1,20 do bounded.units[i]={machine={state="OBSERVING"},car={remove=false,vehicle={model=fixtures}}} end
+ Police.Update(bounded,1)
+ check(scans==Config.MaxScansPerTick,"Global observation budget remains bounded with many units")
+ check(updates==20,"Observation budget does not skip unit lifecycle updates")
+ Police.Update(bounded,2)
+ local seenCount=0;for _ in seen do seenCount+=1 end
+ check(seenCount==20,"Observation budget rotates so later units are not starved")
  local OfficerTemplate=Officers.CreateTemplate();OfficerTemplate.Parent=root
  check(OfficerTemplate.Humanoid.HipHeight>1,"R15 standing height derives from real feet")
  local sources=game.ServerStorage.PoliceVehicleModels
