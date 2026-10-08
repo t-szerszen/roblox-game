@@ -36,6 +36,15 @@ function Manager.Start(): boolean
 	local startEpoch=epoch
 	if not Config.Enabled then return false end
 	local root=Tool.Root()
+	local lease=root:FindFirstChild("RuntimeStop")
+	assert(not lease or (lease:IsA("BindableEvent") and lease:GetAttribute("TrafficRuntime")==true),"Traffic runtime lease conflicts with authoring content")
+	if not lease then
+		local event=Instance.new("BindableEvent");event.Name="RuntimeStop";event:SetAttribute("TrafficRuntime",true);event.Parent=root;lease=event
+	end
+	local stopEvent=lease :: BindableEvent
+	-- Stop a previous controller even when a development reload creates a fresh
+	-- require context. Inspect yields before a new fleet is published.
+	stopEvent:Fire()
 	local authored=root:FindFirstChild("Network")
 	local data=if authored and authored:GetAttribute("Approved")==true then Tool.Read(authored) else Data
 	if not data.approved then warn("[Traffic] No approved network. Use TrafficWorkflow in Edit mode; map generation is never automatic."); return false end
@@ -90,6 +99,7 @@ function Manager.Start(): boolean
 	end
 	table.insert(infrastructureConnections,root.Destroying:Connect(Manager.Stop))
 	table.insert(infrastructureConnections,activeFolder.Destroying:Connect(Manager.Stop))
+	table.insert(infrastructureConnections,stopEvent.Event:Connect(Manager.Stop))
  local policeContext: Police.Context={network=network,sensor=sensor,cars=cars,parent=activeFolder,
   root=root,random=random,nextId=function() nextId+=1;return nextId end}
  local policeOk,policeResult=pcall(Police.new,policeContext)

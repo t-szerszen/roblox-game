@@ -73,6 +73,16 @@ local ok,errorMessage=pcall(function()
  Manager.Stop();check(service.destroyed and next(service.units)==nil,"Stop disposes controllers")
  check(Manager.Start(),"Traffic restarts")
  check(Manager.Start(),"Repeated start remains safe")
+ local previous=assert(Manager.GetPoliceService())
+ local modules=Instance.new("Folder");modules.Name="__FreshTrafficManager";modules.Parent=game.ServerScriptService
+ for _,v in game.ServerScriptService.Traffic:GetChildren() do if v:IsA("ModuleScript") then v:Clone().Parent=modules end end
+ local fresh=require(modules.TrafficManager)
+ check(fresh.Start(),"Fresh require context starts safely")
+ waitFor(function() return previous.destroyed end,3)
+ check(Manager.GetPoliceService()==nil,"Fresh manager lease stops the old Heartbeat/controller")
+ fresh.Stop();modules:Destroy()
+ check(Manager.Start(),"Normal manager resumes after fresh-context restart")
+ report.freshContextRestart=true
  task.wait(6)
  local restarted=assert(Manager.GetPoliceService());local count=0
  for _ in restarted.units do count+=1 end
