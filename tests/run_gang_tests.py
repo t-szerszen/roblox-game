@@ -25,7 +25,7 @@ def main() -> None:
         "ReplicatedStorage/Shared/Gang/GangConfig", "ReplicatedStorage/Shared/Gang/GangTypes",
         "ReplicatedStorage/Shared/Gang/TerritoryConfig", "ReplicatedStorage/Shared/Combat/CombatConfig",
         "ReplicatedStorage/Shared/ScooterConfig", "ReplicatedStorage/Shared/Scooter/ScooterConfig",
-        "ReplicatedStorage/Shared/CharacterConfig", "ReplicatedStorage/Shared/Activity/ActivityConfig",
+        "ReplicatedStorage/Shared/Activity/ActivityConfig",
         "ReplicatedStorage/Shared/Phone/PhoneConfig", "ReplicatedStorage/Shared/Shop/ShopConfig",
         "ServerScriptService/Gang/GangNames", "ServerScriptService/Gang/GangService",
         "ServerScriptService/Gang/GangRequests", "ServerScriptService/Combat/CombatService",
