@@ -1,39 +1,52 @@
-# Rider fit and momentum at scale 0.25
+# Avatar behavior
 
-The accepted balance leg is **left**. The right foot stays near the middle of the deck in every state. At idle the
-left foot supports on the road, with natural right-knee flexion preferred over
-a straight support leg. The scooter stays at 0.25. The user chose longer legs
-also outside riding; the native R15 avatar is now about 9.8 studs tall.
+Avatar Settings retains the intended 8-stud height. Gameplay does not scale
+characters, change limb lengths, or add first-person body visibility.
 
-`ScooterServer.alignRiderToDeck` fits the seat weld using the actual standing
-height, a proportionate forward offset and a small crouch. The existing
-AlignOrientation adds a smooth six-degree left lean only at a grounded,
-occupied stop without throttle/brake, wheelie, burnout or fall.
+Stage 1 adds only a base standing pose for mounted R15 riders. `ScooterServer`
+retains the native SeatWeld and lowers its standing root offset by 4.5% of HipHeight
+along the scooter's up axis. `ScooterBaseRidingPose.client.luau` observes occupied
+seats for all visible scooters. A single PreSimulation pass runs
+`Shared/Scooter/ScooterBasePose` after Animator evaluation, overriding the seated
+and mood joint transforms while keeping Animate enabled. Each client computes
+remote riders' appearance too; joint Transform changes themselves are not used
+as a networking mechanism.
 
-`ScooterAnimator` retains the existing occupant binding, replicated state clips
-and cleanup. It adds forward torso pitch and a steering twist. `ScooterLimbSolver`
-solves the arms and procedural legs after the body layer in PreSimulation, using
-either Motor6D or the newer R15 AnimationConstraint joints. A complete manually
-solved chain disables its corresponding IKControl to avoid competing solvers;
-partial rigs retain the original IK fallback. The rider solver uses **fixed** bone lengths and rotations around the actual
-rest-bone axes. It clamps unreachable targets instead of translating or stretching
-limbs. Mesh sizes and geometry remain unchanged, preserving their rectangular
-segments. Elbow poles follow the torso, blend at 6/s, and lift by only 0.25 stud
-while steering. Saved joint transforms are restored on exit.
-See the official [AnimationConstraint reference](https://create.roblox.com/docs/reference/engine/classes/AnimationConstraint).
+The focused two-bone solver reads actual Motor6D C0/C1 or upgraded
+AnimationConstraint attachment frames, preserving joint lengths and attachment
+connections. It places both feet forward on FootRest in a staggered stance, with an
+8-degree toe lift on the front foot and heel lift on the rear foot. Projected
+foot bounds determine deck contact and margins. Authored palm grip points meet
+HandleBar.LeftHandGrip/RightHandGrip, with hands pointing down onto the bar.
+Waist lean is 5 degrees; neck counter-rotation keeps the head upright. The arm
+solver rotates each elbow only about its authored hinge axis, preserving the
+mesh seam rather than independently twisting upper/lower arm segments. Palm orientation follows the actual moving bar;
+elbow poles have been moved forward and slightly inward. Native
+measurements give approximately 18/30-degree knee bends and 38/26-degree elbow
+bends on the current avatar. Pose parameters
+live in `ScooterConfig.BaseRidingPose`.
 
-`ScooterRiderPose` supplies smoothed targets. During wheelie, the left leg sweeps
-forward/back with a 1.6-stud amplitude and a smaller smooth upward arc. The right
-foot remains on the deck. At idle, a collidable-ground ray outside the scooter and
-character places the left sole on the road; probes run at most every 0.08 seconds.
-Existing idle/riding hysteresis prevents flicker. Loaded authored leg clips still
-take precedence while they have blend weight. The fallback needs no animation
-asset IDs. R6 retains its simpler procedural pose.
+Pose evaluation derives the character frame from the existing SeatWeld so that
+server-owned character/vehicle interpolation cannot introduce a false arm reach
+error while moving. The final reference-fit normal-throttle probe is recorded in
+`SCOOTER_BASE_POSE_ANALYSIS.md`.
 
-`ScooterFirstPerson` makes only the local rider's existing arms/hands visible
-after the default camera update. It neither clones a character nor changes the
-camera. Dismount restores local visibility and removes the render binding. Other
-clients use the existing ScooterRiderVisualizer occupant binding for poses.
+The user subsequently authorized a complete model rebuild around this pose.
+The current authoring recipe preserves the neutral grips, relocates the complete
+front assembly with its real steering axis, and builds a coherent body around
+that mount. See [the current remodel](SCOOTER_RIDER_REMODEL.md) for geometry,
+installation, preservation guarantees and steering reach limitations.
+
+Dismount, death, character/model destruction and script destruction release the
+pose and its event connections. Default animation continues normally afterward.
+R6 and incomplete R15 rigs receive no custom limb pose. Geometry outside the
+confirmed fit cannot be guaranteed: unreachable goals retain joint lengths
+rather than stretching limbs or scaling an avatar. No uploaded animation is
+required. No start/stop, foot-support, wheelie or turning animation was added;
+existing vehicle mechanics remain intact.
+
+See [measurements and diagnosis](SCOOTER_BASE_POSE_ANALYSIS.md) and
+[native verification](../tests/scooter_base_pose.studio.luau).
 
 ## Climbing without artificial horizontal braking
 
@@ -42,54 +55,10 @@ At faster entry speeds this supplied a backward horizontal force, exaggerating
 curb deceleration. The current force separates vertical support from forward
 assistance: it bounds vertical climbing speed at 5.5 studs/s and never supplies
 negative forward acceleration. On a verified contacted ledge, each tire remembers
-its entry speed and can recover toward 90% of that speed, with an 8-stud/s minimum
+its entry speed and retains 100% of that speed, with an 8-stud/s minimum
 for starts from rest. Acceleration is bounded and the target respects the server's
 ECO/SPORT or reverse limit. The existing contacted-face, top/overhead, height and
 airborne-grace checks remain required. Releasing input or reversing clears the
-entry-speed memory. Collision can still remove momentum, especially on tall steps;
-this assistance does not promise constant speed through all obstacles.
-
-## Verification
-
-828 CLI assertions pass, including modern/legacy joint reach and restoration,
-left-leg swing, fixed right foot, sampled idle-ground height, first-person
-visibility/cleanup, and no backward force at fast curb entry. Rojo build and Luau
-analysis pass for the affected modules.
-
-Native Studio Play verified the actual 0.25 scooter and R15 avatar:
-
-- Both hands and feet reach their targets; settled full-lock steering in both
-  directions keeps hand error below 0.004 stud without limb extension.
-- Left idle sole reaches the road with the existing 0.08-stud visual sink.
-- First person shows all six R15 arm/hand parts on the original avatar.
-- Fixed-length controlled wheelie produced a 2.94-stud left-foot sweep, under
-  0.005-stud right-foot target error and roughly 0.006-stud hand error, without falling.
-- Both tires crossed a 2.4-stud ledge at 45 degrees from a blocked start.
-- A rolling one-stud ledge at 60 degrees retained at least 37.67 studs/s from
-  a 40-stud/s start (about 94%) while climbing, with both tires reaching the top.
-
-Temporary physics fixtures were created outside Workspace.Map and removed by
-stopping Play. Human acceptance should check the preferred posture and balance
-rhythm, steering while moving, uneven roads and multiplayer observers. Other
-avatar proportions may need adjustments in `ScooterConfig.RiderPose`.
-
-## Permanent leg proportions
-
-`Characters/CharacterInit.server.luau` applies `CharacterProportions` once after
-player appearance loads, including respawns. `Shared/CharacterConfig` sets the
-minimum leg rest-bone length to 82% of each segment's mesh height. This separates
-overlapping segments without changing mesh sizes. In the tested avatar each leg
-chain measures 3.838 studs; the added rest length is 1.460 studs. HipHeight receives
-the same increment for standing and walking. Spawn/respawn produced the same
-length once, and no further extension occurs on mounting, steering or wheelie.
-
-Motor6D rigs use calibrated C0s. AnimationConstraint rigs use separate rest
-attachments, retaining Roblox's original RigAttachment metadata for animation
-retargeting. Corresponding fallback ball sockets share the calibrated origins.
-The server subtracts the permanent added length when fitting the scooter seat,
-so the walking height increase does not lift the rider away from the grips.
-Appearance assets and rectangular mesh dimensions are retained. Configurable
-proportions are game-wide, not tied to scooter occupancy. Different body packages
-may require additional visual acceptance; tall packages will exceed the earlier
-8-stud reference. Mid-session appearance/scale customization should explicitly
-reapply a fresh rig calibration rather than expecting a mounted-only resize.
+entry-speed memory. Verified climb momentum is restored after native collision solving, including
+a short, expiring clearance interval while the rear tire finishes crossing.
+Walls and unsupported flight remain outside that correction.

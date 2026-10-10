@@ -289,7 +289,9 @@ local function hookCharacter(character: Model)
 	local maid = newMaid()
 	characterMaid = maid
 	local humanoid = character:WaitForChild("Humanoid", 10)
-	if destroyed or localPlayer.Character ~= character or characterMaid ~= maid or not humanoid or not humanoid:IsA("Humanoid") then
+	local characterRoot = character:WaitForChild("HumanoidRootPart", 10)
+	if destroyed or localPlayer.Character ~= character or characterMaid ~= maid
+		or not humanoid or not humanoid:IsA("Humanoid") or not characterRoot or not characterRoot:IsA("BasePart") then
 		return
 	end
 	maid:Give(humanoid.Seated:Connect(function(isSeated: boolean, seat: BasePart?)
