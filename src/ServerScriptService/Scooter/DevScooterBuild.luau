@@ -260,11 +260,20 @@ function DevScooterBuild.Build(source: Instance, settings: Configuration?): Mode
 		assign(crossbar, "BackSuspension")
 		weld(assert(model:FindFirstChild("VirtualBackAxle")) :: BasePart, crossbar)
 		for _, entry in config.ExtraComponents do
-			if model:FindFirstChild(entry.Name) then
-				local item, fixed = part(model, entry.Name), part(model, entry.FixedName)
-				assign(item, entry.Assembly)
-				item.Massless = true
-				weld(fixed, item)
+			local component = model:FindFirstChild(entry.Name)
+			if component then
+				local fixed = part(model, entry.FixedName)
+				local items: { Instance } = if component:IsA("BasePart") then { component } else component:GetDescendants()
+				local count = 0
+				for _, item in items do
+					if item:IsA("BasePart") then
+						assign(item, entry.Assembly)
+						item.Massless = true
+						weld(fixed, item)
+						count += 1
+					end
+				end
+				assert(count > 0, entry.Name .. " requires a decorative part")
 			end
 		end
 		model:SetAttribute("ScooterDraftRig", true)

@@ -44,6 +44,8 @@ return {
 		{ Name = "BrakeLeverRight", Assembly = "Steering", FixedName = "Handbar" },
 		{ Name = "FrontSpringStick", Assembly = "FrontSuspension", FixedName = "VirtualFrontAxle" },
 		{ Name = "FrontBrakeCaliper", Assembly = "FrontSuspension", FixedName = "VirtualFrontAxle" },
+		{ Name = "Kickstand", Assembly = "Body", FixedName = "ScooterBody" },
+		{ Name = "BackFender", Assembly = "BackSuspension", FixedName = "VirtualBackAxle" },
 	},
 	-- The imported Footrest is the rear kick plate. The riding deck is inside ScooterBody.
 	Deck = {
