@@ -29,7 +29,7 @@ Run `tools/blender/generate_warsaw_city.py` from Blender's Scripting workspace. 
 
 The generated root `MapData.luau` is kept separate from `src/ServerScriptService/Map/MapData.luau`: the current mock `AssetRegistry` does not load imported FBX assets or recognize all generated IDs. Import the FBX files into Roblox Studio, register those models in the runtime asset registry, and then move the generated placements into the runtime module as an integration step. The script header lists Roblox Studio's FBX import settings for matching scale and axes, based on the [Roblox Blender and Studio guidance](https://create.roblox.com/docs/art/blender).
 
-# Articulated scooter and rider animation
+# Articulated scooter
 
 The approved nested ScooterFinal uses DevScooterBuild for an anchored preview
 and ScooterWorkflow.InstallNewModel / DevScooterInstall for explicit installation
@@ -57,7 +57,7 @@ See [dashboard installation and verification](SCOOTER_DASHBOARD.md).
 
 `ScooterRig` validates the Studio-authored `scooter` assembly, preserving its physical virtual axles, suspension hinges, springs and welds. `ScooterWorkflow.Assemble()` reloads fresh assembler, rig and configuration modules for Edit-mode use; `DevScooterAssembler.AssembleFromSelection()` installs that rig as the only template in `ServerStorage.ScooterModels.scooter` and replaces the old KuKirin template. The procedural scooter fallback and five-part assembly workflow are retired. Catalog names, tuning, ownership and economy are unchanged.
 
-`ScooterServer` validates rider intent and retains server ownership of every articulated assembly. Existing ground-aligned VectorForce propulsion and AlignOrientation stabilization remain authoritative. Collision proxies follow the physical wheels, while probes use VirtualFrontAxle.AxlePivot and VirtualBackAxle.AxlePivot. Steering writes the physical Servo target; the rear wheel motor runs during fresh W+S input at up to 5 km/h with rear contact. Its torque scales with supported mass and tire radius. Burnout starts directly from accepted DriveInput rather than depending on a second remote's arrival order. Authored springs provide suspension, and burnout smoke follows the rear axle.
+`ScooterServer` validates rider intent and retains server ownership of every articulated assembly. Existing ground-aligned VectorForce propulsion and AlignOrientation stabilization remain authoritative. Collision proxies follow the physical wheels, while probes use VirtualFrontAxle.AxlePivot and VirtualBackAxle.AxlePivot. Steering writes the physical Servo target; the rear wheel motor runs during fresh W+S input at up to 5 km/h with rear contact. Its torque scales with supported mass and tire radius. Burnout starts directly from accepted DriveInput rather than depending on a second remote's arrival order. Authored springs provide suspension, and burnout smoke follows the rear axle. ScooterScrape owns replicated particles at a chassis scrape point: actual pitch of 48 degrees, sufficient speed and nearby road contact enable sparks, with a 43-degree hysteresis threshold. Reset, fall and cleanup stop emission; clients send no effect decisions.
 
 `ScooterBrakeLight` prefers the authored StopLight and reuses its PointLight,
 restoring authored properties on cleanup. The old whole-BackFender fallback stays
@@ -65,7 +65,7 @@ disabled. StopLightActive includes braking, held S and reverse travel; BrakeActi
 means actual opposing-direction braking or W+S. ScooterHeadlight owns a white
 SpotLight on FrontLight. Mounted L requests ToggleHeadlight with no arguments;
 server ownership, seat/life/state and cooldown validation authorize the toggle.
-Its beam and appearance are disposed/restored with the scooter record. Shared ScooterPhysics derives chassis yaw from measured Servo angle, forward speed and actual axle spacing, with no minimum yaw rate during normal riding. Server-accepted burnout allows A/D steering at rest and bounded sustained donut yaw from measured Servo deflection. Release or loss of eligibility immediately restores normal steering rules. A speed-dependent heading lead bounds orientation error when motion is blocked. Chassis roll follows signed speed times yaw rate divided by gravity. The existing AlignOrientation applies that roll only with both contacts outside wheelie; no extra actuator or suspension weld is added. See [SCOOTER_MODEL.md](SCOOTER_MODEL.md) for formulas, configuration and texture limitations.
+Its beam and appearance are disposed/restored with the scooter record. Shared ScooterPhysics derives chassis yaw from measured Servo angle, forward speed and actual axle spacing, with no minimum yaw rate during normal riding. Server-accepted burnout allows A/D steering at rest and bounded sustained donut yaw from measured Servo deflection. Release or loss of eligibility immediately restores normal steering rules. A speed-dependent heading lead bounds orientation error when motion is blocked. Chassis roll follows signed speed times yaw rate divided by gravity. The previous full-axis AlignOrientation controller follows the bounded heading target. Its 165-degree/s yaw cap, 12-degree initial heading lead and high-speed input scale of 0.55 preserve predictable steering; a low-speed curvature boost of 1.2 fades out as speed rises. Heading lead scales with smoothed rider input so a sustained partial turn cannot build up full steering strength. After 0.18 seconds of supported steering, its maximum ramps from 12 to 20 degrees over 0.45 seconds for tighter sustained turns. Release, direction changes and loss of normal riding eligibility clear the bounded server timer; burnout retains its original limit. Ground propulsion corrects lateral slip with the previous 100-studs/s² limit. No suspension weld is added. See [SCOOTER_MODEL.md](SCOOTER_MODEL.md) for formulas, configuration and texture limitations.
 
 Shift/C triggers wheelie above 10 km/h; afterward W raises the front, releasing W eases it down, and W can raise it again before landing. S lowers it faster, and low-speed loss of balance remains active. World speed conversion is 1.6 stud/s per catalog km/h, 60% above the previous 1.0 scale; catalog ratings, ownership and upgrade schedules remain unchanged.
 
@@ -77,7 +77,7 @@ Front endpoint repair restores AuthoredPivotCFrame when available. FrontRestPose
 
 Optional spawn correction is transactional: ScooterRig retains a validated baseline and corrects/calibrates a separate clone. Failure discards that clone and spawns the baseline, exposing FrontRestPoseStatus/FrontRestPoseError and an Output warning. This prevents model-specific correction limits from suppressing a usable scooter. Baseline hierarchy/constraint validation remains mandatory, and explicit Edit-mode repair still rejects invalid replacements.
 
-`ScooterClient.client.luau` sends input and handles mounted controls. `ScooterAnimator` manages hand IK against the moving HandleBar, elbow poles, bounded torso lean and lifecycle cleanup. `ScooterRiderVisualizer` binds it to every scooter occupant so other clients also see the pose. Existing ScooterRiderPose handles feet/wheelie balance and R6 fallback. ScooterLimbSolver supports both Motor6D and AnimationConstraint chains with fixed bone lengths; its complete chains disable competing IK controls. ScooterFirstPerson exposes the local rider's posed arms after the camera update. The server fits the rider seat and applies grounded idle lean; left-foot ground support and balance use procedural targets, while the right foot stays near the middle of the deck. See [rider fit and momentum](SCOOTER_RIDER_POSE.md). ScooterAnimationMath isolates torso lean and leg-state hysteresis for runtime tests. ScooterAnimator blends configurable idle/wheelie tracks from controller-published attributes, releases foot IK according to clip weight and restores deck IK in riding. Only the rider client starts authored clips; other clients consume their replication. Authoritative trick attributes and the replicated measured SteeringAngle drive visuals.
+`ScooterClient.client.luau` sends input and handles mounted controls. `ScooterBaseRidingPose.client.luau` observes occupied scooters and applies the shared R15 base pose after Animator evaluation on each client. It supports Motor6D and AnimationConstraint, restores joint transforms on release, and leaves Animate enabled. The server retains native SeatWeld mounting and owns scooter physics. See [avatar behavior and rider fit](SCOOTER_RIDER_POSE.md).
 
 Garage/premium features remain parked, and local prediction remains disabled. Shop and other gameplay systems remain independent. `Workspace.Map` is never rebuilt. Model installation, exact names and animation APIs are documented in [SCOOTER_MODEL.md](SCOOTER_MODEL.md); controls and server input validation are in [SCOOTER_SYSTEMS.md](SCOOTER_SYSTEMS.md).
 
@@ -85,7 +85,13 @@ Forward acceleration is 25–40 studs/s² across existing scooter tiers; ECO app
 0.7 of the selected tier acceleration. Catalog speeds and upgrade prices are
 unchanged. ScooterTerrain probes the physical tire bottom at both wheels and adds bounded
 wheel-local climbing support, leaving the real springs free to compress. Chassis
-balance follows axle pitch on uneven terrain. IndependentFrontSteering keeps
+balance follows sampled ground height under both axles, including a lower
+surface below an airborne tire when the other still supports the chassis.
+A rigid up-axis constraint prevents collision-driven pitch/roll kicks during
+normal supported riding, while the existing full-axis controller retains yaw
+and wheelie behavior. Revision 3 limits shock force headroom to 1.1 and raises
+damping ratio to 1.4. Post-solver stabilization damps road rebound and restores
+only verified climb momentum through a short, expiring rear-clearance cache. IndependentFrontSteering keeps
 front swingarms/spring fixed to the chassis and adds a wheel kingpin Servo; legacy
 rigs retain their original topology. ScooterImpact requires recent wall contact
 and an actual loss of approach speed, then uses existing crash/stun/recovery.
@@ -95,6 +101,17 @@ keeps vertical support through the corner and permits a bounded 1.25-second
 ground-contact grace during an ongoing climb. It shares normal validated input
 and clears on release, wheelie, dismount or fall. The 0.20 template remains stored;
 Studio comparison displays default off. See [arcade handling](SCOOTER_ARCADE_HANDLING.md).
+
+The reference remodel uses configurable 1.95-stud tires at the same 0.25 body
+scale. Short forward/side face probes admit one-degree curb approaches; verified
+entry assistance also sets the drive grip direction, and simultaneous tire
+contacts share one supported load. If both tire ground probes miss, a short
+Blockcast over the complete deck underside can still authorize grounded drive.
+The deck uses skid friction so W/S can slide off a narrow support. This preserves
+the airborne-drive restriction, height limit and server-owned geometry decisions.
+Default spawn waits for the character root and chooses the enabled spawn nearest
+that root, avoiding scooters at another spawn across the map. See
+[reference remodel and native checks](SCOOTER_LARGE_WHEELS.md).
 
 The 2026-10-05 remodeled draft uses the user's selected full-front steering:
 fork, front suspension and tire follow the column, with seven hinges and two
@@ -106,11 +123,9 @@ seat/foot targets and actual grips for hand targets. Existing gameplay controlle
 and remote validation are reused; see [current assembly](SCOOTER_FINAL_RIG.md).
 
 
-Character appearance completion now runs `Characters/CharacterProportions` once
-per R15 spawn. Shared CharacterConfig defines permanent longer leg rest lengths,
-with a matching HipHeight correction. Original mesh dimensions and RigAttachment
-metadata remain intact; mounted animation never changes limb lengths. This
-implements the user's choice to keep longer legs outside riding as well.
+Avatar Settings retains the intended 8-stud height; gameplay does not scale
+characters. Mounted R15 limbs are posed without changing joint lengths. See [avatar
+behavior](SCOOTER_RIDER_POSE.md).
 
 # Server-local gangs and territories
 
@@ -184,3 +199,19 @@ built from the actual Studio `Workspace.Map.Drogi` road surfaces, rather than th
 older mock `MapData`. Traffic assets preserve authored replacement models during
 Rojo sync. Scooter mechanics and remotes are unchanged. See
 [traffic architecture, workflow, validation and limitations](TRAFFIC_SYSTEM.md).
+
+# NPC police
+
+`ServerScriptService.Police` joins the existing traffic fleet with adapted native
+Kia and Fiat Ducato Policja templates. Directed destinations and per-car tuning
+extend the shared trajectory controller without changing civilian defaults.
+Server scooter records supply precise speed and accepted, grounded wheelie;
+bounded FOV/LOS evidence and exclusive claims authorize pursuits. R15 officers
+exit supported car doors, navigate on foot and request a separately validated
+arrest. The shared scooter dismount and an owner-scoped mount lock make ten-second
+detention reversible on expiry, actor removal, death, respawn, disconnect or stop.
+The client only renders replicated notices. No new remote, economy penalty or
+production map generator is introduced. A server BindableEvent under TrafficSystem
+stops the previous fleet when development creates a fresh manager require context.
+See [police architecture and configuration](POLICE_SYSTEM.md) and
+[executed validation and remaining acceptance](POLICE_VALIDATION.md).

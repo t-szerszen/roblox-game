@@ -72,7 +72,7 @@ near(leftInput, -20 / math.deg(Config.MaxHandlebarAngle), "Chassis steering uses
 local swappedAngle, swappedInput = Physics.GetServoSteering(1, true, true, -10, 20)
 near(swappedAngle, 20, "Reversed attachments apply the positive-side authored limit")
 near(swappedInput, 20 / math.deg(Config.MaxHandlebarAngle), "Reversed limited Servo preserves correct chassis turn direction")
-near(Physics.GetYawRate(limitInput, 15), -15 * math.tan(math.rad(10)) / Config.WheelBase,
+near(Physics.GetYawRate(limitInput, 15), -15 * math.tan(math.rad(10)) * Config.LowSpeedTurnBoost / Config.WheelBase,
 	"Limited Servo supplies the actual wheel curvature")
 local neutral = Physics.GetServoSteering(0, false, true, -10, 20)
 near(neutral, 0, "Neutral input remains neutral with authored limits")
@@ -82,7 +82,7 @@ check(not pcall(Rig.Inspect, source), "Rig rejects steering limits excluding neu
 modelSteer.LimitsEnabled = false
 
 local speed, turn = 15, 0.3
-local expectedYaw = -speed * math.tan(turn * Config.MaxHandlebarAngle) / Config.WheelBase
+local expectedYaw = -speed * math.tan(turn * Config.MaxHandlebarAngle) * Config.LowSpeedTurnBoost / Config.WheelBase
 near(Physics.GetYawRate(turn, speed), expectedYaw, "Chassis yaw follows bicycle curvature")
 local lean = Physics.GetSteeringLean(turn, speed, 196.2)
 near(lean, math.atan2(speed * expectedYaw, 196.2), "Lean follows centripetal acceleration v*yawRate")

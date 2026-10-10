@@ -28,11 +28,13 @@ function ScooterPhysics.IsCollisionImpact(previous: Vector3, current: Vector3, n
 		and (current - previous):Dot(normal) >= settings.MinSpeedLoss
 end
 
-function ScooterPhysics.ComputeStepForce(tangent: Vector3, velocity: Vector3, mass: number, gravity: number, forwardTarget: number?): Vector3
+function ScooterPhysics.ComputeStepForce(tangent: Vector3, velocity: Vector3, mass: number, gravity: number, forwardTarget: number?, stepRise: number?, supportFraction: number?): Vector3
 	if mass <= 0 or gravity <= 0 or tangent.Y <= 0 then return Vector3.zero end
 	local settings = ScooterConfig.StepTraction
-	local acceleration = math.clamp((settings.ClimbSpeed - velocity.Y) * settings.Response,
-		-settings.Acceleration, settings.Acceleration)
+	local gentle = stepRise ~= nil and stepRise <= settings.GentleStep.MaxRise
+	local vertical = if gentle then settings.GentleStep else settings
+	local acceleration = math.clamp((vertical.ClimbSpeed - velocity.Y) * vertical.Response,
+		-vertical.Acceleration, vertical.Acceleration)
 	local planar = Vector3.new(tangent.X, 0, tangent.Z)
 	local push = Vector3.zero
 	if planar.Magnitude > 0.001 then
@@ -43,7 +45,11 @@ function ScooterPhysics.ComputeStepForce(tangent: Vector3, velocity: Vector3, ma
 		push = forward * forwardAcceleration
 	end
 	-- Bound vertical climbing speed without braking horizontal approach momentum.
-	return (Vector3.yAxis * math.max(0, gravity + acceleration) + push) * mass * settings.SupportMassFraction
+	-- A rising tire can briefly outrun the chassis through its spring. Continuing
+	-- to support it then stores energy that kicks the chassis up over the corner.
+	local liftScale = if gentle then math.clamp(1 - (velocity.Y - vertical.ClimbSpeed) / settings.GentleStep.LiftFadeSpeed, 0, 1) else 1
+	return (Vector3.yAxis * math.max(0, gravity + acceleration) * liftScale + push) * mass
+		* (supportFraction or settings.SupportMassFraction)
 end
 
 function ScooterPhysics.IsBraking(forwardSpeed: number, throttleHeld: boolean, brakeHeld: boolean): boolean
@@ -108,8 +114,11 @@ function ScooterPhysics.GetYawRate(
 	if speed < ScooterConfig.MinSteeringSpeed then return 0 end
 	local steerAngle = math.clamp(effectiveSteering, -1, 1) * ScooterConfig.MaxHandlebarAngle
 	local length = math.max(wheelBase or ScooterConfig.WheelBase, ScooterConfig.RigValidation.PositionTolerance)
-	-- Bicycle curvature tends to zero yaw speed at rest, without a minimum spin rate.
-	return math.clamp(-speed * math.tan(steerAngle) / length, -ScooterConfig.TurnRate, ScooterConfig.TurnRate)
+	local fade = math.clamp((speed / ScooterConfig.StudsPerKmH - ScooterConfig.SteeringFadeStartKmh)
+		/ (ScooterConfig.SteeringFadeEndKmh - ScooterConfig.SteeringFadeStartKmh), 0, 1)
+	local curvature = 1 + (ScooterConfig.LowSpeedTurnBoost - 1) * (1 - fade)
+	-- Keep the previous bicycle controller; only crawling turns get a small boost.
+	return math.clamp(-speed * math.tan(steerAngle) * curvature / length, -ScooterConfig.TurnRate, ScooterConfig.TurnRate)
 end
 
 function ScooterPhysics.GetSteeringLean(turnSteering: number, forwardSpeed: number, gravity: number, wheelBase: number?): number
@@ -138,10 +147,24 @@ function ScooterPhysics.AdvanceForward(
 	return CFrame.fromAxisAngle(Vector3.yAxis, yaw):VectorToWorldSpace(forward).Unit
 end
 
-function ScooterPhysics.ClampForwardLead(actual: Vector3, desired: Vector3, yawRate: number?): Vector3
+function ScooterPhysics.AdvanceSteeringHold(current: number, input: number, deltaTime: number): number
+	if math.abs(input) < 0.01 then return 0 end
+	local direction = if input < 0 then -1 else 1
+	local elapsed = if current * direction < 0 then 0 else math.abs(current)
+	local settings = ScooterConfig.HeldSteering
+	return direction * math.min(elapsed + math.clamp(deltaTime, 0, 0.1), settings.Delay + settings.RampTime)
+end
+
+function ScooterPhysics.ClampForwardLead(actual: Vector3, desired: Vector3, yawRate: number?, steeringInput: number?, holdTime: number?): Vector3
 	local angle = math.atan2(actual:Cross(desired).Y, actual:Dot(desired))
-	local limit = if yawRate then math.min(ScooterConfig.MaxHeadingLeadAngle, math.abs(yawRate) * ScooterConfig.HeadingLeadSeconds)
-		else ScooterConfig.MaxHeadingLeadAngle
+	-- Small sustained input must not accumulate the same heading lead as full steering.
+	local settings = ScooterConfig.HeldSteering
+	local ramp = math.clamp(((holdTime or 0) - settings.Delay) / settings.RampTime, 0, 1)
+	local fullLead = ScooterConfig.MaxHeadingLeadAngle
+		+ (settings.MaxHeadingLeadAngle - ScooterConfig.MaxHeadingLeadAngle) * ramp
+	local maximumLead = fullLead * math.abs(math.clamp(steeringInput or 1, -1, 1))
+	local limit = if yawRate then math.min(maximumLead, math.abs(yawRate) * ScooterConfig.HeadingLeadSeconds)
+		else maximumLead
 	local limited = math.clamp(angle, -limit, limit)
 	return CFrame.fromAxisAngle(Vector3.yAxis, limited):VectorToWorldSpace(actual).Unit
 end

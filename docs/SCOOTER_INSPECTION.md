@@ -53,8 +53,7 @@ the new model rather than replacing the driving controller.
 
 `ScooterServer` and shared `ScooterPhysics` already implement authoritative drive,
 braking/reverse, steering, wheelie, burnout, stabilization and ECO/SPORT modes.
-`ScooterAnimator`, `ScooterRiderPose` and `ScooterRiderVisualizer` handle rider poses
-and cleanup. Garage upgrades and premium appearance services are retained but
+Riders retain their Roblox default appearance and animations; no scooter pose client runs. Garage upgrades and premium appearance services are retained but
 paused by `GarageEnabled = false`; enabling/redesigning them is a later product step.
 See [current systems](SCOOTER_SYSTEMS.md) and [rig contract](SCOOTER_MODEL.md).
 

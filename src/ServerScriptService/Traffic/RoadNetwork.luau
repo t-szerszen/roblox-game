@@ -66,6 +66,63 @@ function RoadNetwork.Route(network: Types.Network, start: string, random: Random
 	end
 	return route
 end
+-- Keep the current edge and distance: destinations never relocate a vehicle.
+-- Search directed reachability, then project onto reachable curve samples.
+function RoadNetwork.Destination(network: Types.Network, current: string, distance: number,
+ position: Vector3): ({string}, number, number)
+ assert(Trajectory.ValidVector(position), "Invalid destination")
+ local first=network.paths[current]
+ assert(first and first.edge.enabled~=false, "Invalid current edge")
+ local costs: {[string]: number}={[first.edge.to]=first.length-distance}
+ local previous: {[string]: string}={}
+ local open: {[string]: boolean}={[first.edge.to]=true}
+ local bestEdge=current
+ local bestDistance=distance
+ local bestGap=math.huge
+ local bestCost=math.huge
+ local function consider(path: Types.Path, start: number, cost: number)
+  if path.edge.intersection then return end
+  for _,sample in path.samples do
+   if sample.distance<start then continue end
+   local gap=(sample.position-position).Magnitude
+   local travel=cost+sample.distance-start
+   if gap<bestGap-0.1 or (math.abs(gap-bestGap)<=0.1 and travel<bestCost) then
+    bestGap=gap; bestCost=travel; bestEdge=path.edge.id; bestDistance=sample.distance
+   end
+  end
+ end
+ consider(first,distance,0)
+ for _=1,Config.MaxNodes do
+  local node: string?=nil
+  local cost=math.huge
+  for id in open do if costs[id]<cost then node=id; cost=costs[id] end end
+  if not node then break end
+  open[node]=nil
+  local outgoing: {string}=network.outgoing[node] or {}
+  for _,edgeId in outgoing do
+   local path=network.paths[edgeId]
+   if path.edge.enabled==false then continue end
+   consider(path,0,cost)
+   local nextCost=cost+path.length
+   if nextCost<(costs[path.edge.to] or math.huge) then
+    costs[path.edge.to]=nextCost; previous[path.edge.to]=edgeId; open[path.edge.to]=true
+   end
+  end
+ end
+ if bestGap==math.huge then return {current},first.length,bestGap end
+ if bestEdge==current then return {current},bestDistance,bestGap end
+ local reverse={bestEdge}
+ local node=network.paths[bestEdge].edge.from
+ for _=1,Config.MaxNodes do
+  if node==first.edge.to then break end
+  local edgeId=previous[node]
+  assert(edgeId,"Destination predecessor missing")
+  table.insert(reverse,edgeId); node=network.paths[edgeId].edge.from
+ end
+ local route={current}
+ for i=#reverse,1,-1 do table.insert(route,reverse[i]) end
+ return route,bestDistance,bestGap
+end
 function RoadNetwork.Components(network: Types.Network): { {string} }
 	local adjacency: {[string]: {string}} = {}
 	for id in network.nodes do adjacency[id]={} end

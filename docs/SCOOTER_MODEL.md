@@ -176,48 +176,24 @@ Servo target degrees are `sign * effectiveInput * deg(MaxHandlebarAngle)`, with 
 Otherwise chassis steering uses the wheel kingpin CurrentAngle when present,
 or the legacy column CurrentAngle, divided by the signed full angle, so a blocked Servo cannot rotate the chassis from requested input alone. The [HingeConstraint Servo contract](https://create.roblox.com/docs/reference/engine/classes/HingeConstraint) specifies TargetAngle in degrees. Actual movement still depends on AngularSpeed/ServoMaxTorque; SteeringAngle publishes the measured angle in radians for rider IK/lean.
 
-The bicycle turn model is `yawRate = -abs(speed) * tan(turnInput * MaxHandlebarAngle) / actualWheelbase`, with reverse travel inverting turnInput and magnitude capped by TurnRate. Wheelbase is the initial separation of the virtual axle pivots. No wheel contact produces zero yaw; outside burnout, speed below MinSteeringSpeed also produces zero yaw. Unlike a minimum turn-rate floor, this keeps a finite radius while crawling. Desired heading stays within `min(MaxHeadingLeadAngle, abs(yawRate) * HeadingLeadSeconds)` of the actual planar chassis heading (12 degrees maximum, 0.15 seconds of lead), preventing orientation windup against obstacles. During accepted burnout, yaw instead uses `-measuredSteeringInput * BurnoutTurnRate` (90 degrees/s maximum), independent of travel speed. This allows sustained donuts without weakening normal low-speed steering rules. Releasing either W/S, stale input, losing rear contact, or exceeding 5 km/h disables that mode. The same heading lead bounds still prevent winding up against obstacles, and cornering roll is disabled during burnout. Outside burnout, cornering roll is `atan2(signedSpeed * yawRate, Workspace.Gravity)`, capped by MaxSteeringLean (16 degrees). This ties lean to centripetal acceleration and gives right turns negative roll. Exponential smoothing at SteeringLeanSmoothSpeed eases entry/exit independent of frame rate. Only an occupied, upright chassis with both wheel contacts requests roll; wheelie, airborne and parked states request zero.
+The bicycle turn model is `yawRate = -abs(speed) * tan(turnInput * MaxHandlebarAngle) * curvature / actualWheelbase`, with reverse travel inverting turnInput and magnitude capped by TurnRate. Wheelbase is the initial separation of the virtual axle pivots. Curvature is 1.2 below 25 km/h and fades to 1 by 80 km/h; the previous controller, 165-degree/s cap and high-speed input scale of 0.55 remain in use. No wheel contact produces zero yaw; outside burnout, speed below MinSteeringSpeed also produces zero yaw. Unlike a minimum turn-rate floor, this keeps a finite radius while crawling. Desired heading stays within `min(fullLead * abs(smoothedRiderInput), abs(yawRate) * HeadingLeadSeconds)` of the actual planar chassis heading (fullLead starts at 12 degrees, grows to 20 after a 0.18-second hold and 0.45-second ramp, with 0.15 seconds of yaw-rate lead), preventing orientation windup against obstacles. Release, reversal, stale input and loss of supported normal riding clear the hold timer; burnout uses the original 12-degree limit. During accepted burnout, yaw instead uses `-measuredSteeringInput * BurnoutTurnRate` (90 degrees/s maximum), independent of travel speed. This allows sustained donuts without weakening normal low-speed steering rules. Releasing either W/S, stale input, losing rear contact, or exceeding 5 km/h disables that mode. The same heading lead bounds still prevent winding up against obstacles, and cornering roll is disabled during burnout. Outside burnout, cornering roll is `atan2(signedSpeed * yawRate, Workspace.Gravity)`, capped by MaxSteeringLean (16 degrees). This ties lean to centripetal acceleration and gives right turns negative roll. Exponential smoothing at SteeringLeanSmoothSpeed eases entry/exit independent of frame rate. Only an occupied, upright chassis with both wheel contacts requests roll; wheelie, airborne and parked states request zero.
 
 The roll replaces the old linear lean in the existing root [AlignOrientation](https://create.roblox.com/docs/reference/engine/classes/AlignOrientation) target. It does not teleport individual meshes, change center of mass, add a competing orientation actuator or change suspension spring parameters. Wheelie pitch, drive force and rear-wheel burnout motor retain their separate existing controls. Test the capped roll on the authored springs and slopes in Studio before changing its limits.
 
-## Rider animation
+## Rider appearance
 
-`ScooterAnimator.new(scooter)` returns an animator exposing dot-call methods:
+Player characters retain the intended 8-stud Avatar Settings height and enabled
+`Animate`. Mounted R15 characters use the focused base riding pose described in
+[rider fit](SCOOTER_RIDER_POSE.md), with soles on FootRest and palms at existing
+grip targets. No animation clip, gameplay scaling or first-person body visibility
+is added. Native SeatWeld mounting, steering, drive input and physics are retained.
 
-```lua
-local animator = ScooterAnimator.new(scooter)
-animator.mount(character)
-animator.dismount()
-local state = animator.getState() -- IDLE / RIDING / WHEELIE, or nil when unmounted
-```
-
-ScooterRiderVisualizer binds an animator to every replicated scooter's DriverSeat.Occupant on each client. Missing streamed model/character descendants are retried through events, without per-frame hierarchy scans. Existing ScooterRiderPose supplies foot IK, wheelie foot balance and the R6 standing fallback. It no longer creates hand IK.
-
-For R15, two IKControls target attachments directly on HandleBar, so physical steering moves the hands. Elbow poles lift the arm on the corresponding turn side. Complete Motor6D/AnimationConstraint chains now use ScooterLimbSolver after the torso layer, with their competing IKControls disabled; incomplete chains retain IK fallback. Fixed joint lengths, original rest-bone axes and a steering torso twist keep hands on the grips even at full lock. See [current rider pose](SCOOTER_RIDER_POSE.md). The [IKControl contract](https://create.roblox.com/docs/reference/engine/classes/IKControl) documents moving targets, chain overrides and pole control.
-
-Body lean blends forward speed, lateral speed (`velocity:Dot(root.CFrame.RightVector)`) and the measured steering angle. The server publishes `SteeringAngle` in radians with positive values representing right input, because HingeConstraint.CurrentAngle is [not replicated](https://create.roblox.com/docs/reference/engine/classes/HingeConstraint). Lean is bounded and shared between Root/RootJoint and Waist. PreAnimation updates IK targets and removes the previous procedural torso layer; PreSimulation applies torso transforms. R6 uses its RootJoint and existing procedural standing pose, as it lacks R15 hands.
-
-Dismount, death, character/scooter destruction and remount disconnect callbacks, remove generated IK/poles, restore saved motor transforms and restore the Animate script's previous enabled state. New steering, lean, grip-width and elbow settings live in Shared/ScooterConfig. No new remote grants client authority over physics or tricks.
-
-## Leg animation state machine
-
-The client derives leg states only from controller-published attributes. `WheelieActive` takes priority; `SpeedKmh` selects idle/riding with hysteresis. `DriveState = Airborne/Fallen` and `Fallen = true` prevent the idle ground-foot pose. Missing speed defaults to riding until replicated data arrives. These visual states do not change drive input, force, wheelie rules or burnout.
-
-| State | Entry | Legs |
-| --- | --- | --- |
-| `IDLE` | Speed at/below `IdleEnterSpeedKmh`; retains idle up to `IdleExitSpeedKmh` | Play `IdleFootAnim`, with one foot removed from the support/deck and resting on the ground. |
-| `RIDING` | Speed above the exit threshold or unsuitable ground-foot state | Fade out state clips; left foot returns to the deck, right foot stays near the middle of the deck. |
-| `WHEELIE` | Authoritative `WheelieActive = true`, unless fallen | Play `WheelieBalanceAnim` for rearward body balance and the moving balance leg. |
-
-Set your R15 animation IDs in `Shared/ScooterConfig.RiderAnimations.IdleFootAnim` and `.WheelieBalanceAnim`, using either a numeric **string** or `rbxassetid://<ID>`. Both default to an empty string, which deliberately loads no asset. Until the IDs are supplied, or while a clip is unavailable/not yet loaded, the existing procedural foot/wheelie pose remains active. R6 retains its procedural standing/balance fallback; these clips are intended for R15.
-
-Author both clips with the legs and pelvis keyed; in idle, key the supporting leg on the deck as well as the ground leg. Arms remain driven by hand IK. Wheelie can key the pelvis/root for the rearward shift, with procedural steering lean applied as an additional layer. The actual ground-foot height and reach must be checked against the scooter, slopes and avatar scales in Studio after supplying your assets.
-
-Clips load once per mount and loop at matching Action priority. Attribute-change events drive transitions: entering a state calls `AnimationTrack:Play(FadeTime, Weight, PlaybackSpeed)` once, while the outgoing clip uses `Stop(FadeTime)`. The defaults are a 0.25-second fade, weight 1, playback speed 1 and idle thresholds of 0.5/1.5 km/h. Change these in the same configuration table. Stable states never restart a track every frame; see [AnimationTrack blending](https://create.roblox.com/docs/reference/engine/classes/AnimationTrack).
-
-PreAnimation sums the loaded tracks' current blend weights, then reduces foot IK by that amount. Fully blended clips disable foot IK entirely so poles cannot pin animated feet to the deck; fading back to riding restores the procedural foot pose. Hands stay on the grips through the manual solver or IK fallback. The character owner's client starts clips; observers follow the owner's replicated tracks through Animator.AnimationPlayed and never load or play a second copy. Existing replicated state clips are preserved when attaching an observer. A player character waits for its server-created Animator, because a client-created Animator cannot replicate tracks; see [Animator replication](https://create.roblox.com/docs/reference/engine/classes/Animator).
-
-Dismount stops/destroys the locally owned tracks and animation objects, disconnects state/animation listeners and resets `getState()` to nil. Observers release their references without stopping or destroying the owner's tracks. Asset load/play errors fall back to procedural foot support.
+The current rider-fit revision rebuilds the visible body and moves the complete
+front module with its real steering bearing to meet the accepted neutral pose.
+The straight shaft joins that bearing; the obsolete one-piece neck is hidden.
+See [the rider remodel](SCOOTER_RIDER_REMODEL.md) for component geometry,
+customization, preserved systems and the changed wheelbase. Older templates
+remain archived in `ServerStorage.ScooterTemplateBackups`.
 
 The current central-shock template is rebuilt at scale 0.30 with a 1.48 dashboard
 scale multiplier. Native steering Servo tuning and the 0.65-stud threshold test

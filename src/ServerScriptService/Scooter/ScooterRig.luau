@@ -182,16 +182,14 @@ local function configureModel(model: Model, Config: typeof(Config)): Model
 	local deckHeight = (math.abs(deckPart.CFrame.RightVector.Y) * bodySize.X
 		+ math.abs(deckPart.CFrame.UpVector.Y) * bodySize.Y
 		+ math.abs(deckPart.CFrame.LookVector.Y) * bodySize.Z) * 0.5
-	local deckCenter = deckPart.Position + Vector3.yAxis * (deckHeight + Config.RiderPose.FootPlantClearance)
+	local deckCenter = deckPart.Position + Vector3.yAxis * (deckHeight + Config.RiderDeckClearance)
 	local right = root.CFrame.RightVector
-	attachment(root, "RiderRootAttachment", deckCenter - forward * 0.25)
-	attachment(root, "LeftFootPlant", deckCenter + forward * 0.45 - right * 0.32)
-	attachment(root, "RightFootPlant", deckCenter - forward * 0.55 + right * 0.32)
+	attachment(root, "RiderRootAttachment", deckCenter)
 	-- Targets live on the moving steering assembly, never on the chassis.
 	for _, side in { "Left", "Right" } do
 		local grip = if central then model:FindFirstChild(side .. "Grip") else nil
 		local position = if grip and grip:IsA("BasePart") then grip.Position
-			else rig.handleBar.Position + right * Config.RiderPose.GripHalfWidth * (if side == "Left" then -1 else 1)
+			else rig.handleBar.Position + right * Config.RiderGripHalfWidth * (if side == "Left" then -1 else 1)
 		attachment(rig.handleBar, side .. "HandGrip", position)
 	end
 	local smokePoint = attachment(rig.backAxle, "RearWheelAttachment", rig.backPoint.WorldPosition)

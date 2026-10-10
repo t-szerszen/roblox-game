@@ -12,11 +12,17 @@ local Spawner=require(script.Parent.TrafficSpawner)
 local Intersections=require(script.Parent.IntersectionManager)
 local Debug=require(script.Parent.TrafficDebug)
 local Tool=require(script.Parent.DevTrafficTool)
+local Police=require(script.Parent.Parent.Police.PoliceService)
 local Manager={}
 local heartbeat: RBXScriptConnection?=nil
 local cleanup: (() -> ())?=nil
 local infrastructureConnections: {RBXScriptConnection}={}
 local epoch=0
+local activePolice: Police.Service?=nil
+function Manager.GetPoliceService(): Police.Service?
+ assert(RunService:IsServer() and RunService:IsStudio(),"Police inspection is Studio server-only")
+ return activePolice
+end
 function Manager.Stop()
 	epoch+=1
 	for _,connection in infrastructureConnections do connection:Disconnect() end
@@ -30,6 +36,15 @@ function Manager.Start(): boolean
 	local startEpoch=epoch
 	if not Config.Enabled then return false end
 	local root=Tool.Root()
+	local lease=root:FindFirstChild("RuntimeStop")
+	assert(not lease or (lease:IsA("BindableEvent") and lease:GetAttribute("TrafficRuntime")==true),"Traffic runtime lease conflicts with authoring content")
+	if not lease then
+		local event=Instance.new("BindableEvent");event.Name="RuntimeStop";event:SetAttribute("TrafficRuntime",true);event.Parent=root;lease=event
+	end
+	local stopEvent=lease :: BindableEvent
+	-- Stop a previous controller even when a development reload creates a fresh
+	-- require context. Inspect yields before a new fleet is published.
+	stopEvent:Fire()
 	local authored=root:FindFirstChild("Network")
 	local data=if authored and authored:GetAttribute("Approved")==true then Tool.Read(authored) else Data
 	if not data.approved then warn("[Traffic] No approved network. Use TrafficWorkflow in Edit mode; map generation is never automatic."); return false end
@@ -58,6 +73,7 @@ function Manager.Start(): boolean
 	local sensor=Sensors.new(roads,{debug.folder})
 	local cars: {Controller.Vehicle}={}; local nextId=0; local random=Random.new()
 	local moveClock,senseClock,spawnClock,debugClock=0,0,0,0
+	local police: Police.Service?=nil
 	local debugEnabled=false; local now=0
 	local players: {Vector3}={}
 	local function refreshBodies()
@@ -68,19 +84,28 @@ function Manager.Start(): boolean
 	end
 	local function remove(index: number)
 		local car=table.remove(cars,index); assert(car)
+		if police then police:Removing(car,now) end
 		if car.exitReason and car.exitReason~="RemovedModel" and car.exitReason~="Irrelevant" and car.exitReason~="DeadEnd" then
 			warn(string.format("[Traffic] car %d removed: %s",car.id,car.exitReason))
 		end
 		debug:Remove(car.id); car:Destroy(intersections)
 	end
 	cleanup=function()
+  activePolice=nil
+		if police then police:Destroy(); police=nil end
 		for i=#cars,1,-1 do remove(i) end
 		debug:Destroy(); table.clear(sensor.bodies); table.clear(players)
 		root:SetAttribute("ActiveVehicleCount",0)
 	end
 	table.insert(infrastructureConnections,root.Destroying:Connect(Manager.Stop))
 	table.insert(infrastructureConnections,activeFolder.Destroying:Connect(Manager.Stop))
-	heartbeat=RunService.Heartbeat:Connect(function(elapsed: number)
+	table.insert(infrastructureConnections,stopEvent.Event:Connect(Manager.Stop))
+ local policeContext: Police.Context={network=network,sensor=sensor,cars=cars,parent=activeFolder,
+  root=root,random=random,nextId=function() nextId+=1;return nextId end}
+ local policeOk,policeResult=pcall(Police.new,policeContext)
+ if policeOk then police=policeResult else warn("[Police] startup rejected: "..tostring(policeResult)) end
+ activePolice=police
+ heartbeat=RunService.Heartbeat:Connect(function(elapsed: number)
 		now+=elapsed; moveClock+=elapsed; senseClock+=elapsed; spawnClock+=elapsed; debugClock+=elapsed
 		if senseClock>=1/Config.SenseRate then
 			senseClock=0; table.clear(players)
@@ -89,6 +114,11 @@ function Manager.Start(): boolean
 				if part then table.insert(players,part.Position) end
 			end
 			refreshBodies()
+			if police then
+				local ok,err=pcall(function() (police :: Police.Service):Update(now) end)
+				if not ok then warn("[Police] update rejected: "..tostring(err)) end
+				refreshBodies()
+			end
 			for _,car in cars do
 				if not car.vehicle.model.Parent then car:Fail("RemovedModel"); continue end
 				local ok,err=pcall(function() car:Sense(sensor,intersections,now) end)

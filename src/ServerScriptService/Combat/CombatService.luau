@@ -96,6 +96,10 @@ local function isStunned(player: Player): boolean
 	return typeof(expiresAt) == "number" and expiresAt > Workspace:GetServerTimeNow()
 end
 
+function CombatService.IsInSafeZone(position: Vector3): boolean
+	return isInSafeZone(position)
+end
+
 function CombatService.GetTerritoryPosition(player: Player): Vector3?
 	if player.Parent ~= Players or player:GetAttribute("PassiveMode") == true then return nil end
 	local _, _, root = getCharacterState(player)

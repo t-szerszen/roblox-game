@@ -1,6 +1,44 @@
 # Scooter verification
 
+## Base riding pose, stage 1
+
+After Rojo sync, start Play and mount the scooter with the intended 8-stud R15
+avatar. Run `tests/scooter_base_pose.studio.luau` as a temporary ModuleScript in
+the Client datamodel and call its `Run()` method. The test checks sole height,
+forward feet with reference pitches, projected deck bounds, palm contact, native SeatWeld, enabled Animate,
+detached Motor6D/AnimationConstraint fixtures, restoration and incomplete rigs.
+It passes 91 assertions on the current installed template, including mismatched
+character/seat interpolation snapshots and pure elbow hinge rotation.
+In Edit mode, run `tests/scooter_rider_fit.studio.luau`.Run(previousTemplate),
+using the preserved installed large-wheel template before `ReferenceRiderFit`,
+to verify coherent front relocation, unchanged support/rear geometry, mass,
+mechanical connections, steering sweep and customization (139 native assertions).
+See `docs/SCOOTER_RIDER_REMODEL.md` for the intentional geometry changes and
+remaining hand-reach limitation during steering.
+Detached fixtures
+do not modify the authored map, template or production character joints.
+
+Also inspect the rider from the side and front, drive normally, repeatedly
+mount/dismount and reset the character. Verify walking/idle resume after exit.
+Use two actual clients to confirm other players see the pose; one-client tests
+do not establish multiplayer replication or fit for every body/clothing variant.
+No trick or transition animation is part of this stage.
+
 ## Read-only model inspection
+
+`tests/scooter_remodel.studio.luau` validates the larger-wheel remodel against the
+actual preserved source and `Workspace.newFrontWheel`, with detached fixtures.
+It checks texture preservation, unchanged deck/bar dimensions, level tire centers,
+calibration, compound decorations and idempotent runtime clones without installing
+a template. See [larger-wheel workflow](../docs/SCOOTER_LARGE_WHEELS.md).
+
+The latest arcade regressions cover one-degree contact on either side using
+bounded ray/plane intersections, shared tire lift, nearest-spawn selection,
+full-footprint deck support, W/S recovery and immediate airborne drive clearing.
+The current suite passes 879 assertions. Native Play must also check default
+spawn before any manual SpawnForPlayer call, one-degree forward/reverse curb
+entries from rest and while rolling, and sliding off a narrow underside support.
+Use temporary geometry outside Workspace.Map; stop Play to remove all fixtures.
 
 After Rojo sync, run `tests/scooter_inspection.studio.luau` in Studio's Command Bar.
 It uses real unparented Roblox Instances to check nested raw MeshParts, repeated
@@ -45,7 +83,7 @@ profile migration, failed-load protection, saved upgrades, disconnected profile
 listeners, validated RGB, garage rate limits, unconfigured premium IDs, verified
 game passes, entitlement caching/failure and garage shutdown.
 
-The additional rig/animation suite executes actual ScooterRig preparation, ScooterAnimator lifecycle and ScooterWorkflow reload code. It checks missing parts and invalid links, cloned constraint references, preserved spring parameters and source objects, idempotent preparation, moving hand targets, speed/lateral/steering lean, elbow lift, remount/death cleanup, R6 fallback and transform restoration. Reload tests prepopulate stale assembler/configuration caches, verify repeated assembly loads fresh modules, and check temporary-folder cleanup and template preservation on failure. The leg-state suite verifies wheelie priority, idle/riding hysteresis, controller attribute transitions, single state-entry playback, fade/weight parameters, foot IK handoff, unloaded/missing/failed asset fallback, owned track cleanup and observer reuse of replicated clips. The object doubles do not solve IK, collisions, spring forces or actual animation asset evaluation.
+The scooter suite covers rig preparation, physics tuning, handling, visuals, suspension and terrain behavior. Avatar animation and proportion systems are not part of the game.
 
 These tests do not simulate Roblox physics integration or real network replication.
 The visual suite executes the brake-light lifecycle with and without PBR appearance,
@@ -158,9 +196,6 @@ luau-lsp analyze --platform=roblox \
   src/ServerScriptService/Scooter \
   src/ServerScriptService/Activity/PlayerDataService.luau \
   src/StarterPlayer/StarterPlayerScripts/ScooterClient.client.luau \
-  src/StarterPlayer/StarterPlayerScripts/ScooterAnimator.luau \
-  src/StarterPlayer/StarterPlayerScripts/ScooterRiderPose.luau \
-  src/StarterPlayer/StarterPlayerScripts/ScooterRiderVisualizer.client.luau \
   src/StarterPlayer/StarterPlayerScripts/ScooterPrediction.luau
 ```
 
@@ -178,9 +213,7 @@ Avoid changing the production `Workspace.Map` for testing.
    assemblies retain mass. Only the invisible wheel proxies contact the road, moving
    with physical wheel/axle travel. Confirm all four SpringConstraints compress on
    curbs without a rigid axle-to-Root weld. Local prediction remains disabled. The
-   standing rider stays on the deck; both hands follow HandleBar at both steering
-   limits and while suspension compresses. Confirm speed-dependent torso lean and
-   corresponding elbow lift with two clients, turning in both directions.
+   rider remains seated over the deck through steering and suspension travel.
 2. **Driving.** Accelerate each model on level ground and compare the settled
    speed to the replicated `MaxSpeedKmh` (before and after each purchased tier).
    Release W to coast, press S to brake, then continue S to reverse responsively
@@ -241,25 +274,12 @@ Avoid changing the production `Workspace.Map` for testing.
    request alone must not grant entitlement. Invalid RGB values are rejected.
 8. **Cleanup.** Repeat mount/dismount, reset, death, scooter replacement and server
    Stop/Start. No extra input/render callbacks, prediction models or smoke remain.
-   Rider collisions, Animate enabled state, torso transforms and character network ownership
-   return to normal on dismount. No hand/foot IKControls or elbow poles remain.
+   Rider collisions and character network ownership return to normal on dismount.
    Remount repeatedly with R6/R15 and observe both clients. Typing in chat or losing focus releases controls.
    Lose focus, die/dismount, refocus while unmounted, then remount: controls work.
    Compare client memory and event/network activity before and after repeated cycles.
 
-9. **Leg animation clips.** Supply your actual R15 IDs in RiderAnimations before this
-   check. At rest, IDLE fades into IdleFootAnim: one foot reaches the ground and
-   the supporting foot remains on the deck. Accelerate into RIDING and brake to
-   IDLE repeatedly, including speeds around the two hysteresis thresholds; the
-   clip must not restart every frame or flicker between states. Trigger wheelie
-   while moving: WheelieBalanceAnim takes priority, shifts balance rearward and
-   moves its balance leg. End wheelie while moving and at rest to exercise both
-   exit paths. Verify foot IK does not hold the animated leg on the deck, hands
-   stay attached to HandleBar and observers see one replicated clip per state.
-   Test different avatar scales and slopes. Confirm missing/unavailable IDs retain
-   foot support, and death/dismount/remount leave no owned tracks or state listeners.
-
-10. **Dedicated lights and chassis roll.** With the central-shock template,
+9. **Dedicated lights and chassis roll.** With the central-shock template,
     S while moving forward shows BRAKE and the red StopLight. Reversing keeps
     StopLight on and shows R without BRAKE; W brakes reverse motion and shows
     BRAKE. Test W+S, input expiry, dismount, crash and replacement. L toggles a
@@ -339,19 +359,10 @@ reverse 2.4 studs at 45 degrees, and rejection of a three-stud wall from rest.
 Both wheels must reach the top, with the rider mounted and not fallen. See
 [SCOOTER_ARCADE_HANDLING.md](../docs/SCOOTER_ARCADE_HANDLING.md).
 
-## Rider fit and curb momentum
+## Curb momentum
 
-`scooter_rider_pose.spec.luau` covers analytic joint geometry, Motor6D and
-AnimationConstraint reach/cleanup, left-foot balance and idle-ground support,
-first-person arm visibility/cleanup, and non-braking curb assistance. The suite
-currently passes 828 assertions. Native Play acceptance and fixture measurements
-are documented in [SCOOTER_RIDER_POSE.md](../docs/SCOOTER_RIDER_POSE.md).
-
-The rider suite also verifies permanent server leg calibration on Motor6D and
-AnimationConstraint rigs, idempotent appearance setup, unchanged mesh dimensions
-and original RigAttachment frames, ball-socket alignment, and clamping distant
-limb goals without translation. Native Play verifies spawn/respawn consistency,
-full-lock grip reach, deck-centered right support and controlled wheelie.
+Native curb approach notes and acceptance measurements are documented in
+[SCOOTER_ARCADE_HANDLING.md](../docs/SCOOTER_ARCADE_HANDLING.md).
 
 ## Gangs, territories and protection
 
@@ -430,3 +441,58 @@ Play or alter the map.
 See [traffic testing and manual Play checklist](../docs/TRAFFIC_SYSTEM.md) for actual
 road-generation evidence and the outstanding physics, replication and multiplayer
 acceptance checks.
+
+## NPC police
+
+```sh
+python3 tests/run_police_tests.py --luau /path/to/luau
+```
+
+The 809 assertions execute the actual directed destination search, state machine,
+exclusive pursuit ownership, last-seen/timeouts and sustained violation rules.
+Service doubles supply scooter/combat eligibility for these rule tests. The
+scooter regression suite also exercises the real server module's precise riding
+state, owner-scoped mount locks and exact owned-seat dismount (841 total assertions).
+
+After syncing police scripts and ServerStorage.PoliceVehicleModels, paste
+`tests/police.studio.luau` into the Edit Command Bar. Its 305 native assertions
+check both authored vehicle envelopes, sanitized models, R15 exit/navigation
+prerequisites, real FOV/LOS obstruction, shared controller overrides and detention
+validation/restoration. Temporary far-away support fixtures are removed; authored
+map and vehicles are retained.
+
+`tests/police.play.studio.luau` and `tests/police.edge.play.studio.luau` must run as
+temporary normal **server Scripts in a one-player Play session**, sharing the
+actual traffic/scooter module cache. They reposition test actors and the first
+pauses civilian spawning; the lifecycle fixture respawns the player and restarts
+traffic. Stop Play after testing to discard these temporary runtime fixtures.
+The normal and wheelie/escape scenarios use genuine client controls and server
+physics. The lifecycle script uses authorized fixture interventions to isolate
+removal, respawn and restart behavior (52 checks).
+See [exact startup, inputs, results and remaining manual checks](../docs/POLICE_VALIDATION.md).
+
+### Rounded obstacle and wheelie-spark follow-up
+
+The scooter CLI suite covers sloping faces, rounded-arc support, speed-bounded
+anticipation, wall rejection and common post-solver rebound correction without
+unintended lateral or relative suspension velocity changes. It also checks
+chassis momentum recovery, cache expiry, road rebound damping and sampled
+lower-ground pitch without airborne drive eligibility. It checks the restored
+lateral-slip grip, mild low-speed curvature boost, high-speed input attenuation
+and airborne drive rejection. `scooter_scrape.spec.luau` checks pitch
+hysteresis, speed/contact gates, inactive rider state and idempotent cleanup.
+Native Play additionally checks forward/reverse rounded humps from rest,
+frontal rolling curbs, one-degree approaches, full-speed approach, underside
+support recovery, parked wheels across one- and 2.5-stud height differences,
+full-speed momentum retention and visible shock travel, tighter held-turn
+radius relative to previous steering, 120 ms A/D taps, fast partial left/right
+input and release with tire/vertical stability bounds, and larger sparks during
+an overbalanced wheelie.
+The Studio fixtures live outside Workspace.Map and disappear when Play stops.
+
+To repeat native physics QA, start fresh Studio Play, select Server Command Bar
+and paste `tests/scooter_arcade_followup.studio.luau`. Wait for
+`Workspace._ScooterRemodelQA.AllFinished` and `Passed`, inspect result attributes,
+then stop Play to restore the usual client input. Set `STEERING_ONLY = true` for the focused six-turn and spark regression.
+The runner temporarily replaces
+rider input within Play and never edits authored StarterPlayerScripts or the map.

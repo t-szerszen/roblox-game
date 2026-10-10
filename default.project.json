@@ -2,7 +2,6 @@
   "name": "RobloxGame",
   "tree": {
     "$className": "DataModel",
-
     "ReplicatedStorage": {
       "$className": "ReplicatedStorage",
       "$path": "src/ReplicatedStorage",
@@ -10,12 +9,10 @@
         "$path": "assets/scooter/ScooterDashboard.rbxmx"
       }
     },
-
     "ServerScriptService": {
       "$className": "ServerScriptService",
       "$path": "src/ServerScriptService"
     },
-
     "StarterPlayer": {
       "$className": "StarterPlayer",
       "StarterPlayerScripts": {
@@ -23,17 +20,24 @@
         "$path": "src/StarterPlayer/StarterPlayerScripts"
       }
     },
-
     "StarterGui": {
       "$className": "StarterGui",
       "$path": "src/StarterGui"
     },
-
     "ServerStorage": {
       "$className": "ServerStorage",
       "$ignoreUnknownInstances": true,
       "TerritoryFlagTemplate": {
         "$path": "assets/territory/TerritoryFlag.rbxmx"
+      },
+      "PoliceVehicleModels": {
+        "$className": "Folder",
+        "Kia": {
+          "$path": "assets/police/Kia.rbxm"
+        },
+        "Fiat Ducato Policja": {
+          "$path": "assets/police/FiatDucatoPolicja.rbxm"
+        }
       }
     }
   }

@@ -1,5 +1,9 @@
 # ScooterFinal assembly and runtime integration
 
+The larger-wheel remodel adds `newFrontWheel`, a matching larger rear tire,
+level rest geometry, folded left kickstand and rear fender, preserving the
+existing articulated controller. See [the 2026-10-09 workflow and verification](SCOOTER_LARGE_WHEELS.md).
+
 ## Active remodeled model — 2026-10-05
 
 The user selected 0.25 after comparing sizes. It is the runtime and builder

@@ -48,12 +48,185 @@ check(probe(shallowFace, top(1.05)) ~= nil,
 	"A 75-degree glancing approach still finds contacted curb support")
 local parallelFace = { Position = face.Position, Normal = Vector.xAxis }
 check(probe(parallelFace, top(1)) == nil, "Travel parallel to a face never triggers climbing")
+for _, side in { -1, 1 } do
+	local normal = Vector.new(side * math.cos(math.rad(1)), 0, math.sin(math.rad(1)))
+	local facePoint = point.WorldPosition - normal * 0.94
+	local longestRay, topInset = 0, 0
+	services.Workspace.Raycast = function(_, origin, ray)
+		if ray.Y < -0.1 then
+			topInset = -(origin - facePoint):Dot(normal)
+			if topInset > 0 then return { Position = Vector.new(origin.X, 1.05, origin.Z), Normal = Vector.yAxis } end
+			return nil
+		end
+		longestRay = math.max(longestRay, ray.Magnitude)
+		local denominator = ray:Dot(normal)
+		if denominator >= 0 or origin.Y > 1.05 then return nil end
+		local fraction = (facePoint - origin):Dot(normal) / denominator
+		if fraction >= 0 and fraction <= 1 then return { Position = origin + ray * fraction, Normal = normal } end
+		return nil
+	end
+	local shallow = Terrain.Probe(contact, forward, {})
+	check(shallow ~= nil and Vector.new(shallow.X, 0, shallow.Z).Unit:Dot(-normal) > 0.4,
+		"A real one-degree plane intersection gets inward assistance on either side")
+	check(longestRay < 2 and topInset > 0.04,
+		"Shallow detection stays local and probes the top inward from its face")
+	wheel.AssemblyLinearVelocity = forward * 120
+	local fastEntry = Terrain.Create({ contact })
+	fastEntry.Update(forward, 60, {}, true)
+	check(wheel.WheelStepTraction.Force:Dot(-normal) > 0,
+		"Fast motion along either edge still gets inward traction instead of exhausting the forward-speed target")
+	fastEntry.Destroy()
+	wheel.AssemblyLinearVelocity = Vector.zero
+end
+do
+	services.Workspace.Raycast = function(_, origin, ray)
+		if ray.Y < -0.1 then
+			return { Position = Vector.new(origin.X, 1.05, origin.Z), Normal = Vector.yAxis }
+		end
+		if ray.Z >= 0 or origin.Y > 1.05 then return nil end
+		local fraction = (-0.94 - origin.Z) / ray.Z
+		local x = origin.X + ray.X * fraction
+		if fraction >= 0 and fraction <= 1 and x >= 0.25 and x <= 1 then
+			return { Position = origin + ray * fraction, Normal = Vector.zAxis }
+		end
+		return nil
+	end
+	check(Terrain.Probe(contact, forward, {}) ~= nil,
+		"A diagonal detects a narrow obstacle corner when straight and side rays miss its finite face")
+end
 check(probe({ Position = Vector.new(0, 0.14, -2), Normal = Vector.zAxis }, top(0.65)) == nil,
 	"Extended approach rays do not supply lift before the tire contacts the curb")
 check(probe(face, top(-0.1)) == nil, "A depression never supplies climbing force")
 check(probe(face, top(0.65, Vector.zAxis)) == nil, "A vertical top hit cannot be a supported step")
 check(probe(face, top(0.65), face) == nil, "Blocked overhead rejects climbing")
 check(probe(face, top(0.1)) ~= nil, "Support continues through the final small rise instead of cutting out early")
+do
+	for _, vertical in { 0.09, 0.5, 0.9 } do
+		check(probe({ Position = face.Position, Normal = Vector.new(0, vertical, math.sqrt(1 - vertical^2)) }, top(0.65)) ~= nil,
+			"Rounded and sloping uphill contacts are climbable from rest")
+	end
+	services.Workspace.Raycast = function(_, origin, ray)
+		if ray.Y < 0 then
+			return top(0.65, if origin.Z < -1.3 then Vector.yAxis else Vector.zAxis)
+		end
+		if origin.Y < 0.3 then return face end
+		return nil
+	end
+	check(Terrain.Probe(contact, forward, {}) ~= nil,
+		"A rounded obstacle finds its walkable arc beyond the steep near edge")
+	local ahead = { Position = Vector.new(0, 0.14, -3), Normal = Vector.zAxis }
+	wheel.AssemblyLinearVelocity = forward * 20
+	check(probe(ahead, top(1)) ~= nil, "Rolling approach starts lifting before sharp tire collision")
+	check(probe(ahead, top(3)) == nil, "Earlier detection retains the wall height limit")
+	wheel.AssemblyLinearVelocity = Vector.zero
+	check(probe(ahead, top(1)) == nil, "Stationary assistance remains local to the tire")
+end
+do
+	local chassis = make(model, "Part", "ReboundChassis")
+	chassis.AssemblyRootPart = chassis
+	wheel.AssemblyRootPart = wheel
+	make(chassis, "Attachment", "ScooterDriveAttachment")
+	local rebound = Terrain.Create({ contact }, chassis, { chassis, wheel, chassis })
+	probe(face, top(1))
+	rebound.Update(forward, 60, {}, true)
+	chassis.AssemblyLinearVelocity = Vector.new(7, 12, -8)
+	wheel.AssemblyLinearVelocity = Vector.new(8, 14, -9)
+	rebound.Stabilize()
+	near(chassis.AssemblyLinearVelocity.Y, Config.StepTraction.ChassisClimbSpeed,
+		"Post-solver curb rebound respects the vertical climb limit")
+	near(wheel.AssemblyLinearVelocity.Y - chassis.AssemblyLinearVelocity.Y, 2,
+		"Common correction preserves relative suspension velocity")
+	near(chassis.AssemblyLinearVelocity.X, 7, "Rebound correction preserves sideways momentum")
+	near(chassis.AssemblyLinearVelocity.Z, -8, "Rebound correction preserves forward momentum")
+	rebound.Update(nil, 60, {}, false)
+	chassis.AssemblyLinearVelocity = Vector.new(7, 20, -8)
+	rebound.Stabilize()
+	near(chassis.AssemblyLinearVelocity.Y, 20, "Unassisted flight is never velocity-clamped")
+	rebound.Destroy()
+	check(chassis:FindFirstChild("StepRiseDamper") == nil, "Terrain cleanup removes the chassis rebound actuator")
+	wheel.AssemblyLinearVelocity = Vector.zero
+end
+do
+ local chassis = make(model, "Part", "MomentumChassis")
+ chassis.AssemblyRootPart, wheel.AssemblyRootPart = chassis, wheel
+ make(chassis, "Attachment", "ScooterDriveAttachment")
+ local controller = Terrain.Create({ contact }, chassis, { chassis, wheel })
+ chassis.AssemblyLinearVelocity, wheel.AssemblyLinearVelocity = forward * 50, forward * 45
+ probe(face, top(1))
+ controller.Update(forward, 60, {}, true, 88)
+ chassis.AssemblyLinearVelocity, wheel.AssemblyLinearVelocity = forward * 20 + Vector.xAxis * 7, forward * 15
+ controller.Stabilize()
+ near(chassis.AssemblyLinearVelocity:Dot(forward), 50, "Verified climbing restores incoming chassis momentum instead of a slowed tire speed")
+ near(chassis.AssemblyLinearVelocity.X, 7, "Momentum recovery preserves lateral steering velocity")
+ near((chassis.AssemblyLinearVelocity-wheel.AssemblyLinearVelocity):Dot(forward), 5, "Momentum correction preserves relative suspension movement")
+ services.Workspace.Raycast = function() return nil end
+ testClock += Config.StepTraction.SettleSeconds + .01
+ chassis.AssemblyLinearVelocity = forward * 10
+ controller.Update(forward, 60, {}, true, 88, Vector.yAxis)
+ controller.Stabilize()
+ near(chassis.AssemblyLinearVelocity:Dot(forward), 10, "Cached momentum assistance expires instead of accelerating against a subsequent wall")
+ controller.Update(nil, 60, {}, false)
+ chassis.AssemblyLinearVelocity = forward * 10 + Vector.yAxis * 20
+ controller.Stabilize()
+ near(chassis.AssemblyLinearVelocity.Y, 20, "Unsupported travel keeps natural gravity and jump motion")
+ services.Workspace.Raycast = function() return nil end
+ controller.Update(nil, 60, {}, true, 88, Vector.yAxis)
+ controller.Stabilize()
+ near(chassis.AssemblyLinearVelocity.Y, Config.StepTraction.SurfaceRiseTolerance, "Supported flat-road spring rebound stays within the road-motion allowance")
+ near(chassis.AssemblyLinearVelocity:Dot(forward), 10, "Ordinary road damping never supplies extra propulsion")
+ controller.Destroy()
+ wheel.AssemblyLinearVelocity = Vector.zero
+end
+do
+	probe(face, top(1.05))
+	local _, _, verified = Terrain.Probe(contact, forward, {})
+	check(verified ~= nil, "Verified face geometry is available for the inside-corner transition")
+	wheel.CFrame = Frame.new(0, 1.25, -1.1)
+	services.Workspace.Raycast = function(_, origin, ray)
+		if ray.Y < 0 and origin.Y + ray.Y <= 1.05 then return top(1.05) end
+		return nil
+	end
+	check(Terrain.Probe(contact, forward, {}, verified) ~= nil,
+		"Contact remains verified when low face rays start inside the step during partial overlap")
+	wheel.CFrame = Frame.new(0, 1.25, 0.36)
+	check(Terrain.Probe(contact, forward, {}, verified) ~= nil,
+		"A brief spring rebound keeps already-verified nearby contact instead of restarting the climb")
+	wheel.CFrame = Frame.new(0, 1.25, -1.1)
+	local shallowNormal = Vector.new(math.cos(math.rad(1)), 0, math.sin(math.rad(1)))
+	local shallowContact = { position = point.WorldPosition - shallowNormal * 0.94, normal = shallowNormal }
+	check(Terrain.Probe(contact, Vector.new(math.sin(math.rad(2)), 0, -math.cos(math.rad(2))), {}, shallowContact) ~= nil,
+		"A tiny physical yaw perturbation does not abandon an already-verified one-degree climb")
+	check(Terrain.Probe(contact, -forward, {}, verified) == nil,
+		"Remembered contact cannot pull a retreating tire into the ledge")
+	wheel.CFrame = Frame.new(0, 1.25, -2.5)
+	check(Terrain.Probe(contact, forward, {}, verified) == nil,
+		"Remembered face support ends once the tire has cleared its local contact range")
+	wheel.CFrame = Frame.new(0, 1.25, -1.1)
+	services.Workspace.Raycast = function() return nil end
+	check(Terrain.Probe(contact, forward, {}, verified) == nil,
+		"Remembered contact never substitutes for a still-existing walkable top")
+	wheel.CFrame = Frame.new(0, 1, 0)
+	probe(face, top(1.05))
+	local overlap = Terrain.Create({ contact })
+	overlap.Update(forward, 60, {}, true)
+	wheel.CFrame = Frame.new(0, 2.25, -1.1)
+	services.Workspace.Raycast = function(_, origin, ray)
+		if ray.Y < 0 and origin.Y + ray.Y <= 1.05 then return top(1.05) end
+		return nil
+	end
+	overlap.Update(forward, 60, {}, true)
+	check(wheel.WheelStepTraction.Force.Y == 0 and wheel.WheelStepTraction.Force:Dot(forward) > 0,
+		"A tire briefly above the platform retains inward entry without continuing to lift it")
+	wheel.CFrame = Frame.new(0, 3.3, -1.1)
+	check(Terrain.Probe(contact, forward, {}, verified) == nil,
+		"Verified corner history cannot support an arbitrarily high airborne tire")
+	wheel.CFrame = Frame.new(0, 2.25, -1.1)
+	overlap.Update(nil, 60, {}, true)
+	overlap.Update(forward, 60, {}, true)
+	near(wheel.WheelStepTraction.Force.Magnitude, 0, "Input release also clears remembered inside-corner contact")
+	overlap.Destroy()
+	wheel.CFrame = Frame.new(0, 1, 0)
+end
 contact.radius = 0.714275
 wheel.CFrame = Frame.new(0, contact.radius - Config.WheelColliderClearance, 0)
 local smallFace = { Position = Vector.new(0, 0.14, -0.6), Normal = Vector.zAxis }
@@ -79,6 +252,12 @@ near(Physics.ComputeStepForce(tangent, Vector.zero, 120, 196.2).Magnitude, force
 	"Climbing support scales with the actual carried mass")
 check(Physics.ComputeStepForce(tangent, tangent * 100, 60, 196.2).Magnitude < force.Magnitude,
 	"High climbing speed reduces added support instead of repeated upward kicks")
+local fastRise = Physics.ComputeStepForce(tangent,
+	Vector.yAxis * (Config.StepTraction.GentleStep.ClimbSpeed + Config.StepTraction.GentleStep.LiftFadeSpeed), 60, 196.2, nil, 1)
+near(fastRise.Y, 0, "A fast-rising tire receives no added vertical lift through its spring")
+check(fastRise:Dot(forward) > 0, "Vertical lift taper preserves forward curb traction")
+local tallRise = Physics.ComputeStepForce(tangent, Vector.yAxis * 6.5, 60, 196.2, nil, 2.5)
+check(tallRise.Y > 0, "Tall ledges retain the existing stronger arcade support")
 near(Physics.ComputeStepForce(tangent, Vector.zero, 0, 196.2).Magnitude, 0, "Invalid support mass is inert")
 near(Physics.ComputeStepForce(tangent, Vector.zero, 60, 0).Magnitude, 0, "No gravity does not produce fake support")
 local backTangent = Vector.new(tangent.X, tangent.Y, -tangent.Z)
@@ -103,6 +282,34 @@ controller.Update(forward, 60, {}, false)
 near(actuator.Force.Magnitude, 0, "Releasing input clears grace; airborne drive cannot initiate a new climb")
 controller.Destroy()
 controller.Destroy()
+do
+local secondWheel = make(model, "MeshPart", "BackWheel")
+secondWheel.CFrame, secondWheel.AssemblyLinearVelocity = wheel.CFrame, Vector.zero
+local secondPoint = make(secondWheel, "Attachment", "WheelCenter")
+probe(face, top(0.65))
+local paired = Terrain.Create({ contact, { part = secondWheel, point = secondPoint, radius = contact.radius } })
+local entry = paired.Update(forward, 60, {}, true)
+local combined = wheel.WheelStepTraction.Force + secondWheel.WheelStepTraction.Force
+near(combined.Y, (196.2 + Config.StepTraction.GentleStep.ClimbSpeed * Config.StepTraction.GentleStep.Response) * 60,
+	"Simultaneous tire contact carries one complete gravity load and one climb response instead of doubling lift")
+check(entry ~= nil and entry:Dot(forward) > 0, "The drive controller receives the supported entry direction for grip")
+paired.Destroy()
+end
+wheel.AssemblyLinearVelocity = Vector.yAxis * 6.5
+probe(face, top(2.5))
+local tallController = Terrain.Create({ contact })
+tallController.Update(forward, 60, {}, true)
+check(wheel.WheelStepTraction.Force.Y > 0, "Tall contact selects the stronger lift profile")
+wheel.CFrame = Frame.new(0, 2.4, 0)
+probe({ Position = Vector.new(0, 1.54, -0.94), Normal = Vector.zAxis }, top(2.5))
+tallController.Update(forward, 60, {}, true)
+check(wheel.WheelStepTraction.Force.Y > 0, "A tall climb retains its profile when remaining rise becomes small")
+tallController.Update(nil, 60, {})
+tallController.Update(forward, 60, {}, true)
+near(wheel.WheelStepTraction.Force.Y, 0, "Input release clears remembered height before a new small climb")
+tallController.Destroy()
+wheel.CFrame = Frame.new(0, 1, 0)
+wheel.AssemblyLinearVelocity = Vector.zero
 controller.Update(forward, 60, {})
 check(wheel:FindFirstChild("WheelStepTraction") == nil, "Cleanup disposes actuators and repeated calls stay inert")
 

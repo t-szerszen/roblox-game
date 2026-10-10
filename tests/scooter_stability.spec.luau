@@ -35,6 +35,10 @@ check(moved.FrontSuspensionLeft.CFrame ~= beforeArm, "Moving the mount moves the
 
 local deck = corrected.DeckCollider
 check(deck.CanCollide and deck.Massless and not deck.Anchored, "Deck retains a massless physical road contact after tipping")
+near(deck.CustomPhysicalProperties[2], Config.DeckColliderFriction,
+	"The underside uses skid friction so the base scooter's acceleration can move it off a support")
+near(corrected.FrontWheelCollider.CustomPhysicalProperties[2], Config.GroundColliderFriction,
+	"Underside skid tuning preserves tire contact friction")
 check(deck.DeckColliderWeld.Part0 == corrected.FootRest, "Deck road contact follows existing FootRest assembly")
 check(deck.FrontWheelNoCollision.Part0 == deck and deck.FrontWheelNoCollision.Part1 == corrected.FrontWheelCollider,
 	"Deck cannot collide with its own front suspension tire")
@@ -68,11 +72,14 @@ function instanceMethods:PivotTo(frame)
 	local transform = frame * self.PrimaryPart.CFrame:Inverse()
 	for _, part in self:GetDescendants() do if part:IsA("BasePart") then part.CFrame = transform * part.CFrame end end
 end
+enumMock.AlignType = { AllAxes = "AllAxes", PrimaryAxisParallel = "PrimaryAxisParallel" }
 enumMock.OrientationAlignmentMode = { OneAttachment = "OneAttachment" }
 enumMock.ActuatorRelativeTo = { World = "World" }
 enumMock.KeyCode = { E = "E" }
 enumMock.PartType.Block = "Block"
 baseEnvironment.ColorSequence = { new = function(value) return value end }
+baseEnvironment.NumberSequence = { new = function(first, last) return { first, last } end }
+enumMock.NormalId = { Back = "Back" }
 moduleCache["ServerScriptService/Combat/CombatService"] = { StunPlayer = function() end }
 local physicsModule = make(sharedScooterFolder, "ModuleScript", "ScooterPhysics")
 physicsModule._values._path = "ReplicatedStorage/Shared/Scooter/ScooterPhysics"
@@ -87,6 +94,7 @@ services.Workspace.Raycast = function(_, origin)
 	return { Normal = Vector.yAxis, Position = Vector.new(origin.X, 0, origin.Z), Distance = 1, Instance = spawn }
 end
 function services.Workspace:GetServerTimeNow() return testClock end
+function services.Workspace:Blockcast() return nil end
 local template = services.ServerStorage.ScooterModels.scooter
 local frontLamp = make(corrected, "MeshPart", "FrontLight")
 frontLamp.Massless = true
@@ -99,8 +107,25 @@ corrected.Parent = preservedParent
 local player = makePlayer(8080)
 player.CharacterRemoving = signal()
 player.Parent = playersService
-local scooter = Server.SpawnForPlayer(player)
+local scooter
+do
+	local spawnCharacter = make(nil, "Model", "SpawnRider")
+	local spawnRoot = make(spawnCharacter, "Part", "HumanoidRootPart")
+	local distantSpawn = make(services.Workspace, "SpawnLocation", "FartherSpawn")
+	distantSpawn.Enabled, distantSpawn.CFrame = true, Frame.new(1000, 0, 0)
+	spawnRoot.CFrame = distantSpawn.CFrame
+	player.Character = spawnCharacter
+	scooter = Server.SpawnForPlayer(player)
+	check((scooter.Root.Position - distantSpawn.Position).Magnitude < 15,
+		"With multiple enabled spawns, the scooter appears beside the player's actual spawn")
+	distantSpawn:Destroy()
+end
 local root, upright = scooter.Root, scooter.Root.ScooterUpright
+-- The service double has no solver; put its flat road at actual tire contact height.
+local fixtureGroundY = scooter.FrontWheel.WheelCenter.WorldPosition.Y - scooter:GetAttribute("ResolvedFrontWheelRadius")
+services.Workspace.Raycast = function(_, origin)
+ return { Normal = Vector.yAxis, Position = Vector.new(origin.X, fixtureGroundY, origin.Z), Distance = 1, Instance = spawn }
+end
 check(upright.CFrame.LookVector:Dot(root.CFrame.LookVector) > 0.999, "Spawn balance target initializes to actual yaw")
 check(upright.MaxTorque > Config.Models[Config.DefaultModel].turnTorque * root.AssemblyMass,
 	"Spawn balance includes separate massive hinge assemblies")
@@ -125,6 +150,84 @@ end
 local function tick(speed)
 	root.AssemblyLinearVelocity = root.CFrame.LookVector * speed
 	services.RunService.PreSimulation:Fire(0.1)
+end
+
+do
+	local originalPose, originalRaycast = root.CFrame, services.Workspace.Raycast
+	controls(true, false, 0, false)
+	tick(20)
+	root.CFrame = Frame.new(root.Position) * Frame.Angles(0, math.rad(0.5), 0) * originalPose.Rotation
+	controls(true, false, 0, false)
+	tick(20)
+	check(root.ScooterRoadBalance.Enabled and root.ScooterRoadBalance.RigidityEnabled
+		and root.ScooterRoadBalance.AlignType == enumMock.AlignType.PrimaryAxisParallel,
+		"Normal road contact restricts collision-driven tilt through the up axis only")
+	check(root.ScooterRoadBalance.Attachment0.CFrame.RightVector:Dot(Vector.yAxis)>0.999,
+		"Road balance targets chassis up instead of steering heading")
+	check(root:FindFirstChild("ScooterArcadeYaw") == nil, "Previous steering does not add a separate yaw actuator")
+	check(upright.CFrame.LookVector:Dot(originalPose.LookVector) > 0.999,
+		"Neutral traction retains the rider heading needed for shallow curb entry")
+	check(upright.AlignType == enumMock.AlignType.AllAxes,
+		"Previous balance controller retains full orientation control")
+	services.Workspace.Raycast = function() return nil end
+	tick(20)
+	check(upright.AlignType == enumMock.AlignType.AllAxes, "Unsupported flight retains full orientation balance")
+	check(not root.ScooterRoadBalance.Enabled, "Road tilt restriction disengages during unsupported flight")
+	root.CFrame, services.Workspace.Raycast = originalPose, originalRaycast
+	controls(true, false, 0, false)
+	tick(20)
+end
+
+do
+ local saved = services.Workspace.Raycast
+ local front = scooter.VirtualFrontAxle.AxlePivot.WorldPosition
+ local back = scooter.VirtualBackAxle.AxlePivot.WorldPosition
+ local axis = (front-back).Unit
+ local midpoint = (front+back)*.5
+ services.Workspace.Raycast = function(_, origin)
+  local height = fixtureGroundY - (if (origin-midpoint):Dot(axis)>0 then 1 else 0)
+  return { Normal=Vector.yAxis, Position=Vector.new(origin.X,height,origin.Z), Instance=spawn }
+ end
+ controls(false,false,0,false)
+ for _=1,20 do tick(0) end
+ check(not scooter:GetAttribute("FrontGrounded") and scooter:GetAttribute("RearGrounded"),
+  "A lower road informs pitch without pretending an airborne front wheel has contact")
+ check(upright.CFrame.UpVector:Dot(axis)>0.05,
+  "Chassis tilts toward lower front ground rather than staying flat on the rear contact")
+ services.Workspace.Raycast = function(_,origin)
+  return {Normal=Vector.yAxis,Position=Vector.new(origin.X,fixtureGroundY-10,origin.Z),Instance=spawn}
+ end
+ tick(0)
+ check(not scooter:GetAttribute("FrontGrounded") and not scooter:GetAttribute("RearGrounded"),
+  "Distant ground cannot authorize driving while the scooter is airborne")
+ services.Workspace.Raycast=saved
+ for _=1,20 do tick(0) end
+end
+
+do
+ local policeStart=testCount
+ controls(true,false,0,false);tick(80)
+ local riding=Server.GetRidingState(player)
+ check(riding and riding.model==scooter,"Police reads the actual owned, occupied server record")
+ near(riding.speedKmh,50,"Police uses existing precise 1.6 stud/s per km/h conversion")
+ check(not riding.wheelie,"Grounded normal riding is not wheelie")
+ local owner,other={},{}
+ check(Server.LockMount(player,owner),"Server detention can acquire a mount lock")
+ check(not Server.LockMount(player,other),"Mount lock has one owner")
+ check(Server.GetRidingState(player)==nil,"Locked rider cannot supply fresh violation state")
+ check(not Server.RequestSpawnForPlayer(player,Config.DefaultModel),"Detained player cannot replace the scooter")
+ Server.ReleaseMount(player,other)
+ check(not Server.LockMount(player,other),"Wrong owner cannot release a mount lock")
+ Server.ReleaseMount(player,owner)
+ check(Server.LockMount(player,other),"Authorized release permits reuse")
+ Server.ReleaseMount(player,other)
+ local ownedWeld=make(scooter.DriverSeat,"Weld","SeatWeld")
+ check(Server.DismountForPlayer(player),"Authorized server dismount uses existing scooter lifecycle")
+ check(ownedWeld.destroyed and humanoid.Sit==false,"Only owned seat weld is removed")
+ check(not scooter.destroyed and scooter.VirtualFrontAxle.HingeConstraint.Parent~=nil,"Dismount preserves the articulated scooter")
+ check(not Server.DismountForPlayer(makePlayer(8081)),"A player without a scooter cannot force a dismount")
+ tick(0)
+ print(string.format("PASS: %d police/scooter integration assertions",testCount-policeStart))
 end
 
 do
@@ -372,9 +475,50 @@ services.Workspace.Raycast = function() return nil end
 tick(20)
 check(math.abs(upright.CFrame.LookVector:Dot(root.CFrame.RightVector)) < 1e-6,
 	"A turned Servo cannot generate chassis yaw without wheel contact")
+near(root.ScooterDriveForce.Force.Magnitude, 0, "Unsupported airborne input still supplies no drive force")
+do
+local deckBottom = scooter.DeckCollider.CFrame:PointToWorldSpace(Vector.new(0, -scooter.DeckCollider.Size.Y * 0.5, 0))
+local originalBlockcast = services.Workspace.Blockcast
+services.Workspace.Blockcast = function(_, frame, size)
+	check(size.X == scooter.DeckCollider.Size.X and size.Z == scooter.DeckCollider.Size.Z,
+		"Underside support covers the full deck footprint, including contact between point samples")
+	return { Normal = Vector.yAxis, Position = deckBottom, Instance = spawn }
+end
+controls(true, false, 0, false)
+tick(0)
+check(not scooter:GetAttribute("FrontGrounded") and not scooter:GetAttribute("RearGrounded")
+	and scooter:GetAttribute("DeckGrounded") and scooter:GetAttribute("DriveState") == "Forward",
+	"Physical underside support keeps the grounded drive state with both tires off the road")
+check(root.ScooterDriveForce.Force:Dot(root.CFrame.LookVector) > 0, "W can drive off an underside obstacle")
+controls(false, true, 0, false)
+tick(0)
+check(root.ScooterDriveForce.Force:Dot(root.CFrame.LookVector) < 0
+	and scooter:GetAttribute("DriveState") == "Reverse", "S can reverse off the same underside obstacle")
+services.Workspace.Blockcast = originalBlockcast
+tick(0)
+check(not scooter:GetAttribute("DeckGrounded") and scooter:GetAttribute("DriveState") == "Airborne",
+	"Losing underside support clears grounded drive without retained air thrust")
+near(root.ScooterDriveForce.Force.Magnitude, 0, "Reverse force clears immediately after losing all physical support")
+end
 services.Workspace.Raycast = contactRaycast
 controls(false, false, 0, false)
 tick(0)
+do
+	local terrain = loadModule("ServerScriptService/Scooter/ScooterTerrain")
+	local oldProbe = terrain.Probe
+	terrain.Probe = function(_, direction)
+		return (direction + root.CFrame.RightVector * 0.6 + Vector.yAxis * 0.5).Unit, 1
+	end
+	controls(true, false, 0, false)
+	tick(0)
+	check(root.ScooterDriveForce.Force:Dot(root.CFrame.RightVector) > 0,
+		"Drive grip cooperates with supported sideways curb entry")
+	check(upright.CFrame.LookVector:Dot(root.CFrame.LookVector) > 0.999,
+		"Curb entry preserves rider-controlled chassis heading instead of automatic yaw into the face")
+	terrain.Probe = oldProbe
+	controls(false, false, 0, false)
+	tick(0)
+end
 scooter.DriverSeat.Occupant = nil
 
 local incompatibleRest = corrected:Clone()

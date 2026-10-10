@@ -51,7 +51,13 @@ function DevScooterInstall.Prepare(draft: Model, configuration: typeof(Config)?)
 		end
 		extract(model, "Footrest", "RearFootRest")
 		for _, entry in BuildConfig.ExtraComponents do
-			if model:FindFirstChild(entry.Name) then extract(model, entry.Name, entry.Name) end
+			local component = model:FindFirstChild(entry.Name)
+			if component then
+				local count = 0
+				for _, item in component:GetDescendants() do if item:IsA("BasePart") then count += 1 end end
+				-- Keep compound decorations together; extracting one part would discard the others.
+				if component:IsA("BasePart") or count == 1 then extract(model, entry.Name, entry.Name) end
+			end
 		end
 		for _, endName in { "Front", "Back" } do
 			for _, side in { "Left", "Right" } do

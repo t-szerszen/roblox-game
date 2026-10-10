@@ -62,6 +62,23 @@ function ScooterWorkflow.Assemble(): Model
 	return result :: Model
 end
 
+function ScooterWorkflow.PreviewLargeWheels(): Model
+	assert(RunService:IsStudio() and not RunService:IsRunning(), "Run ScooterWorkflow in Studio Edit mode")
+	local source = assert(ServerScriptService:FindFirstChild("Scooter"), "Sync Rojo first")
+	local reload = Instance.new("Folder")
+	local ok, result = pcall(function(): Model
+		for _, name in { "DevScooterBuildConfig", "DevScooterBuild", "DevScooterRemodelConfig", "ScooterCollision",
+			"ScooterSuspension", "ScooterRigGeometry", "ScooterRig", "DevScooterInstall", "DevScooterRemodel" } do
+			cloneModule(source, name, reload)
+		end
+		local module = assert(reload:FindFirstChild("DevScooterRemodel")) :: ModuleScript
+		return (require(module) :: typeof(require(script.Parent.DevScooterRemodel))).Preview()
+	end)
+	reload:Destroy()
+	if not ok then error(tostring(result), 2) end
+	return result :: Model
+end
+
 function ScooterWorkflow.InstallNewModel(draft: Model?): Model
 	assert(RunService:IsStudio() and not RunService:IsRunning(), "Run ScooterWorkflow in Studio Edit mode")
 	local source = assert(ServerScriptService:FindFirstChild("Scooter"), "Sync Rojo first")

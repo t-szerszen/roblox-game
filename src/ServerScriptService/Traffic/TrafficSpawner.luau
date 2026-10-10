@@ -15,7 +15,8 @@ end
 function Spawner.Spawn(id: number, network: Types.Network, template: Model, parent: Instance,
 	sensor: Sensors.Sensor, cars: {Controller.Vehicle}, players: {Vector3}, random: Random): Controller.Vehicle?
 	local target=math.min(Config.MaxVehicles,math.floor(Config.TargetVehicles*Config.DensityMultiplier))
-	if #cars>=target or #players==0 or #network.spawns==0 then return nil end
+	local civilianCount=0;for _,car in cars do if car.role~="Police" then civilianCount+=1 end end
+	if civilianCount>=target or #players==0 or #network.spawns==0 then return nil end
 	-- Shuffle a bounded subset; no separate fleet is created for each player.
 	local pool=table.clone(network.spawns)
 	for _=1,math.min(Config.MaxSpawnAttempts,#pool) do
