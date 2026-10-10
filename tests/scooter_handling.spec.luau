@@ -12,7 +12,7 @@ near(Physics.GetYawRate(-1, 0, 4, true), Config.BurnoutTurnRate, "Burnout permit
 near(Physics.GetYawRate(0, 0, 4, true), 0, "Burnout does not yaw without steering")
 for _, speed in { 0.5, 1, 5 } do
 	local yaw = Physics.GetYawRate(1, speed, 4)
-	near(speed / math.abs(yaw), 4 / math.tan(Config.MaxHandlebarAngle), "Slow steering retains a finite geometric radius")
+	near(speed / math.abs(yaw), 4 / (math.tan(Config.MaxHandlebarAngle) * Config.LowSpeedTurnBoost), "Slow steering retains a finite geometric radius")
 end
 near(Physics.GetYawRate(1, 1, 8), Physics.GetYawRate(1, 1, 4) / 2, "Actual longer wheelbase widens the turn")
 check(math.abs(Physics.GetYawRate(1, 100, 4)) <= Config.TurnRate, "Fast yaw retains its configured bound")
@@ -25,6 +25,31 @@ for _ = 1, 120 do
 end
 check(math.acos(math.clamp(fwd:Dot(held), -1, 1)) <= Config.MaxHeadingLeadAngle + 1e-6,
 	"Blocked chassis cannot wind up several revolutions of desired heading")
+do
+ local heldPartial = fwd
+ for _ = 1, 240 do
+  heldPartial = Physics.ClampForwardLead(fwd, Physics.AdvanceForward(heldPartial, 0.2, 88, 1 / 60, 4),
+   Physics.GetYawRate(0.2, 88, 4), 0.2)
+ end
+ near(math.acos(math.clamp(fwd:Dot(heldPartial), -1, 1)), Config.MaxHeadingLeadAngle * 0.2,
+  "Sustained fast partial input cannot accumulate full steering lead")
+ local released = Physics.ClampForwardLead(fwd, heldPartial, 0, 0)
+ near(released:Dot(fwd), 1, "Released input immediately clears accumulated steering lead")
+end
+do
+ local settings = Config.HeldSteering
+ local held = 0
+ for _ = 1, 120 do held = Physics.AdvanceSteeringHold(held, 1, 1 / 60) end
+ near(held, settings.Delay + settings.RampTime, "Held steering time is bounded")
+ local full = Physics.ClampForwardLead(fwd, -fwd, Config.TurnRate, 1, held)
+ near(math.acos(fwd:Dot(full)), settings.MaxHeadingLeadAngle, "Sustained input permits a tighter bounded turn")
+ local tap = Physics.ClampForwardLead(fwd, -fwd, Config.TurnRate, 1, settings.Delay - .01)
+ near(math.acos(fwd:Dot(tap)), Config.MaxHeadingLeadAngle, "Brief steering taps retain the previous heading lead")
+ near(Physics.AdvanceSteeringHold(held, 0, 1 / 60), 0, "Release clears held-turn boost immediately")
+ near(Physics.AdvanceSteeringHold(held, -1, .05), -.05, "Reversing steering starts a fresh gentle turn")
+ local partial = Physics.ClampForwardLead(fwd, -fwd, Config.TurnRate, .2, held)
+ near(math.acos(fwd:Dot(partial)), settings.MaxHeadingLeadAngle * .2, "Held boost preserves partial-input proportionality")
+end
 local reducedTarget = Physics.GetServoSteering(1, false, false, -90, 90)
 near(math.abs(reducedTarget), math.deg(Config.MaxHandlebarAngle), "Low-speed steering uses the configured maneuvering angle")
 check(math.abs(reducedTarget) < 55, "Maneuvering angle remains below 55 degrees")
@@ -46,6 +71,21 @@ check(tuning.maxSpeed * Config.StudsPerKmH / tuning.acceleration > 3,
 	"SPORT acceleration takes over three seconds to reach the flat-ground cap")
 check(Config.GetDriveModeAcceleration(tuning.acceleration, "ECO") < tuning.acceleration,
 	"ECO acceleration is gentler than SPORT")
+do
+ local speed = Config.SteeringFadeEndKmh * Config.StudsPerKmH
+ local turn = Physics.GetEffectiveSteering(0.2, speed)
+ near(turn, 0.11, "Fast partial steering retains the previous 55 percent input scale")
+ near(Physics.GetYawRate(turn, speed, 100), -speed * math.tan(turn * Config.MaxHandlebarAngle) / 100,
+  "Maneuvering boost disappears at high speed")
+ local drive = {velocity = fwd * 60, forward = fwd, groundUp = Vector.yAxis, gravity = 196.2,
+  mass = 10, maxSpeed = 88, acceleration = 25, throttleHeld = true, brakeHeld = false,
+  burnout = false, grounded = true, fallen = false, deltaTime = 1 / 60}
+ near(Physics.ComputeDriveForce(drive).X, 0, "Aligned travel does not receive extra cornering force")
+ drive.velocity += Vector.xAxis * 30
+ near(Physics.ComputeDriveForce(drive).X / drive.mass, -100, "Sideways slip uses the previous bounded grip")
+ drive.grounded = false
+ near(Physics.ComputeDriveForce(drive).Magnitude, 0, "Airborne input cannot apply drive or grip force")
+end
 local velocity = Vector.zero
 for _ = 1, 240 do
 	local force = Physics.ComputeDriveForce({ velocity = velocity, forward = fwd, groundUp = Vector.yAxis,

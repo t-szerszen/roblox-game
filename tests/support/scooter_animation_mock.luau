@@ -30,9 +30,10 @@ function Frame.Angles(x, y, z)
 	return Frame.fromAxisAngle(Vector.xAxis, x) * Frame.fromAxisAngle(Vector.yAxis, y)
 		* Frame.fromAxisAngle(Vector.zAxis, z)
 end
-function Frame.lookAt(origin, target)
-	local direction = target - origin
-	return Frame.Angles(0, math.atan2(-direction.X, -direction.Z), 0) + origin
+function Frame.lookAt(origin, target, up)
+	local direction = (target - origin).Unit
+	local right = direction:Cross(up or Vector.yAxis).Unit
+	return Frame.fromMatrix(origin, right, right:Cross(direction).Unit)
 end
 function Frame.fromMatrix(origin, right, up)
 	local back = right:Cross(up)
@@ -85,7 +86,7 @@ function playersService:GetPlayerFromCharacter(character)
 	for _, player in players do if player.Character == character then return player end end
 	return nil
 end
-services.RunService = { PreAnimation = signal(), PreSimulation = signal() }
+services.RunService = { PreAnimation = signal(), PreSimulation = signal(), PostSimulation = signal() }
 local originalNew = InstanceMock.new
 function InstanceMock.new(className)
 	local instance = originalNew(className)
@@ -113,6 +114,8 @@ function InstanceMock.new(className)
 	values.Color = Color.new(1, 1, 1)
 	values.EmissiveStrength = 0
 	values.EmissiveTint = Color.new(1, 1, 1)
+	values.ChildAdded = signal()
+	values.ChildRemoved = signal()
 	values.Destroying = signal()
 	values.AncestryChanged = signal()
 	values.Died = signal()
@@ -251,5 +254,6 @@ end }
 baseEnvironment.PhysicalProperties = { new = function(...) return { ... } end }
 services.Workspace = InstanceMock.new("Workspace")
 function services.Workspace:Raycast() return nil end
+function services.Workspace:GetServerTimeNow() return testClock end
 
 function vectorMethods:Lerp(other, alpha) return self + (other - self) * alpha end

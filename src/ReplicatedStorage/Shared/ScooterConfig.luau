@@ -120,6 +120,9 @@ ScooterConfig.SteeringFadeStartKmh = 25
 ScooterConfig.SteeringFadeEndKmh = 80
 ScooterConfig.HighSpeedSteeringScale = 0.55
 ScooterConfig.LateralGripDeceleration = 100
+-- Build tighter held turns gradually; a brief steering tap keeps its original lead.
+ScooterConfig.HeldSteering = { Delay = 0.18, RampTime = 0.45, MaxHeadingLeadAngle = math.rad(20) }
+ScooterConfig.LowSpeedTurnBoost = 1.2
 ScooterConfig.HillAssistGravityScale = 0.85
 ScooterConfig.WheelieMinSpeedKmh = 10
 ScooterConfig.WheelieMinSpeed = ScooterConfig.WheelieMinSpeedKmh * ScooterConfig.StudsPerKmH
@@ -135,6 +138,12 @@ ScooterConfig.WheelieLowSpeedDropRate = math.rad(80)
 ScooterConfig.WheelieStallDropRate = math.rad(260)
 ScooterConfig.WheelieFallAngle = math.rad(68)
 ScooterConfig.WheelieRecoveryDelay = 1.5
+ScooterConfig.WheelieSparks = {
+	StartPitch = math.rad(48), StopPitch = math.rad(43), MinSpeed = 8,
+	ContactDistance = 0.65, Rate = 85,
+	Size = 0.36, Lifetime = NumberRange.new(0.2, 0.4), Speed = NumberRange.new(10, 18),
+	Texture = "rbxasset://textures/particles/sparkles_main.dds",
+}
 ScooterConfig.CrashStunDuration = 2
 ScooterConfig.CrashEjectUpVelocity = 7
 ScooterConfig.CrashEjectSideVelocity = 9
@@ -172,12 +181,12 @@ ScooterConfig.RigValidation = {
 	MinimumSteeringAxisUpDot = 0.3,
 }
 ScooterConfig.Suspension = {
-	Revision = 1,
+	Revision = 3,
 	ShowConstraints = false,
 	ReferenceRiderMass = 20,
 	PreloadSupportFraction = 0.8,
-	DampingRatio = 0.8,
-	ForceHeadroom = 4,
+	DampingRatio = 1.4,
+	ForceHeadroom = 1.1,
 	MinimumLeverageRatio = 0.02,
 	SampleStepDegrees = 0.5,
 	LimitMarginDegrees = 1,
@@ -191,6 +200,8 @@ ScooterConfig.Suspension = {
 	},
 }
 ScooterConfig.GroundProbeTolerance = 0.45
+ScooterConfig.DeckSupportTolerance = 0.18
+ScooterConfig.DeckSupportProbeThickness = 0.05
 ScooterConfig.SuspensionProbeLift = 1.25
 ScooterConfig.GroundNormalSmoothSpeed = 14
 ScooterConfig.StepProbeDistance = 1.8
@@ -200,11 +211,26 @@ ScooterConfig.MaxStepHeight = 2.5
 ScooterConfig.StepTraction = {
 	-- Arcade curb assistance: a contacted ledge can be taller than the tire.
 	MaxRadiusRatio = 3.5, ContactPadding = 0.18, MinForwardTangentRatio = 0.15,
-	MinFaceOpposition = 0.12,
+	MinFaceOpposition = math.sin(math.rad(0.5)),
+	FaceEntryBias = 0.6,
+	RetainedContactPadding = 0.45,
+	ContactTurnTolerance = math.sin(math.rad(3)),
+	EntryNormalSpeed = 3,
+	EntryNormalResponse = 14,
+	EntryNormalAcceleration = 60,
+	EntryNormalFadeOpposition = 0.5,
 	ClimbSpeed = 5.5, Response = 16, Acceleration = 100, SupportMassFraction = 0.85,
+	PairedSupportMassFraction = 1,
+	ChassisRiseDamping = 35, ChassisRiseDeceleration = 600,
+	ChassisClimbSpeed = 3.5,
+	SurfaceRiseTolerance = 0.05,
+	ApproachSeconds = 0.12, MaxApproachDistance = 5,
+	SettleSeconds = 0.25, SettleProbeDistance = 0.65,
+	RampMinNormalY = 0.08, RampMaxNormalY = 0.98,
+	GentleStep = { MaxRise = 1.25, ClimbSpeed = 3.5, Response = 12, Acceleration = 60, LiftFadeSpeed = 3 },
 	AirContactGraceSeconds = 1.25,
 	HeightTolerance = 0.06, -- Solver penetration must not reject a ledge at the configured limit.
-	ForwardAcceleration = 80, ForwardResponse = 8, MinimumForwardSpeed = 8, SpeedRetention = 0.9,
+	ForwardAcceleration = 80, ForwardResponse = 8, MinimumForwardSpeed = 8, SpeedRetention = 1,
 	MaxChassisPitch = math.rad(20),
 }
 ScooterConfig.ParkingLinearDamping = 4.5
@@ -213,6 +239,7 @@ ScooterConfig.ParkingGroundProbeDistance = 4
 ScooterConfig.RidePromptDistance = 8
 ScooterConfig.WheelFriction = 0.03
 ScooterConfig.GroundColliderFriction = 0.15
+ScooterConfig.DeckColliderFriction = 0.02
 ScooterConfig.TrickCooldown = 0.15
 ScooterConfig.WheelieCooldown = 0.3
 ScooterConfig.GroundMinNormalY = 0.35
@@ -228,49 +255,27 @@ ScooterConfig.BurnoutSmokeRate = 32
 ScooterConfig.BurnoutSmokeLifetime = NumberRange.new(0.6, 0.9)
 ScooterConfig.NeonBrightness = 1.5
 ScooterConfig.NeonRange = 7
-ScooterConfig.RiderPose = {
-	BlendSpeed = 9,
-	FootPlantClearance = 0.01,
-	FootTargetSink = 0.08,
-	WheelieRearFootShift = 0.15,
-	BalanceFootOffset = Vector3.new(-0.6, 0.35, 0),
-	BalanceFootSwing = Vector3.new(0.12, 0.35, 1.6),
-	BalanceFootFrequency = 3.8,
-	RightFootForwardShift = 0.55,
-	RiderForwardShift = 0.65,
-	RiderCrouch = 0.35,
-	ReferenceStandingHeight = 4.67,
-	WaistForwardPitch = math.rad(20),
-	WaistForwardShift = 0.15,
-	WaistSteeringYawFactor = 1,
-	WaistSteeringForwardShift = 0.45,
-	IdleFootSideOffset = 1.35,
-	IdleScooterLean = math.rad(6),
-	IdleProbeLift = 3,
-	IdleProbeDepth = 8,
-	IdleProbeInterval = 0.08,
-	ElbowBlendSpeed = 6,
-	MaxBodyLean = math.rad(22),
-	LeanFullSpeed = 24,
-	LateralLeanFullSpeed = 10,
-	LateralLeanWeight = 0.25,
-	RootLeanShare = 0.3,
-	ElbowOutwardOffset = 1.2,
-	ElbowForwardOffset = 0.6,
-	ElbowLift = 0.25,
-	GripHalfWidth = 0.58,
+ScooterConfig.RiderGripHalfWidth = 0.58
+ScooterConfig.RiderDeckClearance = 0.01
+-- Calibrated against the 8-stud R15 rider and the installed FootRest/grips.
+ScooterConfig.BaseRidingPose = {
+	CrouchHipHeightFraction = 0.045,
+	RootForwardOffset = 0,
+	TorsoLean = math.rad(5),
+	HandPalmPitch = math.rad(-90),
+	FootLateralOffset = 0.10,
+	DeckMargin = 0.015,
+	ElbowPoleWidth = 2.0,
+	ElbowPoleHeight = 5.5,
+	ElbowPoleForwardOffset = 0.6,
+	FrontFootPitch = math.rad(8),
+	RearFootPitch = math.rad(-8),
 }
-ScooterConfig.FirstPersonArms = { Enabled = true, HeadDistance = 1.5 }
-ScooterConfig.RiderAnimations = {
-	-- Supply R15 clips that key the legs/pelvis and leave the arms to hand IK.
-	IdleFootAnim = "",
-	WheelieBalanceAnim = "",
-	FadeTime = 0.25,
-	Weight = 1,
-	PlaybackSpeed = 1,
-	IdleEnterSpeedKmh = 0.5,
-	IdleExitSpeedKmh = 1.5,
-}
+ScooterConfig.IdleLeanSpeedKmh = 0.5
+ScooterConfig.IdleScooterLean = math.rad(6)
+ScooterConfig.IdleProbeLift = 3
+ScooterConfig.IdleProbeDepth = 8
+ScooterConfig.IdleProbeInterval = 0.08
 ScooterConfig.ScooterFolderName = "Scooters"
 ScooterConfig.RemoteFolderName = "ScooterRemotes"
 

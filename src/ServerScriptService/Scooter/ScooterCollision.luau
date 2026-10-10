@@ -54,7 +54,7 @@ local function contact(model: Model, wheel: MeshPart, name: string, radius: numb
 	collider.CanTouch = false
 	collider.CanQuery = false
 	collider.Massless = true
-	collider.CustomPhysicalProperties = PhysicalProperties.new(0.7, configuration.GroundColliderFriction, 0, 100, 10)
+	collider.CustomPhysicalProperties = PhysicalProperties.new(0.7, configuration.GroundColliderFriction, 0, 100, 100)
 	collider.Parent = model
 	weld.Name = "WheelColliderWeld"
 	weld.Part0, weld.Part1 = wheel, collider
@@ -86,7 +86,8 @@ local function deckContact(model: Model, configuration: typeof(Config))
 	collider.CanTouch = false
 	collider.CanQuery = false
 	collider.Massless = true
-	collider.CustomPhysicalProperties = PhysicalProperties.new(0.7, configuration.GroundColliderFriction, 0, 100, 10)
+	-- The underside is a skid, so resting on a curb cannot lock out normal drive.
+	collider.CustomPhysicalProperties = PhysicalProperties.new(0.7, configuration.DeckColliderFriction, 0, 100, 100)
 	collider.Parent = model
 	weld.Name = "DeckColliderWeld"
 	weld.Part0, weld.Part1 = deck, collider

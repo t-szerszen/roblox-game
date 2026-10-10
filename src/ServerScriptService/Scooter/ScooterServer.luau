@@ -7,7 +7,6 @@ local ServerStorage = game:GetService("ServerStorage")
 local Workspace = game:GetService("Workspace")
 
 local ScooterConfig = require(ReplicatedStorage.Shared.Scooter.ScooterConfig)
-local CharacterConfig = require(ReplicatedStorage.Shared.CharacterConfig)
 local ScooterPhysics = require(ReplicatedStorage.Shared.Scooter.ScooterPhysics)
 local ScooterInput = require(script.Parent.ScooterInput)
 local ScooterRig = require(script.Parent.ScooterRig)
@@ -15,6 +14,7 @@ local ScooterCollision = require(script.Parent.ScooterCollision)
 local ScooterBrakeLight = require(script.Parent.ScooterBrakeLight)
 local ScooterHeadlight = require(script.Parent.ScooterHeadlight)
 local ScooterTerrain = require(script.Parent.ScooterTerrain)
+local ScooterScrape = require(script.Parent.ScooterScrape)
 local ScooterImpact = require(script.Parent.ScooterImpact)
 local ShopConfig = require(ReplicatedStorage.Shared.Shop.ShopConfig)
 local CombatService = require(script.Parent.Parent.Combat.CombatService)
@@ -25,8 +25,10 @@ type ScooterRecord = {
 	owner: Player,
 	seat: VehicleSeat,
 	root: BasePart,
+	deckCollider: BasePart,
 	smoke: ParticleEmitter,
 	upright: AlignOrientation,
+	roadBalance: AlignOrientation,
 	input: ScooterInput.State,
 	tuning: ScooterConfig.Tuning,
 	driveMode: string,
@@ -44,6 +46,7 @@ type ScooterRecord = {
 	brakeLight: ScooterBrakeLight.Controller?,
 	headlight: ScooterHeadlight.Controller?,
 	terrain: ScooterTerrain.Controller,
+	scrape: ScooterScrape.Controller,
 	impact: ScooterImpact.Tracker,
 	additionalMass: number,
 	connections: { Connection },
@@ -51,6 +54,7 @@ type ScooterRecord = {
 	lastWheelieAt: number,
 	throttle: number,
 	steering: number,
+	steeringHold: number,
 	steeringLean: number,
 	wheelieActive: boolean,
 	desiredForward: Vector3,
@@ -70,6 +74,7 @@ type ScooterRecord = {
 	cleaning: boolean,
 }
 
+local ROAD_UP_FRAME = CFrame.Angles(0, 0, math.pi / 2)
 local ScooterServer = {}
 
 local recordsByPlayer: { [Player]: ScooterRecord } = {}
@@ -173,6 +178,7 @@ local function createScooter(owner: Player, modelName: string, templateName: str
 	model:SetAttribute("ThrottleInput", 0)
 	model:SetAttribute("FrontGrounded", false)
 	model:SetAttribute("RearGrounded", false)
+	model:SetAttribute("DeckGrounded", false)
 	model:SetAttribute("ForwardSpeed", 0)
 	model:SetAttribute("DriveState", "Idle")
 	return model
@@ -207,15 +213,11 @@ local function alignRiderToDeck(record: ScooterRecord, humanoid: Humanoid)
 	local character = humanoid.Parent
 	local humanoidRoot = if character then character:FindFirstChild("HumanoidRootPart") else nil
 	local riderTarget = findAttachment(record.model, "RiderRootAttachment")
-	local leftFoot = findAttachment(record.model, "LeftFootPlant")
-	local rightFoot = findAttachment(record.model, "RightFootPlant")
 	local seatWeld = record.seat:FindFirstChild("SeatWeld")
 	if
 		not humanoidRoot
 		or not humanoidRoot:IsA("BasePart")
 		or not riderTarget
-		or not leftFoot
-		or not rightFoot
 		or not seatWeld
 		or not seatWeld:IsA("Weld")
 	then
@@ -223,7 +225,6 @@ local function alignRiderToDeck(record: ScooterRecord, humanoid: Humanoid)
 	end
 
 	local root = record.root
-	local footCenter = (leftFoot.WorldPosition + rightFoot.WorldPosition) * 0.5
 	local standingHeight: number
 	if humanoid.RigType == Enum.HumanoidRigType.R6 then
 		local torso = if character then character:FindFirstChild("Torso") else nil
@@ -234,14 +235,13 @@ local function alignRiderToDeck(record: ScooterRecord, humanoid: Humanoid)
 	else
 		standingHeight = humanoid.HipHeight + humanoidRoot.Size.Y * 0.5
 	end
-	local legAdded = character and character:GetAttribute(CharacterConfig.LengthAttribute)
-	if typeof(legAdded) == "number" then standingHeight -= legAdded end
-	local desiredRootPosition = Vector3.new(riderTarget.WorldPosition.X, footCenter.Y + standingHeight, riderTarget.WorldPosition.Z)
+	local poseOffset = Vector3.new(0, standingHeight, 0)
 	if humanoid.RigType == Enum.HumanoidRigType.R15 then
-		local fitScale = math.clamp(standingHeight / ScooterConfig.RiderPose.ReferenceStandingHeight, 0.65, 1.5)
-		desiredRootPosition += root.CFrame.LookVector * ScooterConfig.RiderPose.RiderForwardShift * fitScale
-			- Vector3.yAxis * ScooterConfig.RiderPose.RiderCrouch * fitScale
+		poseOffset = Vector3.new(0, standingHeight - humanoid.HipHeight * ScooterConfig.BaseRidingPose.CrouchHipHeightFraction,
+			-ScooterConfig.BaseRidingPose.RootForwardOffset)
 	end
+	local desiredRootPosition = riderTarget.WorldPosition + (if humanoid.RigType == Enum.HumanoidRigType.R15
+		then root.CFrame:VectorToWorldSpace(poseOffset) else poseOffset)
 	local desiredRootCFrame = CFrame.new(desiredRootPosition) * root.CFrame.Rotation
 	local weldedPart = seatWeld.Part1
 	if not weldedPart then
@@ -324,10 +324,13 @@ local function suppressRiderCollisions(record: ScooterRecord, humanoid: Humanoid
 end
 
 local function resetControls(record: ScooterRecord)
+	record.roadBalance.Enabled = false
 	record.terrain.Update(nil, 0, record.raycastParams)
+	record.scrape.Update(false, 0, 0, record.raycastParams)
 	ScooterInput.Reset(record.input)
 	record.throttle = 0
 	record.steering = 0
+	record.steeringHold = 0
 	local reversing = record.seat.Occupant ~= nil and not record.fallen
 		and record.root.AssemblyLinearVelocity:Dot(record.root.CFrame.LookVector) < -ScooterConfig.StopSpeed
 	if record.brakeLight then record.brakeLight.SetActive(reversing) end
@@ -364,6 +367,7 @@ local function cleanupRecord(record: ScooterRecord)
 	if record.brakeLight then record.brakeLight.Destroy() end
 	if record.headlight then record.headlight.Destroy() end
 	record.terrain.Destroy()
+	record.scrape.Destroy()
 	if record.rider then
 		record.rider.Sit = false
 	end
@@ -382,15 +386,25 @@ local function cleanupRecord(record: ScooterRecord)
 	end
 end
 
-local function getScooterSpawnPivot(model: Model): CFrame
+local function getScooterSpawnPivot(model: Model, player: Player): CFrame
+	local characterRoot = if player.Character then player.Character:FindFirstChild("HumanoidRootPart") else nil
+	local reference = if characterRoot and characterRoot:IsA("BasePart") then characterRoot.Position else nil
+	local selected: SpawnLocation? = nil
+	local nearestDistance = math.huge
 	for _, descendant in Workspace:GetDescendants() do
 		if descendant:IsA("SpawnLocation") and descendant.Enabled then
-			-- A larger imported rig must not start with its wheel contacts below the road.
-			local lift = ScooterCollision.GetSpawnLift(model, descendant.CFrame.Rotation)
-			local heightAboveSpawn = descendant.Size.Y * 0.5
-				+ math.max(2.5, lift + ScooterConfig.SpawnGroundClearance)
-			return descendant.CFrame * CFrame.new(8, heightAboveSpawn, 0)
+			local distance = if reference then (descendant.Position - reference).Magnitude else 0
+			if not selected or distance < nearestDistance then
+				selected, nearestDistance = descendant, distance
+			end
 		end
+	end
+	if selected then
+		-- Multiple authored spawns must not send the scooter to a different part of the map.
+		local lift = ScooterCollision.GetSpawnLift(model, selected.CFrame.Rotation)
+		local heightAboveSpawn = selected.Size.Y * 0.5
+			+ math.max(2.5, lift + ScooterConfig.SpawnGroundClearance)
+		return selected.CFrame * CFrame.new(8, heightAboveSpawn, 0)
 	end
 
 	warn("ScooterServer: no enabled SpawnLocation found; using the world origin")
@@ -410,7 +424,7 @@ local function spawnForPlayer(player: Player, requestedModel: string?, templateN
 	local scooter = createScooter(player, modelName, templateName)
 	local oldRecord = recordsByPlayer[player]
 	if oldRecord then cleanupRecord(oldRecord) end
-	scooter:PivotTo(getScooterSpawnPivot(scooter))
+	scooter:PivotTo(getScooterSpawnPivot(scooter, player))
 	scooter.Parent = getOrCreateFolder(Workspace, ScooterConfig.ScooterFolderName)
 
 	local root = scooter.PrimaryPart
@@ -454,11 +468,24 @@ local function spawnForPlayer(player: Player, requestedModel: string?, templateN
 	upright.Name = "ScooterUpright"
 	upright.Mode = Enum.OrientationAlignmentMode.OneAttachment
 	upright.Attachment0 = driveAttachment
+	upright.AlignType = Enum.AlignType.AllAxes
 	upright.RigidityEnabled = false
 	upright.Responsiveness = ScooterConfig.UprightResponsiveness
 	upright.MaxAngularVelocity = 8
 	upright.CFrame = root.CFrame.Rotation
 	upright.Parent = root
+	local roadAttachment = Instance.new("Attachment")
+	roadAttachment.Name = "ScooterRoadUp"
+	roadAttachment.CFrame = ROAD_UP_FRAME
+	roadAttachment.Parent = root
+	local roadBalance = Instance.new("AlignOrientation")
+	roadBalance.Name = "ScooterRoadBalance"
+	roadBalance.Mode = Enum.OrientationAlignmentMode.OneAttachment
+	roadBalance.AlignType = Enum.AlignType.PrimaryAxisParallel
+	roadBalance.Attachment0 = roadAttachment
+	roadBalance.RigidityEnabled = true
+	roadBalance.Enabled = false
+	roadBalance.Parent = root
 	local smokeAttachment = findAttachment(scooter, "RearWheelAttachment")
 		or createAttachment(rig.backAxle, "RearWheelAttachment", Vector3.zero)
 	smokeAttachment.Parent = rig.backAxle
@@ -502,8 +529,10 @@ local function spawnForPlayer(player: Player, requestedModel: string?, templateN
 		owner = player,
 		seat = seat,
 		root = root,
+		deckCollider = scooter:FindFirstChild("DeckCollider") :: BasePart,
 		smoke = smoke,
 		upright = upright,
+		roadBalance = roadBalance,
 		input = ScooterInput.New(),
 		tuning = tuning,
 		driveMode = ScooterConfig.DriveModes.Default,
@@ -523,7 +552,8 @@ local function spawnForPlayer(player: Player, requestedModel: string?, templateN
 		terrain = ScooterTerrain.Create({
 			{ part = rig.frontWheel, point = rig.frontWheel:FindFirstChild("WheelCenter") :: Attachment, radius = contacts.frontRadius },
 			{ part = rig.backWheel, point = rig.backWheel:FindFirstChild("WheelCenter") :: Attachment, radius = contacts.backRadius },
-		}),
+		}, root, { root, rig.stick, rig.frontAxle, rig.backAxle, rig.frontWheel, rig.backWheel }),
+		scrape = ScooterScrape.Create(scooter, root, rearSuspensionPoint),
 		impact = ScooterImpact.New(),
 		additionalMass = additionalMass,
 		connections = {},
@@ -531,6 +561,7 @@ local function spawnForPlayer(player: Player, requestedModel: string?, templateN
 		lastWheelieAt = -math.huge,
 		throttle = 0,
 		steering = 0,
+		steeringHold = 0,
 		steeringLean = 0,
 		wheelieActive = false,
 		desiredForward = desiredForward,
@@ -739,18 +770,43 @@ local function probeGround(
 	-- A world-down probe keeps the rear contact valid at steep wheelie angles.
 	-- The spherical wheel proxies carry the assembly; there is no fake spring
 	-- force: authored SpringConstraints provide the suspension travel.
-	local origin = point.WorldPosition + Vector3.yAxis * ScooterConfig.SuspensionProbeLift
+	local lift = ScooterConfig.SuspensionProbeLift
+	local origin = point.WorldPosition + Vector3.yAxis * lift
 	local radius = if point == record.frontSuspensionPoint then record.frontWheelRadius else record.backWheelRadius
-	local rayLength = radius + ScooterConfig.GroundProbeTolerance
+	local rayLength = radius + ScooterConfig.GroundProbeTolerance + ScooterConfig.MaxStepHeight
 	local result = Workspace:Raycast(
 		origin,
-		-Vector3.yAxis * (ScooterConfig.SuspensionProbeLift + rayLength),
+		-Vector3.yAxis * (lift + rayLength),
 		record.raycastParams
 	)
 	if not result or result.Normal.Y < ScooterConfig.GroundMinNormalY then
-		return nil, false
+		-- Read a raised cap when the lower origin lies inside its side, while
+		-- preferring the nearby floor when riding beneath an overhead platform.
+		result = Workspace:Raycast(origin + Vector3.yAxis * ScooterConfig.MaxStepHeight,
+			-Vector3.yAxis * (lift + rayLength + ScooterConfig.MaxStepHeight), record.raycastParams)
 	end
-	return result, true
+	if not result or result.Normal.Y < ScooterConfig.GroundMinNormalY then return nil, false end
+	-- A lower surface may inform chassis pitch without authorizing airborne drive.
+	local separation = point.WorldPosition.Y - result.Position.Y
+	return result, separation >= -ScooterConfig.StepTraction.HeightTolerance
+		and separation - radius <= ScooterConfig.GroundProbeTolerance
+end
+
+local function probeDeckSupport(record: ScooterRecord): RaycastResult?
+	if record.root.CFrame.UpVector.Y < 0.25 then return nil end
+	local deck = record.deckCollider
+	local lift = deck.Size.Y + ScooterConfig.GroundProbeTolerance
+	local thickness = ScooterConfig.DeckSupportProbeThickness
+	-- Sample the whole underside: point rays miss narrow supports as they move
+	-- between sample positions, cutting drive while the deck still touches them.
+	local origin = deck.CFrame * CFrame.new(0, -deck.Size.Y * 0.5 + thickness * 0.5, 0)
+		+ Vector3.yAxis * lift
+	local hit = Workspace:Blockcast(origin, Vector3.new(deck.Size.X, thickness, deck.Size.Z),
+		-Vector3.yAxis * (lift + ScooterConfig.DeckSupportTolerance), record.raycastParams)
+	if hit and hit.Normal.Y >= ScooterConfig.GroundMinNormalY
+		and deck.CFrame:PointToObjectSpace(hit.Position).Y <= -deck.Size.Y * 0.5
+			+ ScooterConfig.StepTraction.HeightTolerance then return hit end
+	return nil
 end
 
 local function applyParkingDamping(record: ScooterRecord, deltaTime: number)
@@ -909,6 +965,10 @@ function ScooterServer.Start()
 		mountLocks[player] = nil
 	end))
 
+	table.insert(connections, RunService.PostSimulation:Connect(function()
+		for _, record in recordsByPlayer do record.terrain.Stabilize() end
+	end))
+
 	table.insert(connections, RunService.PreSimulation:Connect(function(deltaTime: number)
 		deltaTime = math.clamp(deltaTime, 0, 0.1)
 		for _, record in pairs(recordsByPlayer) do
@@ -929,6 +989,11 @@ function ScooterServer.Start()
 			local maxSpeed = ScooterConfig.GetDriveModeMaxSpeed(tuning.maxSpeed, record.driveMode) * ScooterConfig.StudsPerKmH
 			local frontHit, frontGrounded = probeGround(record, record.frontSuspensionPoint)
 			local rearHit, rearGrounded = probeGround(record, record.rearSuspensionPoint)
+			-- A scooter balanced on its underside still has physical support and must
+			-- be able to drive off. Airborne tires alone are insufficient to decide this.
+			local deckHit = if not frontGrounded and not rearGrounded then probeDeckSupport(record) else nil
+			local grounded = frontGrounded or rearGrounded or deckHit ~= nil
+			setAttributeIfChanged(record.model, "DeckGrounded", deckHit ~= nil)
 			if record.frontGrounded ~= frontGrounded then
 				record.frontGrounded = frontGrounded
 				record.model:SetAttribute("FrontGrounded", frontGrounded)
@@ -945,12 +1010,16 @@ function ScooterServer.Start()
 				targetGroundUp = frontHit.Normal
 			elseif rearHit then
 				targetGroundUp = rearHit.Normal
+			elseif deckHit then
+				targetGroundUp = deckHit.Normal
 			end
-			if frontGrounded and rearGrounded and not record.wheelieActive then
+			if frontHit and rearHit and grounded and not record.wheelieActive then
 				local axleLine = record.frontSuspensionPoint.WorldPosition - record.rearSuspensionPoint.WorldPosition
 				local planarLine = Vector3.new(axleLine.X, 0, axleLine.Z)
 				if planarLine.Magnitude > 0.01 then
-					local grade = math.clamp(axleLine.Y / planarLine.Magnitude,
+					-- Ground heights break the flat-frame deadlock when one tire hangs over a lower road.
+					local heightDifference = frontHit.Position.Y - rearHit.Position.Y
+					local grade = math.clamp(heightDifference / planarLine.Magnitude,
 						-math.tan(ScooterConfig.StepTraction.MaxChassisPitch), math.tan(ScooterConfig.StepTraction.MaxChassisPitch))
 					targetGroundUp = (Vector3.yAxis - planarLine.Unit * grade).Unit
 				end
@@ -975,7 +1044,7 @@ function ScooterServer.Start()
 				and math.abs(velocity.Y) <= ScooterConfig.MaxGroundedVerticalSpeed
 				and ScooterPhysics.CanBurnout(speed, input.throttleHeld, input.brakeHeld)
 			setBurnout(record, canBurnout)
-			local effectiveSteering = if frontGrounded or rearGrounded
+			local effectiveSteering = if grounded
 				then ScooterPhysics.GetEffectiveSteering(record.steering, headingSpeed, canBurnout)
 				else 0
 			setAttributeIfChanged(record.model, "SteeringInput", math.round(record.steering * 100) / 100)
@@ -997,9 +1066,12 @@ function ScooterServer.Start()
 			-- Road forces may perturb the physical servo. Neutral rider input must
 			-- not turn those small errors into self-amplifying chassis yaw/lean.
 			local controlledSteering = if math.abs(record.steering) < 0.01 then 0 else effectiveSteering
-			local turnSteering = if frontGrounded or rearGrounded
+			local turnSteering = if grounded
 				then (if canBurnout then controlledSteering else ScooterPhysics.GetTurnSteering(controlledSteering, headingSpeed))
 				else 0
+			record.steeringHold = ScooterPhysics.AdvanceSteeringHold(record.steeringHold,
+				if occupied and grounded and not record.fallen and not record.wheelieActive and not canBurnout
+					then input.steering else 0, deltaTime)
 			local desired = ScooterPhysics.AdvanceForward(
 				record.desiredForward,
 				turnSteering,
@@ -1010,7 +1082,7 @@ function ScooterServer.Start()
 			)
 			record.desiredForward = if math.abs(headingSpeed) < ScooterConfig.MinSteeringSpeed and not canBurnout then actualHeading
 				else ScooterPhysics.ClampForwardLead(actualHeading, desired,
-					ScooterPhysics.GetYawRate(turnSteering, headingSpeed, record.wheelBase, canBurnout))
+					ScooterPhysics.GetYawRate(turnSteering, headingSpeed, record.wheelBase, canBurnout), record.steering, math.abs(record.steeringHold))
 
 			local driveForward = ScooterPhysics.ProjectOntoPlane(record.desiredForward, groundUp)
 			if driveForward.Magnitude < 0.01 then
@@ -1018,12 +1090,13 @@ function ScooterServer.Start()
 			else
 				driveForward = driveForward.Unit
 			end
+			local balanceForward = driveForward
 			local forwardSpeed = velocity:Dot(driveForward)
 			setAttributeIfChanged(record.model, "ForwardSpeed", math.floor(forwardSpeed * 2 + 0.5) / 2)
 			local driveState = "Idle"
 			if record.fallen then
 				driveState = "Fallen"
-			elseif not (frontGrounded or rearGrounded) then
+			elseif not grounded then
 				driveState = "Airborne"
 			elseif record.throttle > 0 then
 				driveState = "Forward"
@@ -1032,9 +1105,27 @@ function ScooterServer.Start()
 			end
 			setAttributeIfChanged(record.model, "DriveState", driveState)
 
-			local grounded = frontGrounded or rearGrounded
 			if record.fallen or not occupied then
 				applyParkingDamping(record, deltaTime)
+			end
+			local stepDirection = 0
+			if input.throttleHeld and not input.brakeHeld then
+				stepDirection = 1
+			elseif input.brakeHeld and not input.throttleHeld
+				and forwardSpeed <= ScooterConfig.DirectionChangeSpeedKmh * ScooterConfig.StudsPerKmH then
+				stepDirection = -1
+			end
+			local tractionDirection = if occupied and not record.fallen and not record.wheelieActive and not input.wheelieQueued and stepDirection ~= 0
+				then record.desiredForward * stepDirection else nil
+			local stepSpeedLimit = if stepDirection < 0 then ScooterConfig.MaxReverseSpeedKmh * ScooterConfig.StudsPerKmH else maxSpeed
+			local stepEntry = record.terrain.Update(tractionDirection, root.AssemblyMass + record.additionalMass,
+				record.raycastParams, grounded, stepSpeedLimit,
+				if occupied and grounded and not record.fallen and not record.wheelieActive
+					and not input.wheelieQueued then targetGroundUp else nil)
+			if stepEntry then
+				-- Grip must agree with the verified corner assistance rather than
+				-- immediately cancelling its small sideways entry at shallow angles.
+				driveForward = ScooterPhysics.ProjectOntoPlane(stepEntry * stepDirection, groundUp).Unit
 			end
 			record.driveForce.Force = ScooterPhysics.ComputeDriveForce({
 				velocity = velocity,
@@ -1051,17 +1142,6 @@ function ScooterServer.Start()
 				fallen = record.fallen,
 				deltaTime = deltaTime,
 			})
-			local stepDirection = 0
-			if input.throttleHeld and not input.brakeHeld then
-				stepDirection = 1
-			elseif input.brakeHeld and not input.throttleHeld
-				and forwardSpeed <= ScooterConfig.DirectionChangeSpeedKmh * ScooterConfig.StudsPerKmH then
-				stepDirection = -1
-			end
-			local tractionDirection = if occupied and not record.fallen and not record.wheelieActive and stepDirection ~= 0
-				then record.desiredForward * stepDirection else nil
-			local stepSpeedLimit = if stepDirection < 0 then ScooterConfig.MaxReverseSpeedKmh * ScooterConfig.StudsPerKmH else maxSpeed
-			record.terrain.Update(tractionDirection, root.AssemblyMass + record.additionalMass, record.raycastParams, grounded, stepSpeedLimit)
 
 			local wheelieTriggered = input.wheelieQueued
 			input.wheelieQueued = false
@@ -1120,6 +1200,8 @@ function ScooterServer.Start()
 				record.model:SetAttribute("Fallen", false)
 			end
 
+			record.scrape.Update(occupied and record.wheelieActive and not record.fallen, actualPitch, speed, record.raycastParams)
+
 			local brakeActive = occupied and not record.fallen
 				and ScooterPhysics.IsBraking(forwardSpeed, input.throttleHeld, input.brakeHeld)
 			local stopLightActive = occupied and not record.fallen
@@ -1134,18 +1216,22 @@ function ScooterServer.Start()
 				else 0
 			if occupied and frontGrounded and rearGrounded and not record.wheelieActive and not record.fallen
 				and not input.throttleHeld and not input.brakeHeld
-				and speed <= ScooterConfig.RiderAnimations.IdleEnterSpeedKmh * ScooterConfig.StudsPerKmH then
-				targetLean = ScooterConfig.RiderPose.IdleScooterLean
+				and speed <= ScooterConfig.IdleLeanSpeedKmh * ScooterConfig.StudsPerKmH then
+				targetLean = ScooterConfig.IdleScooterLean
 			end
 			record.steeringLean = ScooterPhysics.SmoothSteeringLean(record.steeringLean, targetLean, deltaTime)
 
+			-- Restrict collision-driven pitch/roll while keeping the previous heading controller.
+			record.roadBalance.Enabled = occupied and not record.fallen and not record.wheelieActive
+				and (grounded or (frontHit ~= nil and rearHit ~= nil))
 			if not record.fallen then
-				local target = CFrame.lookAt(Vector3.zero, driveForward, groundUp)
+				local target = CFrame.lookAt(Vector3.zero, balanceForward, groundUp)
 					* CFrame.Angles(record.wheeliePitch, 0, record.steeringLean)
 				-- Hinges connect several massive assemblies; Root contains only the chassis mass.
 				record.upright.MaxTorque = tuning.turnTorque * (root.AssemblyMass + record.additionalMass)
 				setAttributeIfChanged(record.model, "UprightSupportMass", root.AssemblyMass + record.additionalMass)
 				record.upright.CFrame = target
+				record.roadBalance.CFrame = target * ROAD_UP_FRAME
 			end
 		end
 	end))
