@@ -6,7 +6,7 @@ local Config = require(ReplicatedStorage.Shared.Scooter.ScooterConfig)
 local Physics = require(ReplicatedStorage.Shared.Scooter.ScooterPhysics)
 
 export type Wheel = { part: BasePart, point: Attachment, radius: number }
-export type Contact = { position: Vector3, normal: Vector3, instance: Instance? }
+export type Contact = { position: Vector3, normal: Vector3, instance: Instance?, topHeight: number? }
 export type Controller = {
 	Update: (direction: Vector3?, mass: number, params: RaycastParams, grounded: boolean?, speedLimit: number?, groundUp: Vector3?) -> Vector3?,
 	Stabilize: () -> (),
@@ -22,8 +22,9 @@ function ScooterTerrain.Probe(wheel: Wheel, direction: Vector3, params: RaycastP
 	-- Short side rays find tire contact at shallow approaches without looking
 	-- tens of studs ahead. Only faces the rider is driving into qualify.
 	local reach = (radius + Config.StepTraction.ContactPadding) * math.sqrt(2)
-	local approach = math.clamp(wheel.part.AssemblyLinearVelocity:Dot(direction) * Config.StepTraction.ApproachSeconds,
-		0, Config.StepTraction.MaxApproachDistance)
+	local anticipation = if Config.ArcadeSteps.Enabled then Config.ArcadeSteps else Config.StepTraction
+	local approach = math.clamp(wheel.part.AssemblyLinearVelocity:Dot(direction) * anticipation.ApproachSeconds,
+		0, anticipation.MaxApproachDistance)
 	local sideways = direction:Cross(Vector3.yAxis)
 	local low: Contact? = nil
 	local probe = Vector3.zero
@@ -97,10 +98,14 @@ function ScooterTerrain.Probe(wheel: Wheel, direction: Vector3, params: RaycastP
 	-- rider motion runs along the edge. It ends as soon as the face is cleared.
 	local normal = Vector3.new(low.normal.X, 0, low.normal.Z).Unit
 	local entry = (direction - normal * Config.StepTraction.FaceEntryBias).Unit
+	low.topHeight = top.Position.Y
 	return (entry * above + Vector3.yAxis * gap).Unit, rise, low
 end
 
 function ScooterTerrain.Create(wheels: { Wheel }, root: BasePart?, assemblies: { BasePart }?): Controller
+	if Config.ArcadeSteps.Enabled and root then
+		return require(script.Parent.ScooterArcadeSteps).Create(wheels, root, assemblies or { root }, ScooterTerrain.Probe)
+	end
 	local forces: { VectorForce } = {}
 	for _, wheel in wheels do
 		local force = Instance.new("VectorForce")

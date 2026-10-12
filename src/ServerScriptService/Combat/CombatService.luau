@@ -9,6 +9,8 @@ local Workspace = game:GetService("Workspace")
 local CombatConfig = require(ReplicatedStorage.Shared.Combat.CombatConfig)
 local ScooterConfig = require(ReplicatedStorage.Shared.Scooter.ScooterConfig)
 local GangService = require(script.Parent.Parent.Gang.GangService)
+local MeleeService = require(script.Parent.MeleeService)
+local MeleeConfig = require(ReplicatedStorage.Shared.Combat.MeleeConfig)
 
 type Connections = { RBXScriptConnection }
 
@@ -129,6 +131,10 @@ local function markCombat(attacker: Player, target: Player)
 	target:SetAttribute("CombatUntil", deadline)
 end
 
+function CombatService.MarkMeleeCombat(attacker: Player, target: Player)
+	markCombat(attacker, target)
+end
+
 function CombatService.CanDamage(attacker: Player, target: Player): boolean
 	local _, _, attackerRoot = getCharacterState(attacker)
 	local _, _, targetRoot = getCharacterState(target)
@@ -210,7 +216,7 @@ function CombatService.StunPlayer(player: Player, duration: number)
 		end
 		stunTokens[humanoid] = nil
 		stunExpiresAt[humanoid] = nil
-		if humanoid.Parent and humanoid.Health > 0 then
+		if humanoid.Parent and humanoid.Health > 0 and character:GetAttribute("PepperSprayStunned") ~= true then
 			humanoid.PlatformStand = false
 			humanoid.AutoRotate = true
 			humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
@@ -264,18 +270,7 @@ local function emitPepperSpray(attacker: Player)
 end
 
 local function handleMelee(player: Player)
-	if isStunned(player) then
-		return
-	end
-	local now = os.clock()
-	if now - (lastMeleeAt[player] or 0) < CombatConfig.MeleeCooldown then
-		return
-	end
-	lastMeleeAt[player] = now
-	local target = findTarget(player, CombatConfig.MeleeRange, CombatConfig.MeleeFacingDot)
-	if target then
-		applyDamage(player, target, CombatConfig.MeleeDamage)
-	end
+	MeleeService.Attack(player)
 end
 
 local function handlePepper(player: Player)
@@ -396,9 +391,10 @@ function CombatService.Start()
 	GangService.Start()
 	local remotes = getOrCreateFolder(ReplicatedStorage, CombatConfig.RemoteFolderName)
 	actionRemote = getOrCreateRemote(remotes, CombatConfig.ActionRemoteName)
+	MeleeService.Start(CombatService, getOrCreateRemote(remotes, MeleeConfig.EffectsRemote))
 
-	table.insert(connections, actionRemote.OnServerEvent:Connect(function(player: Player, action: unknown)
-		if typeof(action) ~= "string" then
+	table.insert(connections, actionRemote.OnServerEvent:Connect(function(player: Player, action: unknown, ...: unknown)
+		if typeof(action) ~= "string" or select("#", ...) ~= 0 then
 			return
 		end
 		local now = os.clock()

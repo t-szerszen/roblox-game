@@ -2,6 +2,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("ScooterCustomConfig"))
 local Paint = require(ReplicatedStorage.Shared:WaitForChild("ScooterCustomPaint"))
@@ -20,6 +21,8 @@ local busy = false
 local sourceModel: Model? = nil
 local preview: Model? = nil
 local colors: {[string]: Color3} = {}
+local savedDesigns: {[string]: any} = {}
+local previewOrbit: RBXScriptConnection? = nil
 local selected = "Deck"
 local hue, saturation, value = 0, 0, 1
 local drag: string? = nil
@@ -27,6 +30,8 @@ local touch: InputObject? = nil
 local watchedCharacter: Model? = nil
 local UI = require(ReplicatedStorage.Shared:WaitForChild("ScooterCustomUI"))
 local ui = UI.Create(gui, Config.Groups)
+local UpgradeUI=require(ReplicatedStorage.Shared:WaitForChild("ScooterUpgradeUI"))
+local upgradeState: any=nil
 local panel, scale = ui.Panel, ui.Scale
 local viewport, world, camera = ui.Viewport, ui.World, ui.Camera
 local closeButton, applyButton, resetButton = ui.Close, ui.Apply, ui.Reset
@@ -38,6 +43,25 @@ local function fit()
  scale.Scale = math.min(1, math.max(.25, math.min((size.X-24)/1020,(size.Y-24)/660)))
 end
 table.insert(connections,gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)) fit()
+
+local function setMode(performance: boolean)
+ ui.FooterTitle.Text=if performance then "ZBUDUJ SWÓJ ZESTAW." else "ZAPISANE PROJEKTY"
+ ui.FooterSubtitle.Text=if performance then "Wybierz ulepszenia • sprawdź osiągi na trasie" else "Wybierz kolor • obejrzyj podgląd • zatwierdź"
+ ui.Projects.Visible=not performance
+ ui.FooterSubtitle.Visible=performance
+ ui.Performance.Body.Visible=performance
+ ui.Stage.Visible=not performance ui.Picker.Visible=not performance
+ applyButton.Visible=not performance resetButton.Visible=not performance
+ ui.AppearanceTab.BackgroundColor3=if not performance then ui.Gold else Color3.fromRGB(37,43,52)
+ ui.PerformanceTab.BackgroundColor3=if performance then ui.Gold else Color3.fromRGB(37,43,52)
+ ui.AppearanceTab.TextColor3=if not performance then Color3.fromRGB(16,18,23) else Color3.fromRGB(243,239,228)
+ ui.PerformanceTab.TextColor3=if performance then Color3.fromRGB(16,18,23) else Color3.fromRGB(243,239,228)
+ if performance then
+  status.Text=if upgradeState and not upgradeState.persistent then "Zmiany zachowają się tylko do wyjścia z gry." else "Instalacja jest teraz bezpłatna."
+ end
+end
+table.insert(connections,ui.AppearanceTab.Activated:Connect(function() setMode(false) end))
+table.insert(connections,ui.PerformanceTab.Activated:Connect(function() setMode(true) end))
 
 local function refreshPicker()
  local color = colors[selected] or Color3.new(1, 1, 1)
@@ -62,6 +86,10 @@ local function setColor(color: Color3)
  status.Text = "Podgląd — zatwierdź projekt, aby zapisać kolory."
 end
 local function close()
+ if previewOrbit then previewOrbit:Disconnect() previewOrbit=nil end
+ savedDesigns={}
+ UpgradeUI.ClearThumbnails(ui.Performance)
+ upgradeState=nil
  generation += 1 busy = false panel.Visible = false sourceModel = nil drag = nil touch = nil
  if preview then preview:Destroy() preview = nil end
 end
@@ -70,6 +98,7 @@ local function ownsModel(model: any): boolean
   and model:GetAttribute("OwnerUserId")==player.UserId
 end
 local function makePreview(model: Model)
+ if previewOrbit then previewOrbit:Disconnect() previewOrbit=nil end
  if preview then preview:Destroy() preview = nil end
  local clone = model:Clone()
  if not clone then status.Text = "Podgląd modelu niedostępny." return end
@@ -89,14 +118,52 @@ local function makePreview(model: Model)
  previewCenter,previewOffset,previewDistance,rotation = center,offset.Unit,distance,0
  camera.CFrame = CFrame.lookAt(center + offset.Unit * distance, center)
  Paint.Apply(clone, colors)
+ previewOrbit=RunService.RenderStepped:Connect(function(delta)
+  if not active or not panel.Visible or not ui.Stage.Visible or not preview then return end
+  rotation=(rotation+Config.PreviewRotationSpeed*math.min(delta,.1))%(2*math.pi)
+  local orbit=CFrame.Angles(0,rotation,0):VectorToWorldSpace(previewOffset)
+  camera.CFrame=CFrame.lookAt(previewCenter+orbit*previewDistance,previewCenter)
+ end)
 end
-local function call(operation: string)
+for id,card in ui.Performance.Cards do
+ table.insert(connections,card.Button.Activated:Connect(function()
+  if busy or not sourceModel or not upgradeState or not upgradeState.ready then return end
+  local target=sourceModel
+  local token=generation
+  local enabled=upgradeState.equipped[id]~=true
+  busy=true status.Text="Instalowanie…"
+  task.spawn(function()
+   local ok,response=pcall(function() return action:InvokeServer("Upgrade",target,{id=id,enabled=enabled}) end)
+   if not active or generation~=token then return end
+   busy=false
+   if not ok or typeof(response)~="table" then status.Text="Brak połączenia. Spróbuj ponownie." return end
+   if response.upgrades then
+    upgradeState=response.upgrades UpgradeUI.Update(ui.Performance,upgradeState)
+   end
+   status.Text=response.message or "Nie udało się zainstalować ulepszenia."
+   if response.ok and ownsModel(target) then
+    pcall(function() makePreview(target) end)
+    if upgradeState and not upgradeState.persistent then status.Text ..= " Zapis niedostępny — tylko ta sesja." end
+   end
+  end)
+ end))
+end
+
+local function refreshSlots()
+ for index,slot in ui.Slots do
+  local occupied=savedDesigns[tostring(index)]~=nil
+  slot.Load.Text=if occupied then "Wczytaj "..index else "Pusty"
+  slot.Load.Active=occupied slot.Load.AutoButtonColor=occupied
+  slot.Load.TextTransparency=if occupied then 0 else .5
+ end
+end
+local function call(operation: string, slot: number?)
  if busy then return end
  local token = generation
  busy = true
  status.Text = "Chwilę…"
  local target = sourceModel
- local palette = if operation == "Apply" then table.clone(colors) else nil
+ local palette = if operation == "Apply" then table.clone(colors) elseif operation=="SaveDesign" then {slot=slot,colors=table.clone(colors)} elseif operation=="LoadDesign" then {slot=slot} else nil
  task.spawn(function()
   local ok, response = pcall(function()
    return action:InvokeServer(operation, target, palette)
@@ -108,11 +175,17 @@ local function call(operation: string)
    return
   end
   if not ownsModel(response.model) or response.model~=target then close() return end
-  sourceModel, colors = response.model, response.colors
+  sourceModel=response.model
+  if response.colors then colors=response.colors end
+  if response.designs then savedDesigns=response.designs refreshSlots() end
   if preview then Paint.Apply(preview, colors) end
   refreshPicker()
-  status.Text = if operation == "Reset" then "Przywrócono kolory początkowe." else "Kolory zastosowane."
+  status.Text = response.message or if operation == "Reset" then "Przywrócono kolory początkowe." else "Kolory zastosowane."
  end)
+end
+for index,slot in ui.Slots do
+ table.insert(connections,slot.Save.Activated:Connect(function() call("SaveDesign",index) end))
+ table.insert(connections,slot.Load.Activated:Connect(function() if savedDesigns[tostring(index)] then call("LoadDesign",index) end end))
 end
 for id, tab in tabs do table.insert(connections, tab.Activated:Connect(function() selected = id refreshPicker() end)) end
 for _,item in ui.Swatches do
@@ -123,7 +196,7 @@ end
 local function rotate(amount: number)
  rotation += amount
  local offset = CFrame.Angles(0,rotation,0):VectorToWorldSpace(previewOffset)
- TweenService:Create(camera,TweenInfo.new(.22),{CFrame=CFrame.lookAt(previewCenter+offset*previewDistance,previewCenter)}):Play()
+ camera.CFrame=CFrame.lookAt(previewCenter+offset*previewDistance,previewCenter)
 end
 table.insert(connections,ui.Left.Activated:Connect(function() rotate(-math.pi/6) end))
 table.insert(connections,ui.Right.Activated:Connect(function() rotate(math.pi/6) end))
@@ -169,6 +242,11 @@ table.insert(connections,opened.OnClientEvent:Connect(function(response)
  if not ownsModel(response.model) then return end
  close()
  sourceModel,colors=response.model,response.colors
+ savedDesigns=response.designs or {} refreshSlots()
+ upgradeState=response.upgrades
+ pcall(function() UpgradeUI.BuildThumbnails(ui.Performance,response.model) end)
+ if upgradeState then UpgradeUI.Update(ui.Performance,upgradeState) end
+ setMode(false)
  panel.Visible=true
  local ok=pcall(function() makePreview(response.model) end)
  refreshPicker() refreshAccess()

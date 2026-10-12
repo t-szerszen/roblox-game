@@ -136,6 +136,7 @@ local function configureModel(model: Model, Config: typeof(Config)): Model
 	-- Prepared templates can be cloned at runtime without adding duplicate joints.
 	if model:GetAttribute("ArticulatedScooter") == true then
 		assert(model.PrimaryPart and model.PrimaryPart.Name == "Root", "Prepared scooter requires Root")
+		rig.steering.AngularResponsiveness = Config.SteeringServoResponsiveness
 		Collision.Configure(model, Config)
 		Suspension.Configure(model, Config)
 		Geometry.AssertSafe(model, Config)
@@ -231,6 +232,7 @@ local function configureModel(model: Model, Config: typeof(Config)): Model
 	rig.frontAxle.Transparency = 1
 	rig.backAxle.Transparency = 1
 	rig.steering.ActuatorType = Enum.ActuatorType.Servo
+	rig.steering.AngularResponsiveness = Config.SteeringServoResponsiveness
 	if rig.steering.ServoMaxTorque <= 0 then rig.steering.ServoMaxTorque = Config.SteeringServoTorque end
 	if rig.steering.AngularSpeed <= 0 then rig.steering.AngularSpeed = Config.SteeringServoSpeed end
 	rig.steering.TargetAngle = 0

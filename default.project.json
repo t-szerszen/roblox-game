@@ -39,6 +39,10 @@
           "$path": "assets/police/FiatDucatoPolicja.rbxm"
         }
       }
+    },
+    "ReplicatedFirst": {
+      "$className": "ReplicatedFirst",
+      "$path": "src/ReplicatedFirst"
     }
   }
 }

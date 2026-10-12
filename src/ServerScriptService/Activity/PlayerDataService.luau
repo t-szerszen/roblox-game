@@ -8,6 +8,8 @@ local ActivityConfig = require(ReplicatedStorage.Shared.Activity.ActivityConfig)
 local PhoneConfig = require(ReplicatedStorage.Shared.Phone.PhoneConfig)
 local ShopConfig = require(ReplicatedStorage.Shared.Shop.ShopConfig)
 local ScooterConfig = require(ReplicatedStorage.Shared.ScooterConfig)
+local CustomConfig = require(ReplicatedStorage.Shared.ScooterCustomConfig)
+local UpgradeCatalog = require(ReplicatedStorage.Shared.ScooterUpgradeCatalog)
 
 export type VisualPreference = { enabled: boolean, color: { number } }
 
@@ -25,6 +27,8 @@ export type Profile = {
 	loginStreak: number,
 	owned: { [string]: boolean },
 	scooterUpgrades: { [string]: number },
+	scooterDesigns: {[string]: {[string]: {[string]: string}}},
+	scooterEquipment: {[string]: {owned: {[string]: boolean}, equipped: {[string]: boolean}}},
 	scooterVisuals: { Smoke: VisualPreference, Neon: VisualPreference },
 	canCreateGang: boolean,
 	ownsPepperSpray: boolean,
@@ -61,6 +65,8 @@ local function defaultProfile(): Profile
 		loginStreak = 0,
 		owned = {},
 		scooterUpgrades = {},
+		scooterEquipment = {},
+		scooterDesigns = {},
 		scooterVisuals = {
 			Smoke = { enabled = false, color = { 1, 1, 1 } },
 			Neon = { enabled = false, color = { 0, 1, 1 } },
@@ -112,6 +118,32 @@ local function deserialize(value: unknown): Profile
 			if ScooterConfig.IsValidSpeedTier(tier) then
 				profile.scooterUpgrades[modelName] = tier
 			end
+		end
+	end
+	if typeof(data.scooterEquipment) == "table" then
+		for modelName in ScooterConfig.Models do
+			local state = data.scooterEquipment[modelName]
+			if typeof(state) == "table" then
+				profile.scooterEquipment[modelName] = UpgradeCatalog.Normalize(state)
+			end
+		end
+	end
+	if typeof(data.scooterDesigns) == "table" then
+		for modelName in ScooterConfig.Models do
+			local saved = data.scooterDesigns[modelName]
+			if typeof(saved) ~= "table" then continue end
+			local slots: {[string]: {[string]: string}} = {}
+			for index=1,CustomConfig.DesignSlots do
+				local palette=saved[tostring(index)]
+				if typeof(palette) ~= "table" then continue end
+				local clean: {[string]: string} = {}
+				for _,group in CustomConfig.Groups do
+					local hex=palette[group.Id]
+					if typeof(hex)=="string" and #hex==6 and hex:match("^%x+$") then clean[group.Id]=hex end
+				end
+				if next(clean) then slots[tostring(index)]=clean end
+			end
+			profile.scooterDesigns[modelName]=slots
 		end
 	end
 	if typeof(data.scooterVisuals) == "table" then

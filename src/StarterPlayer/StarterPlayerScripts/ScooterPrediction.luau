@@ -267,7 +267,7 @@ function ScooterPrediction.Start(scooter: Model, root: BasePart, character: Mode
 		end
 		local grounded = scooter:GetAttribute("FrontGrounded") == true or scooter:GetAttribute("RearGrounded") == true
 		local driveMode = scooter:GetAttribute("DriveMode")
-		local maxSpeed = ScooterConfig.GetDriveModeMaxSpeed(tuning.maxSpeed,
+		local maxSpeed = ScooterConfig.GetDriveModeMaxSpeed(scooter:GetAttribute("SportMaxSpeedKmh") or tuning.maxSpeed,
 			if typeof(driveMode) == "string" then driveMode else ScooterConfig.DriveModes.Default)
 		local fallen = scooter:GetAttribute("Fallen") == true
 		local velocity = proxy.AssemblyLinearVelocity
@@ -296,7 +296,8 @@ function ScooterPrediction.Start(scooter: Model, root: BasePart, character: Mode
 			gravity = Workspace.Gravity,
 			mass = mass,
 			maxSpeed = maxSpeed * ScooterConfig.StudsPerKmH,
-			acceleration = ScooterConfig.GetDriveModeAcceleration(tuning.acceleration,
+			brakingDeceleration = scooter:GetAttribute("BrakeForce") or ScooterConfig.BrakingDeceleration,
+			acceleration = ScooterConfig.GetDriveModeAcceleration(scooter:GetAttribute("Acceleration") or tuning.acceleration,
 				if typeof(driveMode) == "string" then driveMode else ScooterConfig.DriveModes.Default),
 			throttleHeld = input.throttleHeld,
 			brakeHeld = input.brakeHeld,
@@ -319,7 +320,7 @@ function ScooterPrediction.Start(scooter: Model, root: BasePart, character: Mode
 		end
 		local throttle = (if input.throttleHeld then 1 else 0) - (if input.brakeHeld then 1 else 0)
 		if wheelieActive and rearGrounded and forwardSpeed > 0 and not fallen then
-			wheeliePitch = ScooterPhysics.AdvanceWheeliePitch(wheeliePitch, throttle, forwardSpeed, step)
+			wheeliePitch = ScooterPhysics.AdvanceWheeliePitch(wheeliePitch, throttle, forwardSpeed, step, scooter:GetAttribute("WheelieMaxAngle"))
 			if wheeliePitch <= 0 and scooter:GetAttribute("FrontGrounded") == true then
 				wheelieActive = false
 			end

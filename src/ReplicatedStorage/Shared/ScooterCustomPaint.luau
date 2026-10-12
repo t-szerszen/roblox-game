@@ -4,11 +4,18 @@ local Paint = {}
 type ColorTarget = SurfaceAppearance | BasePart
 function Paint.Targets(model: Model): {[string]: {ColorTarget}}
  local targets: {[string]: {ColorTarget}} = {}
+ local parts: {[string]: {BasePart}} = {}
+ for _,part in model:GetDescendants() do
+  if part:IsA("BasePart") then
+   parts[part.Name]=parts[part.Name] or {}
+   table.insert(parts[part.Name],part)
+  end
+ end
  for _,group in Config.Groups do
   local list: {ColorTarget} = {}
   for _,name in group.Parts do
-   local part = model:FindFirstChild(name, true)
-   if part and part:IsA("BasePart") and part:GetAttribute(Config.Attribute) == group.Id then
+   for _,part in parts[name] or {} do
+   if part:IsA("BasePart") and (part:GetAttribute(Config.Attribute) == group.Id or (group.Mode=="WholePart" and part:GetAttribute(Config.Attribute)==nil)) then
     local appearance = part:FindFirstChildOfClass("SurfaceAppearance")
     if part:GetAttribute("ScooterCustomSolidColor") == true then
      table.insert(list, part)
@@ -18,6 +25,7 @@ function Paint.Targets(model: Model): {[string]: {ColorTarget}}
     elseif appearance and appearance.AlphaMode == Enum.AlphaMode.TintMask then
      table.insert(list, appearance)
     end
+   end
    end
   end
   targets[group.Id] = list
