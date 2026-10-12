@@ -38,9 +38,9 @@ registry:Release(p1,a)
 check(registry.owners[p1]==nil and registry.memories[p1]==nil,"Claim and memory cleaned together")
 check(registry:Claim(p3,a,Vector.zero,0),"Freed capacity reused")
 local evidence=Rules.NewEvidence(0)
-for i=1,15 do check(Rules.Accumulate(evidence,i*0.2,true,true,50,false)==nil,"At limit is legal") end
-check(Rules.Accumulate(evidence,3.2,true,true,55,false)==nil,"Single fast sample insufficient")
-check(Rules.Accumulate(evidence,3.4,true,true,40,false)==nil and evidence.speedTime==0,"Speed reduction resets evidence")
+for i=1,15 do check(Rules.Accumulate(evidence,i*0.2,true,true,Config.SpeedLimitKmh,false)==nil,"At configured limit is legal") end
+check(Rules.Accumulate(evidence,3.2,true,true,Config.SpeedLimitKmh+5,false)==nil,"Single fast sample insufficient")
+check(Rules.Accumulate(evidence,3.4,true,true,Config.SpeedLimitKmh-5,false)==nil and evidence.speedTime==0,"Speed reduction resets evidence")
 evidence=Rules.NewEvidence(0)
 local reason
 for i=1,8 do reason=Rules.Accumulate(evidence,i*0.2,true,true,55,false) end

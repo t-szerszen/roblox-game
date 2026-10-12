@@ -6,6 +6,7 @@ local Combat=require(script.Parent.Parent.Combat.CombatService)
 local Detector={}
 export type ReadState=Scooter.RidingState
 export type Evidence={lastSeen: number, lastSample: number, speedTime: number, wheelieTime: number}
+export type BlockEvidence={player: Player, since: number, lastSample: number}
 function Detector.NewEvidence(now: number): Evidence
  return {lastSeen=now,lastSample=now,speedTime=0,wheelieTime=0}
 end
@@ -18,13 +19,13 @@ function Detector.Eligible(player: Player, position: Vector3): boolean
   and not (typeof(protection)=="number" and protection>now)
   and not Combat.IsInSafeZone(position)
 end
-function Detector.Visible(vehicle: Model, frame: CFrame, character: Model, scooter: Model?): boolean
+function Detector.Visible(vehicle: Model, frame: CFrame, character: Model, scooter: Model?, pursuing: boolean?): boolean
  local root=character:FindFirstChild("HumanoidRootPart")
  if not root or not root:IsA("BasePart") then return false end
  local origin=frame.Position+Vector3.yAxis
  local delta=root.Position-origin
- if delta.Magnitude>Config.DetectionRange then return false end
- if delta.Magnitude>0.01 and frame.LookVector:Dot(delta.Unit)<math.cos(math.rad(Config.FieldOfView/2)) then return false end
+ if delta.Magnitude>(if pursuing then Config.PursuitRange else Config.DetectionRange) then return false end
+ if not pursuing and delta.Magnitude>0.01 and frame.LookVector:Dot(delta.Unit)<math.cos(math.rad(Config.FieldOfView/2)) then return false end
  local params=RaycastParams.new();params.FilterType=Enum.RaycastFilterType.Exclude
  local ignored: {Instance}={vehicle}
  local traffic=Workspace:FindFirstChild("TrafficSystem")
@@ -58,5 +59,21 @@ end
 function Detector.Read(player: Player): Scooter.RidingState?
  local state=Scooter.GetRidingState(player)
  return if state and Detector.Eligible(player,state.root.Position) then state else nil
+end
+function Detector.Blocking(evidence: BlockEvidence?, player: Player?, now: number): (BlockEvidence?, boolean)
+ if not player then return nil,false end
+ if not evidence or evidence.player~=player or now-evidence.lastSample>2/Config.ObservationRate then
+  return {player=player,since=now,lastSample=now},false
+ end
+ evidence.lastSample=now
+ return evidence,now-evidence.since>=Config.TrafficBlockDuration
+end
+function Detector.Impact(velocity: Vector3, carVelocity: Vector3, toCar: Vector3): boolean
+ local horizontal=Vector3.new(toCar.X,0,toCar.Z)
+ if horizontal.Magnitude<0.01 then return false end
+ -- Tangential scraping and a patrol driving into a stationary rider are not rider impacts.
+ local approach=velocity:Dot(horizontal.Unit)
+ local closing=(velocity-carVelocity):Dot(horizontal.Unit)
+ return approach>=Config.ImpactMinClosingSpeed and closing>=Config.ImpactMinClosingSpeed
 end
 return Detector

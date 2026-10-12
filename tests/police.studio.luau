@@ -24,6 +24,7 @@ local ok,result=pcall(function()
  local bounded: any={destroyed=false,nextScan=0,scanOffset=0,units={},arrests={Update=function() end},context={root=fixtures},officerTemplate=nil}
  function bounded:Observe(unit,_,_,allocation) scans+=allocation;seen[unit]=true;return 0 end
  function bounded:UpdateUnit() updates+=1 end
+ function bounded:Incidents() end
  for i=1,20 do bounded.units[i]={machine={state="OBSERVING"},car={remove=false,vehicle={model=fixtures}}} end
  Police.Update(bounded,1)
  check(scans==Config.MaxScansPerTick,"Global observation budget remains bounded with many units")
@@ -49,7 +50,13 @@ local ok,result=pcall(function()
   end
   local officer=Officers.new(OfficerTemplate,prepared.model)
   check(officer.humanoid.RigType==Enum.HumanoidRigType.R15,"Native R15 fallback")
-  check(not officer.outside and officer.root.Anchored,"Officer is aboard during patrol")
+  check(not officer.outside and not officer.root.Anchored and officer.mount~=nil,"Officer is welded aboard during patrol")
+  check(officer.mount.Part0==prepared.root and officer.mount.Part1==officer.root,"Mount uses real chassis and officer root")
+  local head=officer.model.Head :: BasePart
+  check(prepared.root.CFrame:PointToObjectSpace(head.Position).Y>prepared.bounds.Y/2,"Officer head is visible above the roof")
+  local relative=prepared.root.CFrame:ToObjectSpace(officer.root.CFrame)
+  prepared.model:PivotTo(prepared.root.CFrame*CFrame.Angles(0,math.rad(40),0)+Vector3.new(20,0,0))
+  check((prepared.root.CFrame:ToObjectSpace(officer.root.CFrame).Position-relative.Position).Magnitude<0.001,"Patrol turns preserve officer mounting position")
   officer:Destroy();officer:Destroy();check(officer.destroyed,"Officer cleanup idempotent")
  end
  local origin=Vector3.new(10000,500,10000)
@@ -63,7 +70,8 @@ local ok,result=pcall(function()
  local frame=CFrame.new(origin)
  check(Rules.Visible(vehicle,frame,character,nil),"Clear forward visibility")
  target.Position=origin+Vector3.new(0,0,30);check(not Rules.Visible(vehicle,frame,character,nil),"Rear target outside FOV")
- target.Position=origin+Vector3.new(0,0,-250);check(not Rules.Visible(vehicle,frame,character,nil),"Target outside detection range")
+ check(Rules.Visible(vehicle,frame,character,nil,true),"Active pursuit tracks rear targets with clear sight")
+ target.Position=origin+Vector3.new(0,0,-Config.DetectionRange-10);check(not Rules.Visible(vehicle,frame,character,nil),"Target outside detection range")
  target.Position=origin+Vector3.new(0,0,-30)
  local wall=part("Occluder",Vector3.new(30,15,2),origin+Vector3.new(0,0,-15),fixtures)
  check(not Rules.Visible(vehicle,frame,character,nil),"Wall blocks both observation points")
@@ -74,6 +82,7 @@ local ok,result=pcall(function()
  nativeOfficer:Animate(1,false)
  check(nativeOfficer.outside and not nativeOfficer.root.Anchored,"Exited officer is physical")
  check(nativeOfficer.model.Parent==fixtures,"Officer separated from vehicle movement")
+ check(nativeOfficer.mount==nil and not nativeOfficer.humanoid.PlatformStand,"Exit releases mount and enables walking")
  nativeOfficer:Board();check(not nativeOfficer.outside and nativeOfficer.model.Parent==vehicle,"Return restores aboard ownership")
  nativeOfficer:Destroy();ground:Destroy()
  local data={version=1,approved=true,nodes={},edges={},spawns={"N0"},review={}}
