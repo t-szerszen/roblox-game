@@ -266,6 +266,30 @@ scope:Give(playerGui.ChildAdded:Connect(watchShop))
 scope:Give(changed.OnClientEvent:Connect(function()
 	if open then refresh() else refreshPending = true; feedback.Show("Nowa informacja z gangu. Otwórz telefon.") end
 end))
+-- Stage changes and distance are replicated by the authoritative delivery service.
+-- Update the visible app locally instead of polling a RemoteFunction while riding.
+local deliveryRenderPending=false
+for _,attribute in {"DeliveryActive","DeliveryStage","DeliveryDestination","DeliveryPickup","DeliveryReward","DeliveryDistance"} do
+	scope:Give(player:GetAttributeChangedSignal(attribute):Connect(function()
+		state.delivery={active=player:GetAttribute("DeliveryActive")==true,
+			stage=player:GetAttribute("DeliveryStage") :: string?,pickup=player:GetAttribute("DeliveryPickup") :: string?,
+			reward=player:GetAttribute("DeliveryReward") :: number?,
+			destination=(player:GetAttribute("DeliveryDestination") :: string?) or "",
+			distance=(player:GetAttribute("DeliveryDistance") :: number?) or 0}
+		if attribute=="DeliveryDistance" then
+			if open and page=="Delivery" then
+				local row=gui:FindFirstChild("Distance",true)
+				local label=row and row:FindFirstChild("Detail",true)
+				if label and label:IsA("TextLabel") then label.Text=string.format("%d studów",math.floor(state.delivery.distance)) end
+			end
+			return
+		end
+		if open and page=="Delivery" and not deliveryRenderPending then
+			deliveryRenderPending=true
+			task.defer(function() deliveryRenderPending=false;if alive and open and page=="Delivery" then render() end end)
+		end
+	end))
+end
 local function cleanup()
 	if not alive then return end
 	if open then setOpen(false) end

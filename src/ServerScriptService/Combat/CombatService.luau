@@ -14,6 +14,7 @@ local MeleeConfig = require(ReplicatedStorage.Shared.Combat.MeleeConfig)
 
 type Connections = { RBXScriptConnection }
 
+local PlayerDataService=require(script.Parent.Parent.Activity.PlayerDataService)
 local CombatService = {}
 local started = false
 local connections: Connections = {}
@@ -274,14 +275,17 @@ local function handleMelee(player: Player)
 end
 
 local function handlePepper(player: Player)
-	if isStunned(player) or player:GetAttribute(CombatConfig.PepperOwnershipAttribute) ~= true then
+	local profile=PlayerDataService.GetProfile(player)
+	if isStunned(player) or player:GetAttribute("ScooterInventoryLocked")==true or not profile or profile.equippedItems.pepper_spray~=true or not PlayerDataService.OwnsProduct(player,"pepper_spray") then
 		return
 	end
 	local now = os.clock()
-	if now - (lastPepperAt[player] or 0) < CombatConfig.PepperCooldown then
+	local nextUse=player:GetAttribute("PepperSprayNextUse")
+	if (typeof(nextUse)=="number" and Workspace:GetServerTimeNow()<nextUse) or now - (lastPepperAt[player] or 0) < CombatConfig.PepperCooldown then
 		return
 	end
 	lastPepperAt[player] = now
+	player:SetAttribute("PepperSprayNextUse",Workspace:GetServerTimeNow()+CombatConfig.PepperCooldown)
 	emitPepperSpray(player)
 	local target = findTarget(player, CombatConfig.PepperRange, CombatConfig.PepperFacingDot)
 	if target then

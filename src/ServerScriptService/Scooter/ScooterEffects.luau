@@ -54,7 +54,7 @@ function ScooterEffects.Create(model: Model, root: BasePart, rearPoint: Attachme
 end
 
 function ScooterEffects.Apply(effects: Effects, visuals: Visuals)
-	-- Entitlement verification and RGB validation happen in GarageService.
+	-- The server selects saved colors and verifies permanent unlocks before applying effects.
 	effects.smoke.Color = ColorSequence.new(if visuals.smokeEnabled then visuals.smokeColor else Color3.new(1, 1, 1))
 	effects.neon.Color = visuals.neonColor
 	effects.neon.Transparency = if visuals.neonEnabled then 0 else 1

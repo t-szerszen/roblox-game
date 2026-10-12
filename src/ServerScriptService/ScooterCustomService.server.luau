@@ -165,9 +165,11 @@ action.OnServerInvoke = function(player: Player, operation: any, modelArgument: 
  end
  if operation=="Apply" then
   if not validatePalette(palette) then return {ok=false} end
+  if not Data.SetPaint(player,model:GetAttribute("ScooterModel") :: string,palette) then return {ok=false,message="Dane gracza są niedostępne."} end
   Paint.Apply(model,palette)
  else
   if palette~=nil or not defaults[model] then return {ok=false} end
+  if not Data.SetPaint(player,model:GetAttribute("ScooterModel") :: string,defaults[model]) then return {ok=false,message="Dane gracza są niedostępne."} end
   Paint.Apply(model,defaults[model])
  end
  return {ok = true, model = model, colors = Paint.Read(model)}

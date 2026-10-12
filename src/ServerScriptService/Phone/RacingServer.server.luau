@@ -110,7 +110,7 @@ RunService.Heartbeat:Connect(function()
 			activeRaces[p1] = nil
 			activeRaces[p2] = nil
 			
-			PlayerDataService.AddCurrency(winner, RacingConfig.RaceRewardCoins, RacingConfig.RaceRewardXP)
+			PlayerDataService.AddCurrency(winner, RacingConfig.RaceRewardCoins, RacingConfig.RaceRewardXP,"RaceWin")
 			PlayerDataService.Increment(winner, "raceWins", 1)
 			PlayerDataService.IncrementDaily(winner, "DailyRaceWins", 1)
 			

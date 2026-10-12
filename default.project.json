@@ -27,6 +27,9 @@
     "ServerStorage": {
       "$className": "ServerStorage",
       "$ignoreUnknownInstances": true,
+      "PepperSprayTemplate": {
+        "$path": "assets/items/gaz.rbxm"
+      },
       "TerritoryFlagTemplate": {
         "$path": "assets/territory/TerritoryFlag.rbxmx"
       },

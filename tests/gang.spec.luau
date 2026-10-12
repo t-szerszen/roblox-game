@@ -1,3 +1,5 @@
+-- The native equipped-fists hitbox system has its own Studio fixture; this suite tests gang/phone and gas integration.
+moduleCache["ServerScriptService/Combat/MeleeService"]={Start=function() end,Attack=function() error("Melee hitboxes are outside this fixture") end}
 local Gang = loadModule("ServerScriptService/Gang/GangService")
 local Requests = loadModule("ServerScriptService/Gang/GangRequests")
 local Capture = loadModule("ServerScriptService/Territory/TerritoryCapture")
@@ -6,6 +8,8 @@ local Territory = loadModule("ServerScriptService/Territory/TerritoryService")
 local Rewards = loadModule("ServerScriptService/Territory/TerritoryRewards")
 local people = {}
 for id = 1, 12 do people[id] = gangPlayer(id) end
+local Profiles=loadModule("ServerScriptService/Activity/PlayerDataService")
+Profiles.Start()
 local a, b, c = people[1], people[4], people[5]
 Gang.Start(); Gang.Start()
 check(Gang.Create(a, "Alfa", 1), "Everyone can create without CanCreateGang entitlement")
@@ -126,6 +130,8 @@ Combat.StunPlayer(people[3], 3)
 check(Combat.GetTerritoryPosition(people[3]) ~= nil, "Living stunned member still participates")
 advance(3)
 a:SetAttribute("OwnsPepperSpray", true)
+check(Profiles.GrantProduct(a,"pepper_spray"),"Combat uses a persistent server-verified unlock")
+check(Profiles.SetItemEquipped(a,"pepper_spray",true),"Gas is explicitly equipped")
 local combatRemote = services.ReplicatedStorage.CombatRemotes.CombatAction
 combatRemote.OnServerEvent:Fire(a, "Pepper")
 near(b:GetAttribute("StunnedUntil") - testClock, 3, "Pepper stun lasts three seconds")
@@ -141,18 +147,21 @@ check(b:GetAttribute("StunnedUntil") == nil, "Current stun cleans up")
 
 Territory.Start(); flush()
 check(people[1]:GetAttribute("DataLoaded") == true, "Existing profile service started")
-Rewards.Pay({ [aId] = 1 })
-for _, player in Gang.GetOnlineMembers(aId) do check(player.leaderstats.Coins.Value == 8, "Equal first 60/7 payout") end
-Rewards.Pay({ [aId] = 1 })
-for _, player in Gang.GetOnlineMembers(aId) do check(player.leaderstats.Coins.Value == 17, "Remainder carried, all second shares equal") end
+Rewards.Clear();Rewards.Update({[aId]=1},testClock)
+Rewards.Update({[aId]=1},testClock+60)
+for _,player in Gang.GetOnlineMembers(aId) do check(player.leaderstats.Coins.Value==100,"One flag pays 100 per member, without division") end
+Rewards.Update({[aId]=1},testClock+120)
+for _,player in Gang.GetOnlineMembers(aId) do check(player.leaderstats.Coins.Value==200,"Next minute pays each member once") end
 Rewards.Clear()
 local eligible = Gang.GetOnlineMembers(aId)
 for index, player in eligible do player:SetAttribute("DataPersistenceAvailable", index <= 3) end
-Rewards.Pay({ [aId] = 2 })
+Rewards.Update({[aId]=2},testClock)
+Rewards.Update({[aId]=2},testClock+60)
 for index, player in eligible do
-	check(player.leaderstats.Coins.Value == (if index <= 3 then 57 else 17), "Two flags split 120 Coins among three eligible profiles only")
+	check(player.leaderstats.Coins.Value == (if index <= 3 then 400 else 200), "Two flags pay 200 to each eligible member")
 	player:SetAttribute("DataPersistenceAvailable", true)
 end
+Rewards.Clear()
 local map = InstanceMock.new("Folder"); map.Name = "Map"; map.Parent = services.Workspace
 local flag = InstanceMock.new("Model"); flag.Name = "Flag"; flag.Parent = map
 local cloth = InstanceMock.new("Part"); cloth.Color = Color.new(0.1, 0.2, 0.3); cloth.Parent = flag
@@ -183,7 +192,7 @@ for _ = 1, 24 do advance(1) end
 check(published:GetAttribute("OwnerGangId") == aId, "Server zone captures for actual gang")
 check(cloth.Color == Gang.GetState(a).gangColor, "Captured flag changes to owner color")
 check(a:GetAttribute("GangFlagsOwned") == 1, "Phone flag count published")
-check(a:GetAttribute("GangIncomePerMinute") == 8, "Phone displays equal share estimate")
+check(a:GetAttribute("GangIncomePerMinute") == 100, "Phone displays per-member flag income")
 for _, player in Gang.GetOnlineMembers(aId) do player.Character.Humanoid.Health = 0 end
 advance(1)
 check(published:GetAttribute("OwnerGangId") == aId, "Wipe preserves owned flag; dead players cannot capture")
@@ -196,6 +205,12 @@ services.CollectionService:AddTag(bad, "GangTerritory")
 check(#services.ReplicatedStorage.Territories:GetChildren() == 1, "Duplicate territory ID rejected")
 
 -- Exercise the real phone transport, including rate limiting before expensive reads.
+local deliveryCalls=0
+moduleCache["ServerScriptService/Activity/ActivityService"]={
+ Start=function() end,
+ AcceptDelivery=function(player) deliveryCalls+=1;return true,"Accepted" end,
+ CancelDelivery=function(player) deliveryCalls+=1;return true,"Cancelled" end,
+}
 loadModule("ServerScriptService/Phone/PhoneServer.server")
 local phone = services.ReplicatedStorage.PhoneRemotes.PhoneRequest
 advance(1)
@@ -207,6 +222,13 @@ advance(1)
 check(not phone.OnServerInvoke(a, "SetGangColor", 0/0), "Hostile color request rejected at transport")
 advance(1)
 check(not phone.OnServerInvoke(people[12], "RespondGangInvite", {id = "forged", accept = true}), "Forged invitation ID rejected")
+
+advance(1)
+check(not phone.OnServerInvoke(a,"AcceptDelivery",{coins=99999}) and deliveryCalls==0,"Phone rejects forged delivery payload before service")
+advance(1)
+check(phone.OnServerInvoke(a,"AcceptDelivery",nil) and deliveryCalls==1,"Phone forwards valid order acceptance")
+advance(1)
+check(phone.OnServerInvoke(a,"CancelDelivery",nil) and deliveryCalls==2,"Phone forwards cancellation")
 
 -- The owner's slot survives only while other online members keep the gang alive.
 disconnectPlayer(a)

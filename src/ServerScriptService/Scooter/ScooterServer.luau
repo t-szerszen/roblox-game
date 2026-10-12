@@ -17,6 +17,9 @@ local ScooterHeadlight = require(script.Parent.ScooterHeadlight)
 local ScooterTerrain = require(script.Parent.ScooterTerrain)
 local ScooterScrape = require(script.Parent.ScooterScrape)
 local ScooterImpact = require(script.Parent.ScooterImpact)
+local Cosmetics = require(script.Parent.ScooterCosmetics)
+local PlayerDataService = require(script.Parent.Parent.Activity.PlayerDataService)
+local ScooterEffects = require(script.Parent.ScooterEffects)
 local UpgradeService = require(script.Parent.ScooterUpgradeService)
 local UpgradeVisuals = require(script.Parent.ScooterUpgradeVisuals)
 local ShopConfig = require(ReplicatedStorage.Shared.Shop.ShopConfig)
@@ -25,6 +28,7 @@ local CombatService = require(script.Parent.Parent.Combat.CombatService)
 type Connection = RBXScriptConnection
 type ScooterRecord = {
 	model: Model,
+	effects: ScooterEffects.Effects,
 	owner: Player,
 	seat: VehicleSeat,
 	root: BasePart,
@@ -459,7 +463,7 @@ end
 
 local function playerOwnsModel(player: Player, modelName: string): boolean
 	local product = ShopConfig.GetScooterProduct(modelName)
-	return product ~= nil and (product.price == 0 or (product.stat ~= nil and player:GetAttribute(product.stat) == true))
+	return product ~= nil and PlayerDataService.OwnsScooter(player,modelName)
 end
 
 local function spawnForPlayer(player: Player, requestedModel: string?, templateName: string?): Model
@@ -542,7 +546,7 @@ local function spawnForPlayer(player: Player, requestedModel: string?, templateN
 	smoke.Parent = smokeAttachment
 	smoke.Color = ColorSequence.new(Color3.new(1, 1, 1))
 	-- Base tuning keeps the MVP independent of garage/profile availability.
-	local tuning = ScooterConfig.GetTuning(modelName, 0)
+	local tuning = ScooterConfig.GetTuning(modelName,0)
 	assert(tuning, "Unknown scooter model")
 	upright.MaxTorque = tuning.turnTorque * (root.AssemblyMass + additionalMass)
 	scooter:SetAttribute("UprightSupportMass", root.AssemblyMass + additionalMass)
@@ -573,8 +577,11 @@ local function spawnForPlayer(player: Player, requestedModel: string?, templateN
 		desiredForward = desiredForward.Unit
 	end
 
+	local visualEffects=ScooterEffects.Create(scooter,root,rearSuspensionPoint,smoke)
+	ScooterEffects.Apply(visualEffects,Cosmetics.GetVisuals(player,modelName))
+	Cosmetics.ApplyPaint(player,scooter)
 	local record: ScooterRecord = {
-		model = scooter,
+		model = scooter, effects = visualEffects,
 		owner = player,
 		seat = seat,
 		root = root,
@@ -927,6 +934,8 @@ local function requestSpawn(player: Player, modelName: string, templateName: str
 		warn("ScooterServer: " .. tostring(problem))
 		return false, "Brak poprawnego nowego modelu hulajnogi."
 	end
+	local profile=PlayerDataService.GetProfile(player)
+	if not templateName and profile and profile.selectedScooter~=modelName then PlayerDataService.SelectScooter(player,modelName) end
 	return true, "Hulajnoga czeka przy spawnie."
 end
 
@@ -1352,13 +1361,29 @@ function ScooterServer.Start()
 	end))
 end
 
-export type RidingState = {model: Model, root: BasePart, speedKmh: number, wheelie: boolean}
+function ScooterServer.RefreshCosmetics(player: Player)
+ local record=recordsByPlayer[player]
+ if not record or record.cleaning then return end
+ local modelName=record.model:GetAttribute("ScooterModel")
+ if typeof(modelName)~="string" then return end
+ ScooterEffects.Apply(record.effects,Cosmetics.GetVisuals(player,modelName))
+ Cosmetics.ApplyPaint(player,record.model)
+end
+
+export type RidingState = {model: Model, root: BasePart, speedKmh: number, maxSpeedKmh: number, wheelie: boolean, burnout: boolean, grounded: boolean}
 function ScooterServer.GetRidingState(player: Player): RidingState?
  local record=recordsByPlayer[player]
  if not record or record.cleaning or not record.model.Parent or not record.root.Parent
   or record.fallen or not playerOwnsOccupiedScooter(player,record) then return nil end
+ local axis=record.rig.backHinge.Attachment0
+ local spin=if axis then math.abs((record.rig.backWheel.AssemblyAngularVelocity-record.root.AssemblyAngularVelocity):Dot(axis.WorldAxis))*record.backWheelRadius else 0
+ local burnout=record.burnoutActive and record.rearGrounded and spin>record.root.AssemblyLinearVelocity.Magnitude+2
  return {model=record.model,root=record.root,speedKmh=record.speedKmh,
+  maxSpeedKmh=ScooterConfig.GetDriveModeMaxSpeed(record.tuning.maxSpeed,record.driveMode),
+  grounded=record.frontGrounded or record.rearGrounded or record.model:GetAttribute("DeckGrounded")==true,
+  burnout=burnout,
   wheelie=record.wheelieActive and record.rearGrounded and not record.frontGrounded
+   and math.asin(math.clamp(record.root.CFrame.LookVector.Y,-1,1))>=ScooterConfig.WheelieBalance.MinimumPhysicalAngle
    and math.abs(record.root.AssemblyLinearVelocity.Y)<=ScooterConfig.MaxGroundedVerticalSpeed}
 end
 function ScooterServer.LockMount(player: Player, owner: {}): boolean

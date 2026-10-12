@@ -5,3 +5,5 @@ local LeaderboardService = require(script.Parent.LeaderboardService)
 
 ActivityService.Start()
 LeaderboardService.Start()
+
+script.Destroying:Connect(ActivityService.Stop)

@@ -68,13 +68,14 @@ local function syncIncome()
 		local flags = if id then counts[id] or 0 else 0
 		local online = if id then #GangService.GetOnlineMembers(id) else 0
 		attribute(player, "GangFlagsOwned", flags)
-		attribute(player, "GangIncomePerMinute", if online > 0 then math.floor(flags * Config.CoinsPerFlag / online) else 0)
+		attribute(player, "GangIncomePerMinute", if online > 0 then flags * Config.CoinsPerFlag else 0)
 	end
 	GangService.NotifyAll()
 end
 local function unregister(zone: BasePart)
 	local record = records[zone]
 	if not record then return end
+	Rewards.Update(flagCounts(),Workspace:GetServerTimeNow())
 	records[zone] = nil
 	byId[record.id] = nil
 	for _, connection in record.connections do connection:Disconnect() end
@@ -150,6 +151,7 @@ local function sample(delta: number)
 		if oldOwner ~= record.state.ownerGangId then ownershipChanged = true end
 		publish(record)
 	end
+	Rewards.Update(flagCounts(),Workspace:GetServerTimeNow())
 	if ownershipChanged then syncIncome() end
 end
 function Service.Start()
@@ -167,25 +169,24 @@ function Service.Start()
 		if instance:IsA("BasePart") then unregister(instance) end
 	end))
 	unsubscribe = GangService.Subscribe(function(id: string)
+		Rewards.Update(flagCounts(),Workspace:GetServerTimeNow())
 		for _, record in records do
 			if not GangService.Exists(id) then Capture.RemoveGang(record.state, id) end
 			publish(record)
 		end
+		Rewards.Update(flagCounts(),Workspace:GetServerTimeNow())
 		syncIncome()
 	end)
 	syncIncome()
 	local accumulated = 0
-	local nextReward = Workspace:GetServerTimeNow() + Config.RewardInterval
+	Rewards.Update(flagCounts(),Workspace:GetServerTimeNow())
 	table.insert(connections, RunService.Heartbeat:Connect(function(delta: number)
 		accumulated += delta
 		if accumulated >= Config.SampleInterval then
 			local elapsed = math.min(accumulated, Config.MaxStepSeconds)
 			accumulated = 0
+			Rewards.Update(flagCounts(),Workspace:GetServerTimeNow())
 			sample(elapsed)
-			if Workspace:GetServerTimeNow() >= nextReward then
-				nextReward = Workspace:GetServerTimeNow() + Config.RewardInterval
-				Rewards.Pay(flagCounts())
-			end
 		end
 	end))
 end

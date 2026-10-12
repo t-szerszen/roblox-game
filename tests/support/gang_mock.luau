@@ -9,6 +9,7 @@ getfenv().RaycastParams = { new = function() return {} end }
 getfenv().OverlapParams = { new = function() return {} end }
 getfenv().UDim2 = { fromScale = function(x, y) return {x, y} end, fromOffset = function(x, y) return {x, y} end }
 getfenv().ColorSequence = { new = function(...) return {...} end }
+function Frame.new(x,y,z) return {Position=Vector.new(x or 0,y or 0,z or 0)} end
 local timers = {}
 function taskMock.delay(duration, callback, ...)
 	local args = table.pack(...)

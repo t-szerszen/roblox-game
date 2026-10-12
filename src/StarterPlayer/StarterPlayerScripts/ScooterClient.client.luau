@@ -300,7 +300,8 @@ local function requestDefaultScooter()
 			end
 		end
 	end
-	requestSpawnRemote:FireServer(ScooterConfig.DefaultModel)
+	local selected=localPlayer:GetAttribute("SelectedScooter")
+	requestSpawnRemote:FireServer(if typeof(selected)=="string" then selected else ScooterConfig.DefaultModel)
 end
 
 local function hookCharacter(character: Model)

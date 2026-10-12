@@ -8,7 +8,7 @@ export type State = {
 	passiveAvailable: boolean,
 	gangName: string?,
 	gang: GangState,
-	delivery: { active: boolean, destination: string, distance: number },
+	delivery: { active: boolean, stage: string?, pickup: string?, reward: number?, destination: string, distance: number },
 	daily: { { id: string, progress: number, target: number } },
 	ownedScooters: { string },
 	loginStreak: number,
