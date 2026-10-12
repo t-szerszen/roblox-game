@@ -37,7 +37,7 @@ check(not Input.IsFresh(input, 1), "New controller has no accepted intent")
 check(Input.Apply(input, 1, true, true, 0.6, true), "Simultaneous brake/throttle accepted")
 check(input.throttleHeld and input.brakeHeld and input.wheelieHeld and input.wheelieQueued,
 	"All buttons preserve independent intent")
-check(not Input.Apply(input, 1.01, false, false, 0, false), "Input spam is rejected")
+check(not Input.Apply(input, 1 + Config.DriveRemoteMinInterval * 0.5, false, false, 0, false), "Input spam is rejected")
 near(input.lastReceivedAt, 1, "Rejected spam does not extend freshness")
 check(Input.Apply(input, 1.1, false, false, -1, false), "Released input accepted")
 check(input.wheelieQueued, "Wheelie trigger edge survives button release")
@@ -58,7 +58,7 @@ check(not input.throttleHeld and not input.brakeHeld and not input.wheelieHeld
 	and not input.wheelieQueued and input.steering == 0,
 	"Reset clears every pending drive/trick intent")
 near(input.lastReceivedAt, 1.1, "Reset preserves request cooldown")
-check(not Input.Apply(input, 1.11, true, false, 0, false), "Reset does not bypass rate limit")
+check(not Input.Apply(input, 1.1 + Config.DriveRemoteMinInterval * 0.5, true, false, 0, false), "Reset does not bypass rate limit")
 
 near(Physics.SmoothSteering(0, 1, 0), 0, "Zero timestep does not steer")
 local smooth = Physics.SmoothSteering(0, 1, 1 / 60)
@@ -92,10 +92,12 @@ check(Physics.AdvanceWheeliePitch(raisedWheelie, 0, 0, 0.1) < raisedWheelie,
 check(Physics.AdvanceWheeliePitch(raisedWheelie, 1, 0, 0.1) < raisedWheelie,
 	"Throttle cannot balance a stationary wheelie")
 local overbalancedWheelie = Config.WheelieKickAngle
-for _ = 1, 30 do
+for _ = 1, 120 do
 	overbalancedWheelie = Physics.AdvanceWheeliePitch(overbalancedWheelie, 1, balanceSpeed, 0.1)
 end
-near(overbalancedWheelie, Config.WheelieFallAngle, "Holding W reaches the fall angle")
+local balanceTarget=Config.WheelieBalance.TargetAngle+Config.WheelieBalance.SpeedAngleBonus*math.clamp(balanceSpeed/(Config.WheelieBalance.SpeedReferenceKmh*Config.StudsPerKmH),0,1)
+check(math.abs(overbalancedWheelie-balanceTarget)<0.001 and overbalancedWheelie<Config.WheelieFallAngle,
+	"Existing Studio wheelie balance converges below the fall angle")
 local drive = {
 	velocity = forward * 20, forward = forward, groundUp = Vector.yAxis, gravity = 196.2,
 	mass = 10, maxSpeed = 55 * Config.StudsPerKmH, acceleration = 135,
@@ -250,7 +252,7 @@ check(not ok and reason == "InvalidRequest", "Client entitlement fields are reje
 ok, reason = request(rich, "PurchaseSpeed", "KuKirin G2 Max", 0 / 0)
 check(not ok and reason == "InvalidUpgrade", "Garage rejects non-finite upgrade requests")
 ok, reason = request(rich, "GetState", Config.DefaultModel, nil)
-check(not ok and reason == "InvalidRequest", "Garage rejects extra state request arguments")
+check(not ok and reason == "InvalidRequest", "Legacy garage rejects extra state request arguments")
 
 Shop.GetProduct("burnout_smoke").productId = 777
 Shop.GetProduct("scooter_neons").productId = 778
@@ -258,6 +260,7 @@ marketplaceService.PromptGamePassPurchaseFinished:Fire(rich, 777, true)
 check(not Garage.GetVisuals(rich).smokeEnabled, "Purchase signal alone never grants premium access")
 marketplaceService.ownership["1:777"] = true
 marketplaceService.ownership["1:778"] = true
+check(Profiles.GrantProduct(rich,"burnout_smoke") and Profiles.GrantProduct(rich,"scooter_neons"),"Legacy fixture receives central verified unlocks")
 marketplaceService.PromptGamePassPurchaseFinished:Fire(rich, 777, true)
 ok, reason, state = request(rich, "SetVisual", nil, { kind = "Smoke", enabled = true, color = Color.new(0.2, 0.4, 0.6) })
 check(ok and state.smokeOwned and state.visuals.smokeEnabled, "Verified pass can enable smoke")
@@ -275,7 +278,7 @@ check(marketplaceService.ownershipCalls == calls, "Cached entitlement avoids rep
 marketplaceService.failRequests = true
 marketplaceService.PromptGamePassPurchaseFinished:Fire(rich, 777, true)
 check(not Garage.GetVisuals(rich).smokeEnabled and not Garage.GetVisuals(rich).neonEnabled,
-	"Marketplace errors fail closed even with saved premium preferences")
+	"Disabled legacy garage fails closed on Marketplace errors")
 marketplaceService.failRequests = false
 check(refreshCount > 0, "Garage changes notify scooter refresh")
 Garage.Stop()

@@ -5,6 +5,7 @@ Captured from place `127535941224851` before the separately authorized integrati
 - `authored-place.rbxm`: native engine serialization of 3,114 authored roots across Workspace, ReplicatedStorage, ReplicatedFirst, ServerScriptService, ServerStorage, StarterPlayer, StarterGui, StarterPack, Lighting, SoundService, Teams and Chat. Includes models, map geometry, native UI and scripts embedded in assets.
 - `authored-terrain.rbxm`: complete sparse TerrainRegion captured with `Terrain:CopyRegion(Terrain.MaxExtents)`. Restore corner is `(-32000, -32000, -32000)` in cell coordinates. No terrain was cleared or pasted during capture.
 - `editor-sources.json`: all 690 readable script editor sources, Base64 encoded to preserve original bytes, including two legacy asset scripts containing non-UTF-8 comments. Open editor buffers are captured even if not yet committed to the Source property.
+- `service-settings.json`: readable serialized service settings and Terrain material colors, collected by ReflectionService. These are recovery metadata, not automatic changes to live services.
 - `manifest.json`: root order/parent paths, original script count, UTC timestamp, terrain information, archive sizes and SHA-256 hashes. The non-archivable Rojo session lock and editor camera are excluded.
 
 The 173 scripts under source-mapped services were also exported into `src/` before integrating local changes. Workspace/ServerStorage embedded scripts stay with their native objects in this snapshot; no standalone duplicates are deployed into those objects.

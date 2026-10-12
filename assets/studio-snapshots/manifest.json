@@ -28056,6 +28056,10 @@
     "editor-sources.json": {
       "bytes": 3015016,
       "sha256": "e9b438d84e73f4664ce58ca46e7ac08ed9cdca59509ad834d3c7e1a3b0d997bc"
+    },
+    "service-settings.json": {
+      "bytes": 16432,
+      "sha256": "800ecd1a44d2a3b7fcce9b0b0f5e8bbc7c7a620018ab732a81f6c038d0995aba"
     }
   }
 }

@@ -473,6 +473,18 @@ See [exact startup, inputs, results and remaining manual checks](../docs/POLICE_
 
 ### Rounded obstacle and wheelie-spark follow-up
 
+For the current smooth traversal controller, use
+`python3 tests/run_scooter_tests.py --arcade-only --luau /path/to/luau` and
+`tests/scooter_arcade_steps.studio.luau` in a fresh Studio Play session.
+Run `tests/scooter_motion.studio.luau` separately in a fresh Play session to
+check client interpolation; its results are on the Client datamodel and need
+the Client viewport in the foreground, rather than throttled in the background.
+Run `tests/scooter_handling.studio.luau` in another fresh Play session for
+left/right/release, rider retention and local wheel/coil visibility and motion.
+Inspect CLIENT `Workspace._ScooterHandlingResults`, then stop Play.
+See [smooth traversal](../docs/SCOOTER_SMOOTH_ARCADE_STEPS.md). The older runner
+below verifies the retained force-based behavior with ArcadeSteps.Enabled=false.
+
 The scooter CLI suite covers sloping faces, rounded-arc support, speed-bounded
 anticipation, wall rejection and common post-solver rebound correction without
 unintended lateral or relative suspension velocity changes. It also checks
@@ -496,3 +508,28 @@ and paste `tests/scooter_arcade_followup.studio.luau`. Wait for
 then stop Play to restore the usual client input. Set `STEERING_ONLY = true` for the focused six-turn and spark regression.
 The runner temporarily replaces
 rider input within Play and never edits authored StarterPlayerScripts or the map.
+
+## Police/traffic repair integration
+
+Run `python3 tests/run_police_traffic_tests.py --luau /path/to/luau` alongside the
+existing police and traffic CLI suites. This runner exercises the actual police
+orchestration, vehicle controller and lifecycle policy with explicit engine
+doubles. It checks impact ownership/contact deduplication/cooldown, sustained
+player obstruction, legitimate intersection/queue exclusions, physical scooter
+targeting, dismount/occlusion, independent player claims, protected retirement,
+120-second recovery, failed recovery, route progress reset and evidence cleanup.
+
+The native `police.studio.luau` and `traffic.studio.luau` fixtures additionally
+check the new weld/exit contract and scaled bounds/axles. These fixtures were
+compiled but could not be run during this repair because Studio execution was
+unreachable. Real physics, visuals, collision timing and two-client scenarios
+remain mandatory acceptance checks. See
+[repair report and A–G scenarios](../docs/POLICE_TRAFFIC_REPAIR.md).
+
+## Economy and phone delivery corrections (local only)
+
+`python3 tests/run_economy_tests.py --luau /path/to/luau` exercises the actual wallet, session persistence, reward calculations, shop and tagged delivery lifecycle with controlled service doubles. Covers phone-first acceptance, collection before delivery, cancellation, duplicate settlement, teleport rejection including the final prompt, unknown saved-field preservation, and accessory equipment without the disabled garage.
+
+`run_gang_tests.py` additionally checks the real phone transport rejects arbitrary delivery payloads and forwards valid accept/cancel actions. Native fixtures remain available for a separately authorized test project; do not sync code to a collaborator's active Studio session to run them. Configuration and manual acceptance checks are listed in `docs/ECONOMY_IMPLEMENTATION.md`.
+
+The Studio-integration worktree preserves the current Studio steering cooldown and wheelie response; runtime tests derive rejection timing from configuration and allow the preserved wheelie balance to converge. After this merge, the CLI object double supports recursive descendants for the latest authored paint selector. Gang tests isolate the separate native melee service; use its existing Studio multiplayer fixture for equipped-fists hitboxes.
