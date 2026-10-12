@@ -33,9 +33,10 @@ function Sensors.RefreshBodies(self: Sensor, cars: {Body})
 	end
 	for _,player in Players:GetPlayers() do
 		local character=player.Character
-		if character and character.PrimaryPart then
+		local root=if character then (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart) else nil
+		if character and root and root:IsA("BasePart") then
 			local frame,size=character:GetBoundingBox()
-			table.insert(self.bodies,{model=character,frame=frame,size=size,velocity=character.PrimaryPart.AssemblyLinearVelocity})
+			table.insert(self.bodies,{model=character,frame=frame,size=size,velocity=root.AssemblyLinearVelocity})
 		end
 	end
 end
@@ -51,10 +52,11 @@ function Sensors.Frame(position: Vector3, direction: Vector3, size: Vector3): CF
 	local p=position+Vector3.yAxis*(size.Y/2+Config.Vehicle.GroundClearance)
 	return CFrame.lookAt(p,p+direction)
 end
-function Sensors.Ground(self: Sensor, position: Vector3, direction: Vector3, size: Vector3): CFrame?
+function Sensors.Ground(self: Sensor, position: Vector3, direction: Vector3, size: Vector3, wheelbase: number?): CFrame?
+	local axleDistance=wheelbase or Config.Vehicle.Wheelbase
 	local right=direction:Cross(Vector3.yAxis).Unit
-	local front=position+direction*Config.Vehicle.Wheelbase/2
-	local back=position-direction*Config.Vehicle.Wheelbase/2
+	local front=position+direction*axleDistance/2
+	local back=position-direction*axleDistance/2
 	local points={front,back,position+right*size.X/2,position-right*size.X/2}
 	for _,x in {-1,1} do for _,z in {-1,1} do
 		table.insert(points,position+right*size.X/2*x+direction*size.Z/2*z)
@@ -66,7 +68,7 @@ function Sensors.Ground(self: Sensor, position: Vector3, direction: Vector3, siz
 		if not hit or hit.Normal.Y<math.cos(Config.MaxSlope) or math.abs(hit.Position.Y-position.Y)>Config.MaxGroundChange then return nil end
 		table.insert(heights,hit.Position.Y)
 	end
-	local pitch=(heights[1]-heights[2])/Config.Vehicle.Wheelbase
+	local pitch=(heights[1]-heights[2])/axleDistance
 	local roll=(heights[3]-heights[4])/size.X
 	if math.abs(pitch)>math.tan(Config.MaxSlope) or math.abs(roll)>math.tan(Config.MaxSlope) then return nil end
 	local forward=Vector3.new(direction.X,pitch,direction.Z).Unit

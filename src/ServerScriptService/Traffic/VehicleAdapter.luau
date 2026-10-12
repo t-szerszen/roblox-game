@@ -2,7 +2,7 @@
 local Config = require(script.Parent.TrafficConfiguration)
 local Trajectory=require(script.Parent.Trajectory)
 local Adapter = {}
-export type Vehicle = { model: Model, root: BasePart, bounds: Vector3 }
+export type Vehicle = { model: Model, root: BasePart, bounds: Vector3, wheelbase: number }
 function Adapter.Placeholder(): Model
 	local model=Instance.new("Model"); model.Name=Config.Vehicle.TemplateName
 	local function part(name: string, size: Vector3, frame: CFrame, color: Color3): Part
@@ -28,7 +28,8 @@ function Adapter.Placeholder(): Model
 	for name,z in axlePositions do
 		local attachment=Instance.new("Attachment"); attachment.Name=name; attachment.Position=Vector3.new(0,-0.9,z); attachment.Parent=root
 	end
-	model:SetAttribute("TrafficBounds",Config.Vehicle.Bounds)
+	model:ScaleTo(Config.Vehicle.PlaceholderScale)
+	model:SetAttribute("TrafficBounds",root.Size)
 	return model
 end
 function Adapter.Prepare(template: Model): Vehicle
@@ -61,6 +62,10 @@ function Adapter.Prepare(template: Model): Vehicle
 	local chassis=clone.PrimaryPart :: BasePart
 	chassis.Size=bounds; chassis.CanCollide=true; chassis.CanQuery=true
 	clone:SetAttribute("NPCVehicle",true)
-	return {model=clone,root=chassis,bounds=bounds}
+	local front=chassis:FindFirstChild("FrontAxle") :: Attachment
+	local rear=chassis:FindFirstChild("RearAxle") :: Attachment
+	local wheelbase=(front.Position-rear.Position).Magnitude
+	assert(wheelbase>0 and wheelbase<=bounds.Z,"Invalid vehicle wheelbase")
+	return {model=clone,root=chassis,bounds=bounds,wheelbase=wheelbase}
 end
 return Adapter

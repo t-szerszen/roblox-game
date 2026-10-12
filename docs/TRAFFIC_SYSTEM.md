@@ -1,5 +1,16 @@
 # NPC road traffic
 
+## Current repair — 2026-10-12
+
+See [police/traffic repair](POLICE_TRAFFIC_REPAIR.md) for changes and validation.
+Civilians now use a 35-stud/s cap, acceleration 5.5 and lane multiplier 1.1;
+the existing fallback is uniformly enlarged by 10%. Ground probes use prepared
+axle spacing. Recovery checks 120 seconds without verified route progress,
+excludes legitimate waits and NPC queues, and retries before retirement. Central
+`VehicleLifecycle` policy protects active police. Movement/sensing schedules,
+authored roads, geometry checks and budgets remain intact. Older defaults below
+are historical.
+
 Implemented on `feat/npc-road-traffic`. Rojo automatically maps the new server
 `Traffic` directory through the existing project paths. Production map authoring,
 map rebuilding, scooter physics, ownership, economy, networking and input remain
