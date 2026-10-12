@@ -52,29 +52,26 @@ end
 function UI.Create(gui, groups)
  local backdrop = frame(gui,"Backdrop",0,0,0,0,Color3.fromRGB(5,7,11))
  backdrop.Size,backdrop.BackgroundTransparency,backdrop.Active,backdrop.Visible=UDim2.fromScale(1,1),.28,true,false
- local panel = frame(gui,"HoneycombCustom",0,0,1020,660,ink)
+ local panel = frame(gui,"GarageCustom",0,0,1020,660,ink)
  panel.Position, panel.AnchorPoint, panel.Visible = UDim2.fromScale(.5,.5),Vector2.new(.5,.5),false
  round(panel,22)
  local outline = Instance.new("UIStroke") outline.Color, outline.Transparency, outline.Parent = gold,.65,panel
  local scale = Instance.new("UIScale") scale.Parent = panel
- local top = frame(panel,"HoneyLine",26,0,968,2,gold)
+ local top = frame(panel,"HeaderLine",26,0,968,2,gold)
  round(top,2)
- hexagon(panel,27,24,19,gold,false)
- label(panel,"H",34,27,24,30,20,gold).Font = Enum.Font.GothamBlack
- label(panel,"HONEYCOMB",78,21,300,32,25).Font = Enum.Font.GothamBlack
- label(panel,"CUSTOM GARAGE  /  STWÓRZ SWÓJ STYL",79,55,460,18,10,muted)
+ label(panel,"GARAŻ",26,21,350,32,25).Font = Enum.Font.GothamBlack
+ label(panel,"PERSONALIZACJA  /  STWÓRZ SWÓJ STYL",27,55,460,18,10,muted)
  local badge = frame(panel,"GarageBadge",780,29,151,30,Color3.fromRGB(48,39,24)) round(badge,15)
  label(badge,"●  WARSZTAT",20,0,130,30,10,gold)
  local closeButton = button(panel,"×",950,25,42,42)
+ local appearanceTab=button(panel,"Wygląd",596,68,195,26)
+ local performanceTab=button(panel,"Wydajność",801,68,195,26)
+ local performance=require(script.Parent.ScooterUpgradeUI).Create(panel)
  local stage = frame(panel,"Showroom",24,98,556,466,card) round(stage,16)
  stage.ClipsDescendants = true
  local gradient = Instance.new("UIGradient")
  gradient.Color = ColorSequence.new(Color3.fromRGB(39,44,54),Color3.fromRGB(19,22,28))
  gradient.Rotation, gradient.Parent = 65,stage
- for row=0,3 do for col=0,6 do
-  local motif = hexagon(stage,20+col*75+(row%2)*37.5,42+row*65,42,Color3.fromRGB(67,72,79),false)
-  for _,edge in motif:GetChildren() do if edge:IsA("Frame") then edge.BackgroundTransparency = .75 end end
- end end
  label(stage,"TWÓJ PROJEKT",22,16,260,24,10,gold)
  local viewport = Instance.new("ViewportFrame")
  viewport.Name, viewport.Position, viewport.Size = "ScooterPreview",UDim2.fromOffset(8,38),UDim2.fromOffset(540,380)
@@ -85,7 +82,7 @@ function UI.Create(gui, groups)
  local camera = Instance.new("Camera") camera.FieldOfView,camera.Parent = 35,viewport viewport.CurrentCamera = camera
  local left = button(stage,"‹",21,417,36,32)
  local right = button(stage,"›",499,417,36,32)
- label(stage,"OBRÓĆ PODGLĄD",188,422,220,22,10,muted)
+ label(stage,"AUTOMATYCZNY OBRÓT",188,422,220,22,10,muted)
  local picker = frame(panel,"Palette",596,98,400,466,card) round(picker,16)
  label(picker,"01  /  WYBIERZ ELEMENT  •  PRZEWIŃ ↔",18,12,365,20,10,gold)
  local tabs = {}
@@ -135,14 +132,22 @@ function UI.Create(gui, groups)
  hex.Font,hex.TextSize,hex.TextColor3=Enum.Font.GothamBold,14,white
  hex.BackgroundColor3,hex.BorderSizePixel,hex.Parent=ink,0,picker round(hex,8)
  label(picker,"WŁASNY HEX",259,425,125,19,9,muted)
- label(panel,"TWÓJ KOLOR. TWÓJ CHARAKTER.",26,581,500,24,12)
- label(panel,"Wybierz kolor • obejrzyj podgląd • zatwierdź",26,610,540,22,11,muted)
+ local footerTitle=label(panel,"TWÓJ KOLOR. TWÓJ CHARAKTER.",26,581,500,24,12)
+ local footerSubtitle=label(panel,"Wybierz kolor • obejrzyj podgląd • zatwierdź",26,610,540,22,11,muted)
+ local projects = frame(panel,"Projects",26,603,540,30,ink)
+ local slots = {}
+ for index=1,3 do
+  local x=(index-1)*182
+  slots[index]={Save=button(projects,"Zapisz "..index,x,0,84,30),Load=button(projects,"Pusty",x+88,0,84,30)}
+ end
  local apply = button(panel,"ZATWIERDŹ PROJEKT  →",596,582,265,48)
  apply.BackgroundColor3,apply.TextColor3=gold,ink
  local reset = button(panel,"Resetuj",871,582,125,48)
  local status = label(panel,"",596,636,400,16,10,muted)
  return {Panel=panel,Backdrop=backdrop,Scale=scale,Viewport=viewport,World=world,Camera=camera,
   Close=closeButton,Apply=apply,Reset=reset,Status=status,Hex=hex,Swatch=swatch,
-  Tabs=tabs,Swatches=swatches,Sliders=sliders,Left=left,Right=right,Gold=gold}
+  Tabs=tabs,Swatches=swatches,Sliders=sliders,Left=left,Right=right,Gold=gold,
+  Stage=stage,Picker=picker,AppearanceTab=appearanceTab,PerformanceTab=performanceTab,Performance=performance,
+  FooterTitle=footerTitle,FooterSubtitle=footerSubtitle,Projects=projects,Slots=slots}
 end
 return UI

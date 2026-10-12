@@ -10,10 +10,15 @@ local GangRequests = require(script.Parent.Parent.Gang.GangRequests)
 local CombatService = require(script.Parent.Parent.Combat.CombatService)
 local ScooterServer = require(script.Parent.Parent.Scooter.ScooterServer)
 
+local ActivityService = require(script.Parent.Parent.Activity.ActivityService)
+
 type GangState = GangService.GangState
 
 type DeliveryState = {
 	active: boolean,
+	stage: string,
+	pickup: string,
+	reward: number,
 	destination: string,
 	distance: number,
 }
@@ -64,6 +69,7 @@ else
 	stateChanged.Parent = remotes
 end
 
+ActivityService.Start()
 GangService.Start()
 GangService.SetChangedCallback(function(player: Player)
 	stateChanged:FireClient(player)
@@ -82,9 +88,9 @@ end
 local function getState(player: Player): PhoneState
 	local gangName = optionalStringAttribute(player, "GangName")
 	local ownedScooters: { string } = {}
-	for _, product in ShopConfig.CoinProducts do
+	for _, product in ShopConfig.GetScooters() do
 		if product.price == 0 or (product.stat ~= nil and player:GetAttribute(product.stat) == true) then
-			table.insert(ownedScooters, product.name)
+			table.insert(ownedScooters, product.modelName or product.name)
 		end
 	end
 
@@ -106,6 +112,9 @@ local function getState(player: Player): PhoneState
 		gang = GangService.GetState(player),
 		delivery = {
 			active = player:GetAttribute("DeliveryActive") == true,
+			stage = optionalStringAttribute(player,"DeliveryStage") or "",
+			pickup = optionalStringAttribute(player,"DeliveryPickup") or "",
+			reward = numericAttribute(player,"DeliveryReward"),
 			destination = optionalStringAttribute(player, "DeliveryDestination") or "",
 			distance = numericAttribute(player, "DeliveryDistance"),
 		},
@@ -124,6 +133,13 @@ local function handleRequest(player: Player, action: string, payload: unknown)
 	if action == "GetState" then
 		if payload ~= nil then return response(false, "Nieprawidłowe żądanie.", player) end
 		return response(true, "", player)
+	end
+	if action=="AcceptDelivery" or action=="CancelDelivery" then
+		if payload~=nil then return response(false,"Nieprawidłowe żądanie dostawy.",player) end
+		local success,message
+		if action=="AcceptDelivery" then success,message=ActivityService.AcceptDelivery(player)
+		else success,message=ActivityService.CancelDelivery(player) end
+		return response(success,message,player)
 	end
 	if action == "SetPassive" then
 		if typeof(payload) ~= "boolean" then return response(false, "Nieprawidłowy tryb ochrony.", player) end

@@ -78,17 +78,24 @@ function AppsView.Render(parent: Instance, scope: Scope.Scope, page: Types.Page,
 	if page == "Scooters" then
 		local owned: { [string]: boolean } = {}
 		for _, name in state.ownedScooters do owned[name] = true end
-		for _, product in ShopConfig.CoinProducts do
-			local available = owned[product.name] == true
+		for _, product in ShopConfig.GetScooters() do
+			local available = owned[product.modelName or product.name] == true
+			if product.retired and not available then continue end
 			local row = card(product.id, product.name, product.description, if available then Color3.fromRGB(0, 200, 245) else Color3.fromRGB(70, 70, 75))
-			action(row, "Spawn", if available then "Przywołaj" else "Dostępna w sklepie", "SpawnScooter", product.name, available, true)
+			action(row, "Spawn", if available then "Przywołaj" else "Dostępna w sklepie", "SpawnScooter", product.modelName or product.name, available, true)
 		end
 	elseif page == "Delivery" then
 		if state.delivery.active then
-			card("Destination", "Cel dostawy", state.delivery.destination)
+			local pickup=state.delivery.stage=="Pickup"
+			card("Stage", if pickup then "1 / 2 — Odbiór w sklepie" else "2 / 2 — Dostawa pod budynek",
+				if pickup then "Podjedź do sklepu i odbierz zamówienie przy punkcie odbioru." else "Podjedź pod budynek i przekaż zamówienie przy punkcie dostawy.")
+			card("Destination", if pickup then "Sklep odbioru" else "Adres dostawy", state.delivery.destination)
 			card("Distance", "Pozostały dystans", string.format("%d studów", math.floor(state.delivery.distance)))
+			local row=card("Reward", "Wynagrodzenie", string.format("%d Coins po dostarczeniu",state.delivery.reward or 0))
+			action(row,"CancelDelivery","Anuluj zlecenie","CancelDelivery",nil,true,false)
 		else
-			card("NoDelivery", "Brak zlecenia", "Znajdź punkt odbioru paczek na mapie, aby rozpocząć dostawę.")
+			local row=card("NoDelivery", "Dostawy", "Przyjmij zlecenie, odbierz zamówienie w sklepie i dostarcz je pod wskazany budynek. Zarobisz 100–250 Coins zależnie od długości trasy.")
+			action(row,"AcceptDelivery","Przyjmij zlecenie","AcceptDelivery",nil,true,true)
 		end
 	elseif page == "Daily" then
 		card("Login", "Seria logowań", string.format("Dzień %d/7", state.loginStreak))

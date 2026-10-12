@@ -50,6 +50,10 @@ See [measurements and diagnosis](SCOOTER_BASE_POSE_ANALYSIS.md) and
 
 ## Climbing without artificial horizontal braking
 
+Current small-obstacle traversal uses the server-authored height path documented
+in [smooth arcade steps](SCOOTER_SMOOTH_ARCADE_STEPS.md). The force/momentum
+implementation described below remains the development fallback.
+
 Previously the tire force targeted a fixed speed **along** the climbing tangent.
 At faster entry speeds this supplied a backward horizontal force, exaggerating
 curb deceleration. The current force separates vertical support from forward

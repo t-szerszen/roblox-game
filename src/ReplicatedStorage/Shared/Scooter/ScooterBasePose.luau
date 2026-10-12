@@ -20,6 +20,23 @@ export type Rig = {
 	waist: Joint,
 	neck: Joint,
 	limbs: { [string]: Limb },
+	lastSpeed: number?,
+	acceleration: number,
+	forwardLean: number,
+	cornerLean: number,
+	steeringYaw: number,
+	wheelieCounter: number,
+	lastVerticalSpeed: number?,
+	landingCrouch: number,
+	startCrouch: number,
+	reachShift: number,
+	wasFrontGrounded: boolean,
+	ScooterPitch: number,
+	ScooterRoll: number,
+	SteeringAngle: number,
+	RiderLean: number,
+	RiderPitch: number,
+	RiderTurnLean: number,
 }
 
 local BasePose = {}
@@ -81,7 +98,10 @@ function BasePose.Bind(character: Model): Rig?
 			limbs[endName] = { first = first, middle = middle, last = last, endPart = endPart }
 		end
 	end
-	return { rootPart = rootPart, root = root, waist = waist, neck = neck, limbs = limbs }
+	return { rootPart = rootPart, root = root, waist = waist, neck = neck, limbs = limbs,
+		lastSpeed = nil, acceleration = 0, forwardLean = 0, cornerLean = 0, steeringYaw = 0, wheelieCounter = 0,
+		lastVerticalSpeed = nil, landingCrouch = 0, startCrouch = 0, reachShift = 0, wasFrontGrounded = true,
+		ScooterPitch = 0, ScooterRoll = 0, SteeringAngle = 0, RiderLean = 0, RiderPitch = 0, RiderTurnLean = 0 }
 end
 
 local function setTransform(j: Joint, value: CFrame)
@@ -91,6 +111,18 @@ local function setTransform(j: Joint, value: CFrame)
 	else
 		instance.Transform = value
 	end
+end
+
+local function refreshJointFrames(j: Joint): boolean
+	local instance = j.instance
+	if instance:IsA("Motor6D") then
+		j.c0, j.c1 = instance.C0, instance.C1
+	else
+		local a0, a1 = instance.Attachment0, instance.Attachment1
+		if not a0 or not a1 then return false end
+		j.c0, j.c1 = a0.CFrame, a1.CFrame
+	end
+	return true
 end
 
 local function setJoint(j: Joint, parentFrame: CFrame, childFrame: CFrame)
@@ -188,7 +220,19 @@ local function solveArm(limb: Limb, parentFrame: CFrame, desiredEnd: CFrame, pol
 	return math.abs(delta.Magnitude - combined.Magnitude)
 end
 
-function BasePose.Update(rig: Rig, scooter: Model): number
+function BasePose.Update(rig: Rig, scooter: Model, deltaTime: number?): number
+	-- Avatar geometry can finish replicating after Bind succeeds. Use the actual
+	-- joint frames in this existing pose pass instead of retaining startup offsets.
+	for _, j in { rig.root, rig.waist, rig.neck } do
+		if not refreshJointFrames(j) then return math.huge end
+	end
+	for _, limb in rig.limbs do
+		for _, j in { limb.first, limb.middle, limb.last } do
+			if not refreshJointFrames(j) then return math.huge end
+		end
+		if (limb.middle.c0.Position - limb.first.c1.Position).Magnitude < EPSILON
+			or (limb.last.c0.Position - limb.middle.c1.Position).Magnitude < EPSILON then return math.huge end
+	end
 	local root = scooter.PrimaryPart
 	local deck = scooter:FindFirstChild("FootRest", true)
 	local bar = scooter:FindFirstChild("HandleBar", true)
@@ -205,11 +249,85 @@ function BasePose.Update(rig: Rig, scooter: Model): number
 	local rootFrame = if seat and seat:IsA("BasePart") and weld and weld:IsA("Weld")
 		and weld.Part0 == seat and weld.Part1 == rig.rootPart
 		then seat.CFrame * weld.C0 * weld.C1:Inverse() else rig.rootPart.CFrame
-	local lower = rootFrame * rig.root.c0 * rig.root.c1:Inverse()
-	local upper = lower * rig.waist.c0 * CFrame.Angles(-settings.TorsoLean, 0, 0) * rig.waist.c1:Inverse()
-	setTransform(rig.root, CFrame.identity)
-	setTransform(rig.waist, CFrame.Angles(-settings.TorsoLean, 0, 0))
-	setTransform(rig.neck, CFrame.Angles(settings.TorsoLean, 0, 0))
+	local dynamics = Config.RiderDynamics
+	local dt = math.clamp(deltaTime or 1 / 60, 1 / 240, 0.1)
+	local alpha = 1 - math.exp(-dynamics.Response * dt)
+	local flatHeading = Vector3.new(root.CFrame.LookVector.X, 0, root.CFrame.LookVector.Z)
+	local speed = if flatHeading.Magnitude > EPSILON then root.AssemblyLinearVelocity:Dot(flatHeading.Unit) else 0
+	local acceleration = if rig.lastSpeed then math.clamp((speed - rig.lastSpeed) / dt,
+		-dynamics.AccelerationReference, dynamics.AccelerationReference) else 0
+	rig.lastSpeed = speed
+	rig.acceleration += (acceleration - rig.acceleration) * alpha
+	local speedRatio = math.clamp(math.abs(speed) / (dynamics.LeanFullSpeedKmh * Config.StudsPerKmH), 0, 1)
+	local accelerationRatio = rig.acceleration / dynamics.AccelerationReference
+	local motionLean = if accelerationRatio >= 0 then accelerationRatio * dynamics.AccelerationLean
+		else -accelerationRatio * dynamics.BrakingLean
+	local steeringValue = scooter:GetAttribute("Steering")
+	local steeringAmount = math.clamp(if typeof(steeringValue) == "number" then steeringValue else 0, -1, 1)
+	local desiredForwardLean = motionLean + speedRatio * dynamics.SpeedLean
+		+ math.abs(steeringAmount) * dynamics.SteeringReachLean
+	rig.forwardLean += (desiredForwardLean - rig.forwardLean) * alpha
+	local chassisPitch = math.asin(math.clamp(root.CFrame.LookVector.Y, -1, 1))
+	local frontGrounded = scooter:GetAttribute("FrontGrounded") == true
+	local rearGrounded = scooter:GetAttribute("RearGrounded") == true
+	-- Contact confirms the stunt. Preserve its eased counter-pose through landing;
+	-- slopes with both tires supported do not select a wheelie pose.
+	local pitch = if scooter:GetAttribute("WheeliePhysical") == true
+		or (rig.wheelieCounter > math.rad(1) and not frontGrounded and rearGrounded)
+		then math.max(0, chassisPitch) else 0
+	rig.wheelieCounter += (pitch - rig.wheelieCounter) * alpha
+	local chassisRoll = math.atan2(root.CFrame.RightVector.Y, root.CFrame.UpVector.Y)
+	local cornering = math.clamp(chassisRoll * dynamics.BodyCorneringFraction * speedRatio,
+		-dynamics.MaximumBodyCornering, dynamics.MaximumBodyCornering)
+	rig.cornerLean += (cornering - rig.cornerLean) * alpha
+	local verticalSpeed = root.AssemblyLinearVelocity.Y
+	local verticalAcceleration = if rig.lastVerticalSpeed then (verticalSpeed - rig.lastVerticalSpeed) / dt else 0
+	rig.lastVerticalSpeed = verticalSpeed
+	local landing = frontGrounded and not rig.wasFrontGrounded and rig.wheelieCounter > math.rad(4)
+	rig.wasFrontGrounded = frontGrounded
+	local compression = math.clamp(verticalAcceleration / dynamics.VerticalAccelerationReference, 0, 1)
+	local crouchTarget = if landing then dynamics.LandingCrouch else compression * dynamics.LandingCrouch
+	rig.landingCrouch += (crouchTarget - rig.landingCrouch) * (1 - math.exp(-dynamics.LandingResponse * dt))
+	local startCrouchTarget = if scooter:GetAttribute("RidingState") == "WheelieStart" then dynamics.WheelieStartCrouch else 0
+	rig.startCrouch += (startCrouchTarget - rig.startCrouch) * alpha
+	local crouch = dynamics.WheelieCrouch * math.clamp(rig.wheelieCounter / Config.WheelieFallAngle, 0, 1)
+		+ dynamics.AccelerationCrouch * math.abs(accelerationRatio)
+		+ rig.landingCrouch
+		+ rig.startCrouch
+	local rootPitch = -rig.wheelieCounter * dynamics.WheelieRootCounter
+	local waistPitch = math.clamp(-settings.TorsoLean - rig.forwardLean - rig.wheelieCounter * dynamics.WheelieTorsoCounter, -math.rad(60), math.rad(8))
+	local rootPose = CFrame.new(0, -crouch, -rig.reachShift) * CFrame.Angles(rootPitch, 0, rig.cornerLean * 0.35)
+	local steering = scooter:GetAttribute("Steering")
+	local yaw = -math.clamp(if typeof(steering) == "number" then steering else 0, -1, 1)
+		* Config.MaxHandlebarAngle * dynamics.SteeringTorsoYaw
+	rig.steeringYaw += (yaw - rig.steeringYaw) * alpha
+	local waistPose = CFrame.Angles(waistPitch, rig.steeringYaw, rig.cornerLean * 0.65)
+	local lower = rootFrame * rig.root.c0 * rootPose * rig.root.c1:Inverse()
+	local upper = lower * rig.waist.c0 * waistPose * rig.waist.c1:Inverse()
+	local reachCorrection = -math.huge
+	for _, side in { "Left", "Right" } do
+		local arm = rig.limbs[side .. "Hand"]
+		local grip = if side == "Left" then leftGrip else rightGrip
+		local shoulder = (upper * arm.first.c0).Position
+		local length = (arm.middle.c0.Position - arm.first.c1.Position).Magnitude
+			+ (arm.last.c0.Position - arm.middle.c1.Position).Magnitude - dynamics.ArmReachMargin
+		reachCorrection = math.max(reachCorrection, (grip.WorldPosition - shoulder).Magnitude - length)
+	end
+	local shiftTarget = math.clamp(rig.reachShift + reachCorrection, 0, dynamics.ReachShiftLimit)
+	-- Shift the cosmetic hips slightly rather than leaning the chest dramatically
+	-- or stretching arms. Feet remain solved to the deck with authored limb lengths.
+	rig.reachShift += (shiftTarget - rig.reachShift) * alpha
+	rootPose = CFrame.new(0, -crouch, -rig.reachShift) * CFrame.Angles(rootPitch, 0, rig.cornerLean * 0.35)
+	lower = rootFrame * rig.root.c0 * rootPose * rig.root.c1:Inverse()
+	upper = lower * rig.waist.c0 * waistPose * rig.waist.c1:Inverse()
+	rig.ScooterPitch, rig.ScooterRoll = chassisPitch, chassisRoll
+	rig.SteeringAngle = steeringAmount * Config.MaxHandlebarAngle
+	rig.RiderLean, rig.RiderPitch, rig.RiderTurnLean = rig.forwardLean, rootPitch + waistPitch, rig.cornerLean
+	setTransform(rig.root, rootPose)
+	setTransform(rig.waist, waistPose)
+	local headPitch = math.clamp(-(chassisPitch + rootPitch + waistPitch) * dynamics.HeadLevelFraction, -math.rad(25), math.rad(25))
+	local headRoll = math.clamp(-(chassisRoll + rig.cornerLean) * dynamics.HeadLevelFraction, -math.rad(18), math.rad(18))
+	setTransform(rig.neck, CFrame.Angles(headPitch, -rig.steeringYaw * dynamics.HeadLevelFraction, headRoll))
 	local deckFrame = root.CFrame:ToObjectSpace(deck.CFrame)
 	local width = math.abs(deckFrame.RightVector.X) * deck.Size.X
 		+ math.abs(deckFrame.UpVector.X) * deck.Size.Y + math.abs(deckFrame.LookVector.X) * deck.Size.Z
@@ -243,6 +361,23 @@ function BasePose.Update(rig: Rig, scooter: Model): number
 		local handOrientation = bar.CFrame.Rotation * CFrame.Angles(0, math.pi, 0)
 		local handFrame = CFrame.new(grip.WorldPosition) * handOrientation
 			* CFrame.Angles(settings.HandPalmPitch, 0, 0) * palmOffset:Inverse()
+		local shoulder = (upper * arm.first.c0).Position
+		local wristOffset = arm.last.c1.Position - palmOffset.Position
+		local towardShoulder = shoulder - grip.WorldPosition
+		local maximumReach = (arm.middle.c0.Position - arm.first.c1.Position).Magnitude
+			+ (arm.last.c0.Position - arm.middle.c1.Position).Magnitude - dynamics.ArmReachMargin
+		local wristDistance = ((handFrame * arm.last.c1).Position - shoulder).Magnitude
+		if wristOffset.Magnitude > EPSILON and towardShoulder.Magnitude > EPSILON then
+			-- Keep the palm on the grip and place its wrist toward the arm. Copying
+			-- the bar's rotation can put the wrist beyond the palm at full steering,
+			-- making an otherwise reachable grip exceed the authored arm length.
+			local corrected = boneFrame(grip.WorldPosition,
+				grip.WorldPosition + towardShoulder.Unit * wristOffset.Magnitude,
+				palmOffset.Position, arm.last.c1.Position, handFrame)
+			local correction = math.clamp((wristDistance - maximumReach) / wristOffset.Magnitude, 0, 1)
+			local rotation = handFrame.Rotation:Lerp(corrected.Rotation, correction)
+			handFrame = CFrame.new(grip.WorldPosition) * rotation * CFrame.new(-palmOffset.Position)
+		end
 		local elbowPole = root.CFrame:PointToWorldSpace(Vector3.new(sign * settings.ElbowPoleWidth, deckTop + settings.ElbowPoleHeight, -settings.ElbowPoleForwardOffset))
 		error = math.max(error, solveArm(arm, upper, handFrame, elbowPole))
 	end

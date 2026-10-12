@@ -4,6 +4,7 @@ local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
 local UserInputService = game:GetService("UserInputService")
 
 local ScooterConfig = require(ReplicatedStorage.Shared.Scooter.ScooterConfig)
@@ -106,6 +107,7 @@ end
 
 local function keyHeld(first: Enum.KeyCode, second: Enum.KeyCode): boolean
 	return heldKeys[first] == true or heldKeys[second] == true
+		or UserInputService:IsKeyDown(first) or UserInputService:IsKeyDown(second)
 end
 
 local function readInput(seat: VehicleSeat): DriveInput
@@ -114,10 +116,15 @@ local function readInput(seat: VehicleSeat): DriveInput
 	end
 	local keyboardSteering = (if keyHeld(Enum.KeyCode.D, Enum.KeyCode.Right) then 1 else 0)
 		- (if keyHeld(Enum.KeyCode.A, Enum.KeyCode.Left) then 1 else 0)
+	-- Default VehicleSeat input can lag a keyboard reversal or release by a frame.
+	-- Keep its analog input for touch/gamepad; keyboard movement reads the keys directly.
+	local lastInputType = UserInputService:GetLastInputType()
+	local analogControls = lastInputType == Enum.UserInputType.Touch
+		or string.match(lastInputType.Name, "^Gamepad") ~= nil
 	return {
-		throttleHeld = keyHeld(Enum.KeyCode.W, Enum.KeyCode.Up) or seat.ThrottleFloat > 0.1,
-		brakeHeld = keyHeld(Enum.KeyCode.S, Enum.KeyCode.Down) or seat.ThrottleFloat < -0.1,
-		steering = math.clamp(if math.abs(seat.SteerFloat) > 0.1 then seat.SteerFloat else keyboardSteering, -1, 1),
+		throttleHeld = keyHeld(Enum.KeyCode.W, Enum.KeyCode.Up) or (analogControls and seat.ThrottleFloat > 0.1),
+		brakeHeld = keyHeld(Enum.KeyCode.S, Enum.KeyCode.Down) or (analogControls and seat.ThrottleFloat < -0.1),
+		steering = math.clamp(if analogControls then seat.SteerFloat else keyboardSteering, -1, 1),
 		wheelieHeld = wheelieButtonHeld or keyHeld(Enum.KeyCode.LeftShift, Enum.KeyCode.C),
 	}
 end
@@ -132,6 +139,13 @@ local function startController(scooter: Model, seat: VehicleSeat, root: BasePart
 	activeSeat = seat
 	local maid = newMaid()
 	activeMaid = maid
+	local backpackWasEnabled = StarterGui:GetCoreGuiEnabled(Enum.CoreGuiType.Backpack)
+	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
+	maid:Give(function()
+		StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, backpackWasEnabled)
+	end)
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if humanoid then humanoid:UnequipTools() end
 	local lastInputSentAt = -math.huge
 	local lastBurnoutSentAt = -math.huge
 	local lastSent: DriveInput? = nil
@@ -210,6 +224,7 @@ local function startController(scooter: Model, seat: VehicleSeat, root: BasePart
 		if playerGui:GetAttribute("GameplayInputBlocked") == true then clearControls() end
 	end))
 	maid:Give(seat:GetPropertyChangedSignal("Occupant"):Connect(function()
+		if seat.Occupant == nil and humanoid and humanoid.SeatPart == seat and humanoid.Sit then return end
 		if seat.Occupant == nil or seat.Occupant.Parent ~= character then
 			cleanupController()
 		end
@@ -217,10 +232,11 @@ local function startController(scooter: Model, seat: VehicleSeat, root: BasePart
 	maid:Give(scooter.Destroying:Connect(cleanupController))
 
 	maid:Give(RunService.PreSimulation:Connect(function()
-		if activeScooter ~= scooter or activeSeat ~= seat or seat.Occupant == nil then
+		if activeScooter ~= scooter or activeSeat ~= seat then
 			cleanupController()
 			return
 		end
+		if seat.Occupant == nil then return end
 		local input = readInput(seat)
 
 		local now = os.clock()
@@ -252,18 +268,24 @@ local function startController(scooter: Model, seat: VehicleSeat, root: BasePart
 	end))
 end
 
-local function tryStartFromSeat(seat: BasePart)
+local function tryStartFromSeat(seat: BasePart): boolean
 	if not seat:IsA("VehicleSeat") then
-		return
+		return false
 	end
 	local scooter = seat:FindFirstAncestorOfClass("Model")
 	if not scooter or scooter:GetAttribute("OwnerUserId") ~= localPlayer.UserId then
-		return
+		return false
 	end
+	local character = localPlayer.Character
+	local humanoid = if character then character:FindFirstChildOfClass("Humanoid") else nil
+	if not humanoid or humanoid.Health <= 0 or seat.Occupant ~= humanoid then return false end
 	local root = scooter.PrimaryPart
 	if root then
+		if activeScooter == scooter and activeSeat == seat then return true end
 		startController(scooter, seat, root)
+		return true
 	end
+	return false
 end
 
 local function requestDefaultScooter()
@@ -278,7 +300,8 @@ local function requestDefaultScooter()
 			end
 		end
 	end
-	requestSpawnRemote:FireServer(ScooterConfig.DefaultModel)
+	local selected=localPlayer:GetAttribute("SelectedScooter")
+	requestSpawnRemote:FireServer(if typeof(selected)=="string" then selected else ScooterConfig.DefaultModel)
 end
 
 local function hookCharacter(character: Model)
@@ -295,17 +318,29 @@ local function hookCharacter(character: Model)
 		return
 	end
 	maid:Give(humanoid.Seated:Connect(function(isSeated: boolean, seat: BasePart?)
-		if isSeated and seat then
-			tryStartFromSeat(seat)
-		else
-			cleanupController()
-		end
+		if not isSeated and humanoid.SeatPart == nil then cleanupController() end
 	end))
+	local mountRevision = 0
+	maid:Give(function() mountRevision += 1 end)
+	local function reconcileSeat()
+		mountRevision += 1
+		local revision = mountRevision
+		local seat = humanoid.SeatPart
+		if not seat then cleanupController(); return end
+		task.spawn(function()
+			local deadline = os.clock() + 20
+			-- SeatPart can precede Occupant, ownership attributes or PrimaryPart.
+			while characterMaid == maid and localPlayer.Character == character and revision == mountRevision
+				and humanoid.Health > 0 and humanoid.SeatPart == seat and os.clock() < deadline do
+				if tryStartFromSeat(seat) then return end
+				task.wait(0.1)
+			end
+		end)
+	end
+	maid:Give(humanoid:GetPropertyChangedSignal("SeatPart"):Connect(reconcileSeat))
 	maid:Give(humanoid.Died:Connect(cleanupController))
 	maid:Give(character.Destroying:Connect(cleanupController))
-	if humanoid.SeatPart then
-		tryStartFromSeat(humanoid.SeatPart)
-	end
+	reconcileSeat()
 	task.defer(requestDefaultScooter)
 end
 

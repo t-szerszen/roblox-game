@@ -9,11 +9,22 @@ local Workspace = game:GetService("Workspace")
 
 local ActivityConfig = require(ReplicatedStorage.Shared.Activity.ActivityConfig)
 local PlayerDataService = require(script.Parent.PlayerDataService)
+local Scooter = require(script.Parent.Parent.Scooter.ScooterServer)
+local ScooterConfig = require(ReplicatedStorage.Shared.ScooterConfig)
+local EconomyConfig = require(ReplicatedStorage.Shared.Activity.EconomyConfig)
+local RewardMath = require(script.Parent.RewardMath)
 
 type DeliveryRecord = {
+	pickup: Instance,
+	pickupName: string,
+	stage: "Pickup" | "Dropoff",
 	destination: Instance,
 	destinationName: string,
 	distance: number,
+	travelled: number,
+	position: Vector3?,
+	sampledAt: number,
+	character: Model?,
 }
 type TrickRecord = {
 	owner: Player,
@@ -26,7 +37,8 @@ local ActivityService = {}
 local deliveries: { [Player]: DeliveryRecord } = {}
 local promptConnections: { [Instance]: RBXScriptConnection } = {}
 local trickRecords: { [Model]: TrickRecord } = {}
-local lastPositions: { [Player]: Vector3 } = {}
+local motions: { [Player]: {model: Model, motion: RewardMath.Motion} } = {}
+local lastInteraction: {[Player]: number} = {}
 local connections: { RBXScriptConnection } = {}
 local started = false
 
@@ -59,6 +71,8 @@ local function playerIsNear(player: Player, instance: Instance): boolean
 	local position = positionOf(instance)
 	return root ~= nil
 		and root:IsA("BasePart")
+		and character ~= nil and character:FindFirstChildOfClass("Humanoid") ~= nil
+		and (character:FindFirstChildOfClass("Humanoid") :: Humanoid).Health>0
 		and position ~= nil
 		and (root.Position - position).Magnitude <= ActivityConfig.InteractionDistance + 3
 end
@@ -66,12 +80,23 @@ end
 local function setDeliveryAttributes(player: Player, delivery: DeliveryRecord?)
 	if delivery then
 		player:SetAttribute("DeliveryActive", true)
-		player:SetAttribute("DeliveryDestination", delivery.destinationName)
-		player:SetAttribute("DeliveryDistance", delivery.distance)
+		player:SetAttribute("DeliveryStage", delivery.stage)
+		player:SetAttribute("DeliveryPickup", delivery.pickupName)
+		player:SetAttribute("DeliveryDestination", if delivery.stage=="Pickup" then delivery.pickupName else delivery.destinationName)
+		player:SetAttribute("DeliveryReward", RewardMath.Delivery(delivery.distance))
+		local target=if delivery.stage=="Pickup" then delivery.pickup else delivery.destination
+		local targetPosition=positionOf(target)
+		player:SetAttribute("DeliveryTargetPosition",targetPosition)
+		local root=player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+		player:SetAttribute("DeliveryDistance",if targetPosition and root and root:IsA("BasePart") then (targetPosition-root.Position).Magnitude else delivery.distance)
 	else
 		player:SetAttribute("DeliveryActive", false)
+		player:SetAttribute("DeliveryStage", nil)
+		player:SetAttribute("DeliveryPickup", nil)
+		player:SetAttribute("DeliveryReward", nil)
 		player:SetAttribute("DeliveryDestination", nil)
 		player:SetAttribute("DeliveryDistance", nil)
+		player:SetAttribute("DeliveryTargetPosition",nil)
 	end
 end
 
@@ -80,7 +105,7 @@ local function chooseDestination(origin: Vector3): (Instance?, number)
 	for _, candidate in CollectionService:GetTagged(ActivityConfig.DestinationTag) do
 		if candidate:IsDescendantOf(Workspace) then
 			local position = positionOf(candidate)
-			if position then
+			if position and (position-origin).Magnitude>ActivityConfig.InteractionDistance*2 then
 				table.insert(available, { instance = candidate, distance = (position - origin).Magnitude })
 			end
 		end
@@ -92,36 +117,77 @@ local function chooseDestination(origin: Vector3): (Instance?, number)
 	return selected.instance, selected.distance
 end
 
-local function startDelivery(player: Player, pickup: Instance): (boolean, string)
-	if deliveries[player] then
-		return false, "Masz juz aktywna dostawe."
+function ActivityService.AcceptDelivery(player: Player): (boolean, string)
+	if player.Parent~=Players or not PlayerDataService.Ready(player) then return false,"Dane gracza są niedostępne." end
+	if deliveries[player] then return false,"Masz już aktywne zlecenie." end
+	local pickups: {Instance} = {}
+	for _,candidate in CollectionService:GetTagged(ActivityConfig.PickupTag) do
+		if candidate:IsDescendantOf(Workspace) and positionOf(candidate) then table.insert(pickups,candidate) end
 	end
-	local origin = positionOf(pickup)
-	if not origin then
-		return false, "Punkt odbioru jest nieprawidlowy."
-	end
-	local destination, distance = chooseDestination(origin)
-	if not destination then
-		return false, "Brak oznaczonych celow dostawy."
-	end
+	if #pickups==0 then return false,"Brak dostępnych sklepów odbioru." end
+	local pickup=pickups[math.random(1,#pickups)]
+	local origin=positionOf(pickup) :: Vector3
+	local destination,distance=chooseDestination(origin)
+	if not destination then return false,"Brak dostępnych budynków dostawy." end
 	local delivery: DeliveryRecord = {
-		destination = destination,
-		destinationName = destinationName(destination),
-		distance = distance,
+		pickup=pickup,pickupName=destinationName(pickup),stage="Pickup",
+		destination=destination,destinationName=destinationName(destination),
+		distance=distance,travelled=0,position=nil,sampledAt=os.clock(),character=player.Character,
 	}
-	deliveries[player] = delivery
-	setDeliveryAttributes(player, delivery)
-	return true, "Dostawa rozpoczeta."
+	deliveries[player]=delivery
+	setDeliveryAttributes(player,delivery)
+	return true,"Zlecenie przyjęte. Odbierz zamówienie w wyznaczonym sklepie."
+end
+
+function ActivityService.CancelDelivery(player: Player): (boolean, string)
+	if not deliveries[player] then return false,"Nie masz aktywnego zlecenia." end
+	deliveries[player]=nil
+	setDeliveryAttributes(player,nil)
+	return true,"Zlecenie anulowane."
+end
+
+local function collectOrder(player: Player, pickup: Instance): (boolean,string)
+	local delivery=deliveries[player]
+	if not delivery then return false,"Najpierw przyjmij zlecenie w aplikacji Dostawy w telefonie." end
+	if delivery.stage~="Pickup" or delivery.pickup~=pickup then return false,"To nie jest sklep odbioru twojego zlecenia." end
+	if not PlayerDataService.Ready(player) then return false,"Dane gracza są niedostępne." end
+	delivery.stage="Dropoff"
+	delivery.travelled=0
+	local character=player.Character
+	local root=character and character:FindFirstChild("HumanoidRootPart")
+	delivery.position=if root and root:IsA("BasePart") then root.Position else nil
+	delivery.character=character
+	delivery.sampledAt=os.clock()
+	setDeliveryAttributes(player,delivery)
+	return true,"Zamówienie odebrane. Dostarcz je pod wskazany budynek."
 end
 
 local function finishDelivery(player: Player, destination: Instance): (boolean, string)
 	local delivery = deliveries[player]
-	if not delivery or delivery.destination ~= destination then
+	if not delivery or delivery.stage~="Dropoff" or delivery.destination ~= destination then
 		return false, "To nie jest cel twojej dostawy."
 	end
-	local distanceSteps = math.floor(delivery.distance / ActivityConfig.DistanceStepStuds)
-	local coins = ActivityConfig.BaseCoins + distanceSteps * ActivityConfig.DistanceBonusCoins
-	PlayerDataService.AddCurrency(player, coins, ActivityConfig.BaseXP)
+	if delivery.travelled < math.max(0,delivery.distance-ActivityConfig.InteractionDistance*2) then
+		return false,"Trasa dostawy nie została jeszcze poprawnie pokonana."
+	end
+	-- The assigned route is fixed, so looping around cannot inflate the order price.
+	-- Check the final displacement too: a prompt can arrive before the next heartbeat.
+	local root=player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	local human=player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+	local riding=Scooter.GetRidingState(player)
+	if not root or not root:IsA("BasePart") or not human or human.Health<=0 or delivery.character~=player.Character or not delivery.position then return false,"Zlecenie jest niedostępne." end
+	local delta=root.Position-delivery.position
+	local flat=Vector3.new(delta.X,0,delta.Z)
+	local limit=if riding then riding.maxSpeedKmh*ScooterConfig.StudsPerKmH else human.WalkSpeed
+	if flat.Magnitude>limit*math.max(0,os.clock()-delivery.sampledAt)*EconomyConfig.MotionTolerance+0.5 or math.abs(delta.Y)>EconomyConfig.MaxVerticalStep then
+		ActivityService.CancelDelivery(player)
+		return false,"Nieprawidłowy ruch na trasie. Zlecenie anulowane."
+	end
+	local coins = RewardMath.Delivery(delivery.distance)
+	if not PlayerDataService.Ready(player) then return false,"Dane gracza są niedostępne." end
+	-- Consume before crediting, with no yield between these operations.
+	deliveries[player] = nil
+	PlayerDataService.AddCurrency(player, coins, ActivityConfig.BaseXP,"DeliveryCompleted")
 	PlayerDataService.Increment(player, "deliveries", 1)
 	PlayerDataService.IncrementDaily(player, "DailyDeliveries", 1)
 	deliveries[player] = nil
@@ -152,15 +218,18 @@ local function attachPrompt(instance: Instance, isPickup: boolean)
 		prompt.RequiresLineOfSight = false
 		prompt.Parent = parent
 	end
-	prompt.ActionText = if isPickup then "Wez paczke" else "Dostarcz paczke"
-	prompt.ObjectText = if isPickup then "Punkt odbioru" else destinationName(instance)
+	prompt.ActionText = if isPickup then "Odbierz zamówienie" else "Dostarcz zamówienie"
+	prompt.ObjectText = destinationName(instance)
 	promptConnections[instance] = prompt.Triggered:Connect(function(player: Player)
+		if player.Parent~=Players or not instance:IsDescendantOf(Workspace) or not CollectionService:HasTag(instance,if isPickup then ActivityConfig.PickupTag else ActivityConfig.DestinationTag) then return end
+		if os.clock()-(lastInteraction[player] or -math.huge)<0.5 then return end
+		lastInteraction[player]=os.clock()
 		local success: boolean
 		local message: string
 		if not playerIsNear(player, instance) then
 			success, message = false, "Podejdz blizej do punktu."
 		else
-			success, message = if isPickup then startDelivery(player, instance) else finishDelivery(player, instance)
+			success, message = if isPickup then collectOrder(player, instance) else finishDelivery(player, instance)
 		end
 		player:SetAttribute("ActivityMessage", message)
 		player:SetAttribute("ActivityMessageSuccess", success)
@@ -171,6 +240,7 @@ local function attachPrompt(instance: Instance, isPickup: boolean)
 end
 
 local function detachPrompt(instance: Instance)
+	for player,delivery in deliveries do if delivery.destination==instance or delivery.pickup==instance then deliveries[player]=nil;setDeliveryAttributes(player,nil) end end
 	local connection = promptConnections[instance]
 	if connection then
 		connection:Disconnect()
@@ -237,38 +307,58 @@ local function trackScooter(scooter: Model)
 	update("Wheelie", "WheelieActive")
 end
 
-local function updateDistance(player: Player)
-	local character = player.Character
-	local root = if character then character:FindFirstChild("HumanoidRootPart") else nil
-	if not root or not root:IsA("BasePart") then
-		lastPositions[player] = nil
-		return
-	end
-	local current = root.Position
-	local delivery = deliveries[player]
-	if delivery then
-		local destinationPosition = positionOf(delivery.destination)
-		if destinationPosition then
-			player:SetAttribute("DeliveryDistance", (destinationPosition - current).Magnitude)
+local function updateDistance(player: Player, elapsed: number)
+	local character=player.Character
+	local root=if character then character:FindFirstChild("HumanoidRootPart") else nil
+	local delivery=deliveries[player]
+	local state=Scooter.GetRidingState(player)
+	if delivery and root and root:IsA("BasePart") then
+		local human=character and character:FindFirstChildOfClass("Humanoid")
+		local previous=delivery.position
+		if delivery.character~=character then
+			ActivityService.CancelDelivery(player)
+			player:SetAttribute("ActivityMessage","Zlecenie anulowane po odrodzeniu.")
+		else
+			delivery.position=root.Position
+			delivery.sampledAt=os.clock()
+			if delivery.stage=="Dropoff" and previous and human and human.Health>0 and elapsed>0 then
+				local delta=root.Position-previous
+				local flat=Vector3.new(delta.X,0,delta.Z)
+				local limit=if state then state.maxSpeedKmh*ScooterConfig.StudsPerKmH else human.WalkSpeed
+				if flat.Magnitude>limit*elapsed*EconomyConfig.MotionTolerance+0.5 or math.abs(delta.Y)>EconomyConfig.MaxVerticalStep then
+					ActivityService.CancelDelivery(player)
+					player:SetAttribute("ActivityMessage","Zlecenie anulowane: nieprawidłowy ruch na trasie.")
+				elseif elapsed<=EconomyConfig.MaxSampleSeconds and flat:Dot(root.AssemblyLinearVelocity)>0 then
+					delivery.travelled+=flat.Magnitude
+				end
+			end
+			local target=if delivery.stage=="Pickup" then delivery.pickup else delivery.destination
+			local targetPosition=positionOf(target)
+			if deliveries[player] and targetPosition then player:SetAttribute("DeliveryDistance",(targetPosition-root.Position).Magnitude)
+			elseif deliveries[player] then ActivityService.CancelDelivery(player) end
 		end
 	end
-	local previous = lastPositions[player]
-	lastPositions[player] = current
-	if not previous then
+	if not state or not PlayerDataService.Ready(player) then
+		motions[player]=nil;player:SetAttribute("RideRewardActive",false);player:SetAttribute("RideRewardMultiplier",1)
 		return
 	end
-	local offset = current - previous
-	local studs = math.min(Vector2.new(offset.X, offset.Z).Magnitude, ActivityConfig.MaxCreditedStudsPerSample)
-	if studs < 0.1 then
-		return
+	player:SetAttribute("RideRewardActive",true)
+	local record=motions[player]
+	if not record or record.model~=state.model then
+		record={model=state.model,motion=RewardMath.NewMotion(state.root.Position)};motions[player]=record
+		player:SetAttribute("RideRewardMultiplier",1);return
 	end
-	local kilometers = studs / ActivityConfig.StudsPerKilometer
-	PlayerDataService.Increment(player, "totalDistanceKm", kilometers)
-	PlayerDataService.IncrementDaily(player, "DailyDistanceKm", kilometers)
-	local hour = Lighting.ClockTime
-	if hour >= 18 or hour < 6 then
-		PlayerDataService.IncrementDaily(player, "DailyNightDistanceKm", kilometers)
-	end
+	local studs,multiplier,average=RewardMath.Sample(record.motion,state.root.Position,state.root.AssemblyLinearVelocity,
+		state.maxSpeedKmh*ScooterConfig.StudsPerKmH,state.grounded,state.wheelie,state.burnout,elapsed)
+	player:SetAttribute("RideRewardMultiplier",math.floor(multiplier*100+0.5)/100)
+	if state.burnout and elapsed<=EconomyConfig.MaxSampleSeconds then PlayerDataService.RecordTimedReward(player,"Burnout",elapsed) end
+	if studs<=0 then return end
+	PlayerDataService.RecordRide(player,studs,average)
+	local kilometers=studs/EconomyConfig.StudsPerKilometer
+	PlayerDataService.Increment(player,"totalDistanceKm",kilometers)
+	PlayerDataService.IncrementDaily(player,"DailyDistanceKm",kilometers)
+	local hour=Lighting.ClockTime
+	if hour>=18 or hour<6 then PlayerDataService.IncrementDaily(player,"DailyNightDistanceKm",kilometers) end
 end
 
 function ActivityService.RecordRaceWin(player: Player)
@@ -327,18 +417,34 @@ function ActivityService.Start()
 
 	table.insert(connections, Players.PlayerRemoving:Connect(function(player)
 		deliveries[player] = nil
-		lastPositions[player] = nil
+		motions[player] = nil
+		lastInteraction[player]=nil
 	end))
 	local accumulated = 0
 	table.insert(connections, RunService.Heartbeat:Connect(function(deltaTime)
 		accumulated += deltaTime
-		if accumulated >= ActivityConfig.DistanceSampleInterval then
+		if accumulated >= EconomyConfig.SampleInterval then
+			local elapsed=accumulated
 			accumulated = 0
 			for _, player in Players:GetPlayers() do
-				updateDistance(player)
+				updateDistance(player,elapsed)
 			end
 		end
 	end))
+end
+
+function ActivityService.Stop()
+	if not started then return end
+	started=false
+	for _,connection in connections do connection:Disconnect() end
+	table.clear(connections)
+	for instance,connection in promptConnections do connection:Disconnect();promptConnections[instance]=nil end
+	for model,record in trickRecords do
+		for _,connection in record.connections do connection:Disconnect() end
+		trickRecords[model]=nil
+	end
+	for player in deliveries do setDeliveryAttributes(player,nil) end
+	table.clear(deliveries);table.clear(motions);table.clear(lastInteraction)
 end
 
 return ActivityService

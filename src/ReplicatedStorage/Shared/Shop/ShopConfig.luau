@@ -2,7 +2,7 @@
 
 export type Currency = "Coins" | "Robux"
 export type ProductKind = "Scooter" | "GamePass" | "DeveloperProduct"
-export type TabId = "Hulajnogi" | "Premium" | "Kody"
+export type TabId = "Classic" | "Premium" | "Kody"
 export type Tab = { id: TabId, label: string, icon: string, accentColor: Color3 }
 export type Product = {
 	id: string,
@@ -13,6 +13,11 @@ export type Product = {
 	kind: ProductKind,
 	productId: number?,
 	stat: string?,
+	modelName: string?,
+	category: string?,
+	coinPrice: number?,
+	assetReady: boolean?,
+	retired: boolean?,
 	accent: Color3,
 	tab: TabId,
 	speed: number?,      -- km/h display for scooters
@@ -28,75 +33,86 @@ ShopConfig.RequestFunctionName = "ShopRequest"
 ShopConfig.RequestCooldown = 0.25
 
 ShopConfig.Tabs = {
-	{ id = "Hulajnogi" :: TabId, label = "Hulajnogi", icon = "🛴", accentColor = Color3.fromRGB(241, 196, 43) },
-	{ id = "Premium" :: TabId,   label = "Premium",   icon = "💎", accentColor = Color3.fromRGB(180, 70, 220) },
-	{ id = "Kody" :: TabId,      label = "Kody",      icon = "🎁", accentColor = Color3.fromRGB(56, 182, 255) },
+	{ id = "Classic" :: TabId, label = "CLASSIC", icon = "🛴", accentColor = Color3.fromRGB(241, 196, 43) },
+	{ id = "Premium" :: TabId,   label = "PREMIUM",   icon = "💎", accentColor = Color3.fromRGB(180, 70, 220) },
 } :: { Tab }
 
 ShopConfig.CoinProducts = {
 	{
 		id = "kukirin_g2_pro",
 		previewKey = "scooter",
-		name = "KuKirin G2 Pro",
-		description = "Model startowy",
+		name = "KuKirin 1",
+		modelName = "KuKirin G2 Pro",
+		category = "Pojazdy",
+		description = "Darmowy pojazd podstawowy",
 		price = 0,
 		currency = "Coins",
 		kind = "Scooter",
 		stat = "Owned_KuKirinG2Pro",
 		accent = Color3.fromRGB(235, 196, 45),
-		tab = "Hulajnogi" :: TabId,
+		tab = "Classic" :: TabId,
 		speed = 55,
 	},
 	{
 		id = "kukirin_g2_max",
 		previewKey = "scooter",
-		name = "KuKirin G2 Max",
+		name = "KuKirin 2",
+		modelName = "KuKirin G2 Max",
+		category = "Pojazdy",
 		description = "Szybszy naped",
-		price = 1_000,
+		price = 10_000,
 		currency = "Coins",
 		kind = "Scooter",
 		stat = "Owned_KuKirinG2Max",
 		accent = Color3.fromRGB(54, 190, 129),
-		tab = "Hulajnogi" :: TabId,
+		tab = "Classic" :: TabId,
 		speed = 65,
 	},
 	{
 		id = "kukirin_g2_master",
 		previewKey = "scooter",
-		name = "KuKirin G2 Master",
+		name = "KuKirin 3",
+		modelName = "KuKirin G2 Master",
+		category = "Pojazdy",
 		description = "Mocny model miejski",
-		price = 4_500,
+		price = 40_000,
 		currency = "Coins",
 		kind = "Scooter",
 		stat = "Owned_KuKirinG2Master",
 		accent = Color3.fromRGB(62, 150, 224),
-		tab = "Hulajnogi" :: TabId,
+		tab = "Classic" :: TabId,
 		speed = 72,
 	},
+} :: { Product }
+
+-- Preserve old unlocks/tuning without selling removed catalog entries.
+ShopConfig.LegacyScooters = {
 	{
 		id = "kukirin_g3_pro",
 		previewKey = "scooter",
 		name = "KuKirin G3 Pro",
+		modelName = "KuKirin G3 Pro", retired = true,
 		description = "Wyczynowa konfiguracja",
 		price = 12_000,
 		currency = "Coins",
 		kind = "Scooter",
 		stat = "Owned_KuKirinG3Pro",
 		accent = Color3.fromRGB(224, 91, 80),
-		tab = "Hulajnogi" :: TabId,
+		tab = "Classic" :: TabId,
 		speed = 80,
 	},
 	{
 		id = "kukirin_g4",
 		previewKey = "scooter",
 		name = "KuKirin G4",
+		modelName = "KuKirin G4", retired = true,
 		description = "Najwyzsza klasa",
 		price = 26_000,
 		currency = "Coins",
 		kind = "Scooter",
 		stat = "Owned_KuKirinG4",
 		accent = Color3.fromRGB(194, 91, 217),
-		tab = "Hulajnogi" :: TabId,
+		tab = "Classic" :: TabId,
 		speed = 90,
 		featured = true,
 	},
@@ -106,9 +122,10 @@ ShopConfig.CoinProducts = {
 ShopConfig.RobuxProducts = {
 	{
 		id = "pepper_spray",
-		name = "Gaz Pieprzowy",
+		name = "Gaz",
+		category = "Walka",
 		description = "Obezwladnia wroga na 3 sek",
-		price = 250,
+		price = 500,
 		currency = "Robux",
 		kind = "GamePass",
 		productId = 0,
@@ -118,7 +135,8 @@ ShopConfig.RobuxProducts = {
 	{
 		id = "radio",
 		name = "Radio",
-		description = "Muzyczny boombox na ekranie",
+		category = "Dodatki", coinPrice = 250_000,
+		description = "Trwałe odblokowanie; odtwarzanie audio jeszcze niedostępne",
 		price = 500,
 		currency = "Robux",
 		kind = "GamePass",
@@ -129,8 +147,9 @@ ShopConfig.RobuxProducts = {
 	{
 		id = "suron",
 		name = "Suron",
-		description = "Specjalny pojazd premium",
-		price = 500,
+		category = "Pojazdy", assetReady = false,
+		description = "Pojazd premium — model wymaga podłączenia",
+		price = 800,
 		currency = "Robux",
 		kind = "GamePass",
 		productId = 0,
@@ -138,20 +157,9 @@ ShopConfig.RobuxProducts = {
 		tab = "Premium" :: TabId,
 	},
 	{
-		id = "the_turbo",
-		name = "The Turbo",
-		description = "Ekskluzywna hulajnoga premium",
-		price = 500,
-		currency = "Robux",
-		kind = "GamePass",
-		productId = 0,
-		accent = Color3.fromRGB(255, 80, 120),
-		tab = "Premium" :: TabId,
-		featured = true,
-	},
-	{
 		id = "burnout_smoke",
-		name = "RGB Dym",
+		name = "Kolorowy dym spod opon",
+		category = "Dodatki do pojazdów",
 		description = "Wlasny kolor dymu burnout",
 		price = 100,
 		currency = "Robux",
@@ -162,7 +170,8 @@ ShopConfig.RobuxProducts = {
 	},
 	{
 		id = "scooter_neons",
-		name = "RGB Neony",
+		name = "RGB pod hulajnogą",
+		category = "Dodatki do pojazdów",
 		description = "Kolorowe podswietlenie hulajnogi",
 		price = 100,
 		currency = "Robux",
@@ -171,18 +180,9 @@ ShopConfig.RobuxProducts = {
 		accent = Color3.fromRGB(62, 213, 187),
 		tab = "Premium" :: TabId,
 	},
-	{
-		id = "double_coins",
-		name = "2x Coiny",
-		description = "Podwaja zarobki na stale",
-		price = 300,
-		currency = "Robux",
-		kind = "GamePass",
-		productId = 0,
-		accent = Color3.fromRGB(235, 196, 45),
-		tab = "Premium" :: TabId,
-		featured = true,
-	},
+	{ id = "rainbow_paint", name = "Tęczowy kolor malowania", description = "Specjalny wariant kolorów; osobno dla każdego pojazdu",
+		category = "Dodatki do pojazdów", price = 100, currency = "Robux", kind = "GamePass", productId = 0,
+		accent = Color3.fromRGB(225, 130, 230), tab = "Premium" :: TabId },
 } :: { Product }
 
 function ShopConfig.GetProduct(id: string): Product?
@@ -199,9 +199,15 @@ function ShopConfig.GetProduct(id: string): Product?
 	return nil
 end
 
+function ShopConfig.GetScooters(): { Product }
+	local products = table.clone(ShopConfig.CoinProducts)
+	for _, product in ShopConfig.LegacyScooters do table.insert(products, product) end
+	return products
+end
+
 function ShopConfig.GetScooterProduct(modelName: string): Product?
-	for _, product in ShopConfig.CoinProducts do
-		if product.kind == "Scooter" and product.name == modelName then
+	for _, product in ShopConfig.GetScooters() do
+		if product.modelName == modelName then
 			return product
 		end
 	end

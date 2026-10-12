@@ -1,10 +1,15 @@
 # Drivable scooter MVP
 
-Current scope: throttle, coasting/braking/reverse, smooth steering, wheelie, burnout, calibrated suspension, cornering lean and cleanup. The articulated scooter rig is active; mounted R15 avatars use only the base riding pose, preserving their intended 8-stud Avatar Settings height. Garage, premium visuals, audio and local prediction are paused; the later sections describe parked work, not the active MVP.
+Current scope: throttle, coasting/braking/reverse, smooth steering, wheelie, burnout, calibrated suspension, cornering lean and cleanup. The articulated scooter rig is active; mounted R15 avatars use only the base riding pose, preserving their intended 8-stud Avatar Settings height. The separate garage panel, audio and local prediction are paused. Permanent premium visuals are controlled from the shop; legacy garage sections describe parked work.
+
+Small anchored obstacles now use a smooth server-controlled height path with
+separate suspension compression and animated coils. See
+[SCOOTER_SMOOTH_ARCADE_STEPS.md](SCOOTER_SMOOTH_ARCADE_STEPS.md) for the active
+traversal rules, verification and native-collision fallback.
 
 ## Studio setup
 
-1. Run `rojo serve default.project.json` and connect/sync the Rojo plugin to this project.
+1. Capture current Studio work before a separately authorized sync. Do not connect Rojo or sync over a collaborator’s active work without explicit authorization; see `ROJO_STUDIO_SYNC.md`.
 2. Select the complete new `scooter` Folder in Edit mode and run `require(game.ServerScriptService.Scooter.ScooterWorkflow).Assemble()`. This installs `ServerStorage.ScooterModels.scooter` and replaces the old KuKirin template. The new rig is required; there is no generated fallback. See [SCOOTER_MODEL.md](SCOOTER_MODEL.md) for the authored hierarchy and generated support parts.
 3. Verify tire contact radius in Studio. A positive `WheelRadius` attribute on each wheel or the template overrides the radius inferred from wheel mesh Size. Apply the suspension calibration from DevScooterSuspension.Apply and verify its travel and sag in Studio. Adjust generated foot targets and HandleBar grip attachments to the authored meshes. Prepared templates contain wheel contact proxies; the server preserves their collisions and uses their actual radii for ground probes and spawn clearance. It does not rigidly weld suspension to Root. For a collapsing rig use DevScooterRepair as described in [SCOOTER_MODEL.md](SCOOTER_MODEL.md#diagnose-or-repair-a-collapsing-scooter).
 4. Use a flat collidable road and an enabled SpawnLocation. Press **Play**, approach the automatically spawned scooter, and press **E**. The map is not rebuilt or overwritten.

@@ -10,6 +10,9 @@ export type DriveInput = {
 	mass: number,
 	maxSpeed: number,
 	acceleration: number,
+	brakingDeceleration: number?,
+	throttleStrength: number?,
+	brakeStrength: number?,
 	throttleHeld: boolean,
 	brakeHeld: boolean,
 	burnout: boolean,
@@ -130,8 +133,20 @@ function ScooterPhysics.GetSteeringLean(turnSteering: number, forwardSpeed: numb
 end
 
 function ScooterPhysics.SmoothSteeringLean(current: number, target: number, deltaTime: number): number
-	local alpha = 1 - math.exp(-ScooterConfig.SteeringLeanSmoothSpeed * math.clamp(deltaTime, 0, 0.1))
-	return current + (target - current) * alpha
+	local settings = ScooterConfig.Handling
+	local dt = math.clamp(deltaTime, 0, 0.1)
+	local returning = math.abs(target) < math.abs(current) or target * current < 0
+	local response = if returning then settings.LeanReturnResponse else settings.LeanAttackResponse
+	local change = (target - current) * (1 - math.exp(-response * dt))
+	local maximum = settings.MaxLeanRate * dt
+	return current + math.clamp(change, -maximum, maximum)
+end
+
+function ScooterPhysics.SmoothYawRate(current: number, target: number, deltaTime: number): number
+	local dt = math.clamp(deltaTime, 0, 0.1)
+	local change = (target - current) * (1 - math.exp(-ScooterConfig.YawResponse * dt))
+	local limit = ScooterConfig.MaxYawAcceleration * dt
+	return current + math.clamp(change, -limit, limit)
 end
 
 function ScooterPhysics.AdvanceForward(
@@ -140,9 +155,10 @@ function ScooterPhysics.AdvanceForward(
 	forwardSpeed: number,
 	deltaTime: number,
 	wheelBase: number?,
-	burnout: boolean?
+	burnout: boolean?,
+	yawRate: number?
 ): Vector3
-	local yaw = ScooterPhysics.GetYawRate(effectiveSteering, forwardSpeed, wheelBase, burnout) * math.clamp(deltaTime, 0, 0.1)
+	local yaw = (yawRate or ScooterPhysics.GetYawRate(effectiveSteering, forwardSpeed, wheelBase, burnout)) * math.clamp(deltaTime, 0, 0.1)
 	if yaw == 0 then return forward end
 	return CFrame.fromAxisAngle(Vector3.yAxis, yaw):VectorToWorldSpace(forward).Unit
 end
@@ -184,12 +200,20 @@ function ScooterPhysics.AdvanceWheeliePitch(
 	currentPitch: number,
 	balanceInput: number,
 	forwardSpeed: number,
-	deltaTime: number
+	deltaTime: number,
+	maximumAngle: number?
 ): number
 	local step = math.clamp(deltaTime, 0, 0.1)
 	local pitch = currentPitch
 	if balanceInput > 0 then
-		pitch += ScooterConfig.WheeliePitchRate * step
+		local settings = ScooterConfig.WheelieBalance
+		local speedRatio = math.clamp(forwardSpeed / (settings.SpeedReferenceKmh * ScooterConfig.StudsPerKmH), 0, 1)
+		local target = math.min(settings.TargetAngle + settings.SpeedAngleBonus * speedRatio,
+			settings.MaximumBalanceAngle, (maximumAngle or ScooterConfig.WheelieFallAngle) - settings.FallMargin)
+		-- Throttle supplies progressively less lift near the balance point. Coasting
+		-- and braking still lower the wheel; no frame is locked to a fixed angle.
+		local change = (target - pitch) * (1 - math.exp(-settings.Response * step))
+		pitch += math.clamp(change, -ScooterConfig.WheeliePitchRate * step, ScooterConfig.WheeliePitchRate * step)
 	elseif balanceInput < 0 then
 		pitch = lowerWheelie(pitch, step, ScooterConfig.WheelieBrakeDropRate, ScooterConfig.WheelieBrakeReturnSpeed)
 	else
@@ -203,7 +227,7 @@ function ScooterPhysics.AdvanceWheeliePitch(
 		0,
 		1
 	)
-	pitch = math.clamp(pitch - ScooterConfig.WheelieLowSpeedDropRate * lowSpeedRatio * step, 0, ScooterConfig.WheelieFallAngle)
+	pitch = math.clamp(pitch - ScooterConfig.WheelieLowSpeedDropRate * lowSpeedRatio * step, 0, maximumAngle or ScooterConfig.WheelieFallAngle)
 	return if step > 0 and pitch <= ScooterConfig.WheelieRestAngle then 0 else pitch
 end
 
@@ -217,23 +241,29 @@ function ScooterPhysics.ComputeDriveForce(input: DriveInput): Vector3
 	local targetSpeed = 0
 	local rate = ScooterConfig.CoastingDeceleration
 	if input.burnout or (input.throttleHeld and input.brakeHeld) then
-		rate = ScooterConfig.BrakingDeceleration
+		rate = input.brakingDeceleration or ScooterConfig.BrakingDeceleration
 	elseif input.throttleHeld then
 		if forwardSpeed < -directionChangeSpeed then
-			rate = ScooterConfig.DirectionChangeBrakingDeceleration
+			rate = ScooterConfig.DirectionChangeBrakingDeceleration * ((input.brakingDeceleration or ScooterConfig.BrakingDeceleration) / ScooterConfig.BrakingDeceleration)
 		else
 			targetSpeed = input.maxSpeed
 			rate = input.acceleration
 		end
 	elseif input.brakeHeld then
 		if forwardSpeed > directionChangeSpeed then
-			rate = ScooterConfig.DirectionChangeBrakingDeceleration
+			rate = ScooterConfig.DirectionChangeBrakingDeceleration * ((input.brakingDeceleration or ScooterConfig.BrakingDeceleration) / ScooterConfig.BrakingDeceleration)
 		else
 			targetSpeed = -ScooterConfig.MaxReverseSpeedKmh * ScooterConfig.StudsPerKmH
 			rate = ScooterConfig.ReverseAcceleration
 		end
 	end
 
+	-- Ramp longitudinal effort on the server without delaying lateral grip or setting velocity directly.
+	if input.throttleHeld and not input.brakeHeld then
+		rate *= math.clamp(input.throttleStrength or 1, 0, 1)
+	elseif input.brakeHeld then
+		rate *= math.clamp(input.brakeStrength or 1, 0, 1)
+	end
 	local step = math.max(input.deltaTime, 1 / 240)
 	local acceleration = 0
 	if targetSpeed ~= 0 or math.abs(forwardSpeed) > ScooterConfig.StopSpeed then
@@ -251,7 +281,8 @@ function ScooterPhysics.ComputeDriveForce(input: DriveInput): Vector3
 	local lateralAcceleration = Vector3.zero
 	if lateralVelocity.Magnitude > ScooterConfig.StopSpeed then
 		lateralAcceleration = -lateralVelocity.Unit
-			* math.min(lateralVelocity.Magnitude / step, ScooterConfig.LateralGripDeceleration)
+			* math.min(lateralVelocity.Magnitude * ScooterConfig.LateralGripResponse,
+				lateralVelocity.Magnitude / step, ScooterConfig.LateralGripDeceleration)
 	end
 	return (input.forward * acceleration + lateralAcceleration) * input.mass
 end

@@ -3,7 +3,7 @@ local Ragdoll = {}
 local Config = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("PepperSprayConfig"))
 type State = {
  character: Model, humanoid: Humanoid, root: BasePart,
- motors: {[Motor6D]: boolean}, collisions: {[BasePart]: boolean},
+ motors: {[Motor6D | AnimationConstraint]: boolean}, collisions: {[BasePart]: boolean},
  objects: {Instance}, connections: {RBXScriptConnection},
  walk: number, jump: number, jumpHeight: number, autoRotate: boolean, platform: boolean,
 }
@@ -23,9 +23,14 @@ function Ragdoll.Stop(character: Model)
   if humanoid.WalkSpeed == 0 then humanoid.WalkSpeed = state.walk end
   if humanoid.JumpPower == 0 then humanoid.JumpPower = state.jump end
   if humanoid.JumpHeight == 0 then humanoid.JumpHeight = state.jumpHeight end
-  if not humanoid.AutoRotate then humanoid.AutoRotate = state.autoRotate end
-  humanoid.PlatformStand = state.platform
-  if humanoid.Health > 0 and not state.platform then humanoid:ChangeState(Enum.HumanoidStateType.GettingUp) end
+  local player = game:GetService("Players"):GetPlayerFromCharacter(character)
+  local stunUntil = player and player:GetAttribute("StunnedUntil")
+  local otherStun = typeof(stunUntil) == "number" and stunUntil > workspace:GetServerTimeNow()
+  if not otherStun then
+   if not humanoid.AutoRotate then humanoid.AutoRotate = state.autoRotate end
+   humanoid.PlatformStand = state.platform
+   if humanoid.Health > 0 and not state.platform then humanoid:ChangeState(Enum.HumanoidStateType.GettingUp) end
+  end
  end
  if state.root.Parent then
   state.root.AssemblyAngularVelocity = Vector3.zero
@@ -57,7 +62,7 @@ function Ragdoll.Start(character: Model, duration: number): boolean
  end
  -- Keep neck and root motors intact: safe health and a stable camera subject on both rigs.
  for _,joint in character:GetDescendants() do
-  if joint:IsA("Motor6D") and joint.Part0 and joint.Part1 and joint.Name ~= "Neck"
+  if (joint:IsA("Motor6D") or joint:IsA("AnimationConstraint")) and joint.Part0 and joint.Part1 and joint.Name ~= "Neck"
    and joint.Part0 ~= root and joint.Part1 ~= root
    and joint.Part0.Parent == character and joint.Part1.Parent == character then
    local a0, a1 = Instance.new("Attachment"), Instance.new("Attachment")

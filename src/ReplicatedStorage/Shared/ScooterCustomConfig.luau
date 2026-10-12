@@ -1,6 +1,8 @@
 --!strict
 return table.freeze({
  RequestCooldown = .15,
+ DesignSlots = 3,
+ PreviewRotationSpeed = math.rad(12),
  GarageName = "garage",
  ScooterFolderName = "Scooters",
  StationName = "ScooterCustomStation",
@@ -11,11 +13,12 @@ return table.freeze({
  AccessInterval = .25,
  Groups = {
   {Id = "Deck", Label = "Deck", Parts = {"BatteryPanelLeft", "BatteryPanelRight", "ScooterBody"}},
-  {Id = "Stem", Label = "Słupek", Parts = {"HandleBarStick"}},
+  {Id = "Handlebar", Label = "Kierownica", Mode = "WholePart", Parts = {"HandleBar"}},
+ {Id = "Stem", Label = "Słupek", Parts = {"HandleBarStick"}},
   {Id = "Suspension", Label = "Amortyzatory", Parts = {"FrontSuspensionLeft", "FrontSuspensionRight", "BackSuspensionLeft", "BackSuspensionRight"}},
   {Id = "Grips", Label = "Gripy", Mode = "WholePart", Parts = {"LeftGrip", "RightGrip"}},
   {Id = "BrakeLevers", Label = "Klamki", Mode = "WholePart", Parts = {"BrakeLeverLeft", "BrakeLeverRight"}},
-  {Id = "Calipers", Label = "Zaciski", Mode = "WholePart", Parts = {"FrontBrakeCaliper"}},
+  {Id = "Calipers", Label = "Klocki / zaciski", Mode = "WholePart", Parts = {"FrontBrakeCaliper"}},
   {Id = "BrakeDiscs", Label = "Tarcze", Mode = "WholePart", Parts = {"BrakeDisc"}},
  },
  Textures = {

@@ -1,0 +1,732 @@
+{
+  "StarterPlayer": {
+    "skipped": [
+      "AvatarJointUpgrade_SerializedRollout",
+      "CreateDefaultPlayerModule",
+      "EnableDynamicHeads",
+      "LoadCharacterLayeredClothing"
+    ],
+    "class": "StarterPlayer",
+    "attributes": [],
+    "properties": {
+      "CharacterWalkSpeed": 16,
+      "AutoJumpEnabled": true,
+      "CameraMinZoomDistance": 0.5,
+      "AllowCustomAnimations": true,
+      "UserEmotesEnabled": true,
+      "CharacterMaxSlopeAngle": 89,
+      "DevComputerCameraMovementMode": {
+        "value": "Enum.DevComputerCameraMovementMode.UserChoice",
+        "type": "EnumItem"
+      },
+      "HealthDisplayDistance": 100,
+      "ClassicDeath": true,
+      "NameDisplayDistance": 100,
+      "CharacterBreakJointsOnDeath": false,
+      "Capabilities": {
+        "value": "",
+        "type": "SecurityCapabilities"
+      },
+      "CharacterJumpPower": 50,
+      "Name": "StarterPlayer",
+      "LoadCharacterAppearance": true,
+      "LuaCharacterController": {
+        "value": "Enum.CharacterControlMode.Default",
+        "type": "EnumItem"
+      },
+      "CharacterUseJumpPower": false,
+      "EnableMouseLockOption": true,
+      "CharacterJumpHeight": 7.199999809265137,
+      "DevTouchMovementMode": {
+        "value": "Enum.DevTouchMovementMode.UserChoice",
+        "type": "EnumItem"
+      },
+      "DevComputerMovementMode": {
+        "value": "Enum.DevComputerMovementMode.UserChoice",
+        "type": "EnumItem"
+      },
+      "CameraMode": {
+        "value": "Enum.CameraMode.Classic",
+        "type": "EnumItem"
+      },
+      "CameraMaxZoomDistance": 128,
+      "DevTouchCameraMovementMode": {
+        "value": "Enum.DevTouchCameraMovementMode.UserChoice",
+        "type": "EnumItem"
+      },
+      "DevCameraOcclusionMode": {
+        "value": "Enum.DevCameraOcclusionMode.Zoom",
+        "type": "EnumItem"
+      }
+    }
+  },
+  "TerrainMaterialColors": {
+    "LeafyGrass": {
+      "value": [
+        0.4156862795352936,
+        0.5254902243614197,
+        0.250980406999588
+      ],
+      "type": "Color3"
+    },
+    "Rock": {
+      "value": [
+        0.38823530077934265,
+        0.3921568691730499,
+        0.4000000059604645
+      ],
+      "type": "Color3"
+    },
+    "Basalt": {
+      "value": [
+        0.29411765933036804,
+        0.29019609093666077,
+        0.29019609093666077
+      ],
+      "type": "Color3"
+    },
+    "Sand": {
+      "value": [
+        0.8117647171020508,
+        0.7960784435272217,
+        0.6549019813537598
+      ],
+      "type": "Color3"
+    },
+    "Sandstone": {
+      "value": [
+        0.5803921818733215,
+        0.48627451062202454,
+        0.37254902720451355
+      ],
+      "type": "Color3"
+    },
+    "Brick": {
+      "value": [
+        0.5411764979362488,
+        0.3803921639919281,
+        0.2862745225429535
+      ],
+      "type": "Color3"
+    },
+    "Cobblestone": {
+      "value": [
+        0.5254902243614197,
+        0.5254902243614197,
+        0.4627451002597809
+      ],
+      "type": "Color3"
+    },
+    "Glacier": {
+      "value": [
+        0.8666666746139526,
+        0.8941176533699036,
+        0.8980392217636108
+      ],
+      "type": "Color3"
+    },
+    "Slate": {
+      "value": [
+        0.3450980484485626,
+        0.3490196168422699,
+        0.33725491166114807
+      ],
+      "type": "Color3"
+    },
+    "Snow": {
+      "value": [
+        0.9215686321258545,
+        0.9921568632125854,
+        1
+      ],
+      "type": "Color3"
+    },
+    "WoodPlanks": {
+      "value": [
+        0.6745098233222961,
+        0.5803921818733215,
+        0.42352941632270813
+      ],
+      "type": "Color3"
+    },
+    "Limestone": {
+      "value": [
+        1,
+        0.9529411792755127,
+        0.7529411911964417
+      ],
+      "type": "Color3"
+    },
+    "Mud": {
+      "value": [
+        0.4745098054409027,
+        0.43921568989753723,
+        0.3843137323856354
+      ],
+      "type": "Color3"
+    },
+    "Salt": {
+      "value": [
+        1,
+        1,
+        0.9960784316062927
+      ],
+      "type": "Color3"
+    },
+    "Asphalt": {
+      "value": [
+        0.3137255012989044,
+        0.3294117748737335,
+        0.3294117748737335
+      ],
+      "type": "Color3"
+    },
+    "CrackedLava": {
+      "value": [
+        1,
+        0.0941176488995552,
+        0.26274511218070984
+      ],
+      "type": "Color3"
+    },
+    "Ground": {
+      "value": [
+        0.5490196347236633,
+        0.5098039507865906,
+        0.40784314274787903
+      ],
+      "type": "Color3"
+    },
+    "Concrete": {
+      "value": [
+        0.5960784554481506,
+        0.5960784554481506,
+        0.5960784554481506
+      ],
+      "type": "Color3"
+    },
+    "Grass": {
+      "value": [
+        0.43529412150382996,
+        0.4941176474094391,
+        0.24313725531101227
+      ],
+      "type": "Color3"
+    },
+    "Pavement": {
+      "value": [
+        0.5607843399047852,
+        0.5647059082984924,
+        0.529411792755127
+      ],
+      "type": "Color3"
+    },
+    "Ice": {
+      "value": [
+        0.800000011920929,
+        0.8235294222831726,
+        0.8745098114013672
+      ],
+      "type": "Color3"
+    }
+  },
+  "Lighting": {
+    "skipped": [
+      "ExtendLightRangeTo120"
+    ],
+    "class": "Lighting",
+    "attributes": {
+      "RBX_OriginalTechnologyOnFileLoad": 3,
+      "RBX_LightingTechnologyUnifiedMigration": true
+    },
+    "properties": {
+      "ExposureCompensation": 0,
+      "ColorShift_Bottom": {
+        "value": [
+          0,
+          0,
+          0
+        ],
+        "type": "Color3"
+      },
+      "FogColor": {
+        "value": [
+          0.7529412508010864,
+          0.7529412508010864,
+          0.7529412508010864
+        ],
+        "type": "Color3"
+      },
+      "FogEnd": 100000,
+      "Outlines": false,
+      "Brightness": 3,
+      "ColorShift_Top": {
+        "value": [
+          0,
+          0,
+          0
+        ],
+        "type": "Color3"
+      },
+      "PrioritizeLightingQuality": true,
+      "Capabilities": {
+        "value": "",
+        "type": "SecurityCapabilities"
+      },
+      "LightingStyle": {
+        "value": "Enum.LightingStyle.Soft",
+        "type": "EnumItem"
+      },
+      "GlobalShadows": true,
+      "EnvironmentSpecularScale": 1,
+      "Name": "Lighting",
+      "FogStart": 0,
+      "Ambient": {
+        "value": [
+          0.27450981736183167,
+          0.27450981736183167,
+          0.27450981736183167
+        ],
+        "type": "Color3"
+      },
+      "OutdoorAmbient": {
+        "value": [
+          0.27450981736183167,
+          0.27450981736183167,
+          0.27450981736183167
+        ],
+        "type": "Color3"
+      },
+      "TimeOfDay": "14:30:00",
+      "GeographicLatitude": 0,
+      "ShadowSoftness": 0.20000000298023224,
+      "EnvironmentDiffuseScale": 1
+    }
+  },
+  "ReplicatedFirst": {
+    "skipped": [],
+    "class": "ReplicatedFirst",
+    "attributes": [],
+    "properties": {
+      "Name": "ReplicatedFirst",
+      "Capabilities": {
+        "value": "",
+        "type": "SecurityCapabilities"
+      }
+    }
+  },
+  "StarterPack": {
+    "skipped": [],
+    "class": "StarterPack",
+    "attributes": [],
+    "properties": {
+      "Name": "StarterPack",
+      "Capabilities": {
+        "value": "",
+        "type": "SecurityCapabilities"
+      }
+    }
+  },
+  "Chat": {
+    "skipped": [],
+    "class": "Chat",
+    "attributes": [],
+    "properties": {
+      "Name": "Chat",
+      "Capabilities": {
+        "value": "",
+        "type": "SecurityCapabilities"
+      },
+      "LoadDefaultChat": true,
+      "BubbleChatEnabled": true
+    }
+  },
+  "ServerStorage": {
+    "skipped": [],
+    "class": "ServerStorage",
+    "attributes": [],
+    "properties": {
+      "Name": "ServerStorage",
+      "Capabilities": {
+        "value": "",
+        "type": "SecurityCapabilities"
+      }
+    }
+  },
+  "Workspace.Terrain": {
+    "skipped": [
+      "Decoration",
+      "GrassLength",
+      "MaterialColors",
+      "Materials",
+      "PhysicsGrid",
+      "SmoothGrid",
+      "Color3uint8",
+      "MaterialVariantSerialized"
+    ],
+    "class": "Terrain",
+    "attributes": [],
+    "properties": {
+      "RightParamB": 0.5,
+      "TopSurfaceInput": {
+        "value": "Enum.InputType.NoInput",
+        "type": "EnumItem"
+      },
+      "CFrame": {
+        "value": [
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "type": "CFrame"
+      },
+      "FrontSurfaceInput": {
+        "value": "Enum.InputType.NoInput",
+        "type": "EnumItem"
+      },
+      "BottomParamB": 0.5,
+      "size": {
+        "value": [
+          2044,
+          252,
+          2044
+        ],
+        "type": "Vector3"
+      },
+      "FrontParamB": 0.5,
+      "BottomSurfaceInput": {
+        "value": "Enum.InputType.NoInput",
+        "type": "EnumItem"
+      },
+      "CanCollide": true,
+      "CollisionGroup": "Default",
+      "BackSurfaceInput": {
+        "value": "Enum.InputType.NoInput",
+        "type": "EnumItem"
+      },
+      "EnableFluidForces": true,
+      "LeftSurface": {
+        "value": "Enum.SurfaceType.Smooth",
+        "type": "EnumItem"
+      },
+      "FrontParamA": -0.5,
+      "FrontSurface": {
+        "value": "Enum.SurfaceType.Smooth",
+        "type": "EnumItem"
+      },
+      "WaterWaveSize": 0.15000000596046448,
+      "Capabilities": {
+        "value": "",
+        "type": "SecurityCapabilities"
+      },
+      "Velocity": {
+        "value": [
+          0,
+          0,
+          0
+        ],
+        "type": "Vector3"
+      },
+      "BackParamB": 0.5,
+      "TopSurface": {
+        "value": "Enum.SurfaceType.Studs",
+        "type": "EnumItem"
+      },
+      "Transparency": 0,
+      "RightParamA": -0.5,
+      "CanQuery": true,
+      "TopParamB": 0.5,
+      "TopParamA": -0.5,
+      "Massless": false,
+      "CollisionGroupId": 0,
+      "RightSurface": {
+        "value": "Enum.SurfaceType.Smooth",
+        "type": "EnumItem"
+      },
+      "RootPriority": 0,
+      "RightSurfaceInput": {
+        "value": "Enum.InputType.NoInput",
+        "type": "EnumItem"
+      },
+      "RotVelocity": {
+        "value": [
+          0,
+          0,
+          0
+        ],
+        "type": "Vector3"
+      },
+      "Reflectance": 0,
+      "BottomParamA": -0.5,
+      "Material": {
+        "value": "Enum.Material.Plastic",
+        "type": "EnumItem"
+      },
+      "BottomSurface": {
+        "value": "Enum.SurfaceType.Inlet",
+        "type": "EnumItem"
+      },
+      "Locked": true,
+      "LeftSurfaceInput": {
+        "value": "Enum.InputType.NoInput",
+        "type": "EnumItem"
+      },
+      "BackSurface": {
+        "value": "Enum.SurfaceType.Smooth",
+        "type": "EnumItem"
+      },
+      "WaterReflectance": 1,
+      "BackParamA": -0.5,
+      "LeftParamB": 0.5,
+      "WaterColor": {
+        "value": [
+          0.0470588281750679,
+          0.3294117748737335,
+          0.3607843220233917
+        ],
+        "type": "Color3"
+      },
+      "CanTouch": true,
+      "Anchored": true,
+      "WaterWaveSpeed": 10,
+      "WaterTransparency": 0.30000001192092896,
+      "Name": "Terrain",
+      "AudioCanCollide": true,
+      "CustomPhysicalProperties": {
+        "type": "nil"
+      },
+      "LeftParamA": -0.5,
+      "CastShadow": true,
+      "PivotOffset": {
+        "value": [
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "type": "CFrame"
+      }
+    }
+  },
+  "Workspace": {
+    "skipped": [
+      "AvatarUnificationMode",
+      "EnableSLIMAvatars",
+      "ExpandedTerrain",
+      "ExplicitAutoJoints",
+      "FluidForces",
+      "IKControlConstraintSupport",
+      "ImprovedAnimationConstraint",
+      "ImprovedPhysicsReplication",
+      "LayeredClothingCacheOptimizations",
+      "MapTVRemoteToGamepadKeycodes",
+      "MeshPartHeadsAndAccessories",
+      "MeshStreamingAndImprovedLods",
+      "ModelStreamingBehavior",
+      "NextGenerationReplication",
+      "PathfindingUseImprovedSearch",
+      "PhysicsSteppingMethod",
+      "PlayerCharacterDestroyBehavior",
+      "PlayerScriptsUseInputActionSystem",
+      "PredictiveStreamingMode",
+      "PrimalPhysicsSolver",
+      "RejectCharacterDeletions",
+      "RenderingCacheOptimizations",
+      "ReplicateInstanceDestroySetting",
+      "SandboxedInstanceMode",
+      "SignalBehavior2",
+      "StreamOutBehavior",
+      "StreamingIntegrityMode",
+      "StreamingMinRadius",
+      "StreamingTargetRadius",
+      "TerrainWeldsFixed",
+      "TouchEventsUseCollisionGroups",
+      "TouchesUseCollisionGroups",
+      "UseFixedSimulation",
+      "UseInputSink",
+      "UseNewLuauTypeSolver",
+      "ValidateEnabledProximityPrompt",
+      "ModelMeshCFrame",
+      "ModelMeshData",
+      "ModelMeshSize",
+      "NeedsPivotMigration",
+      "ScaleFactor",
+      "WorldPivotData"
+    ],
+    "class": "Workspace",
+    "attributes": [],
+    "properties": {
+      "FallenPartsDestroyHeight": -500,
+      "Capabilities": {
+        "value": "",
+        "type": "SecurityCapabilities"
+      },
+      "DistributedGameTime": 0,
+      "FallHeightEnabled": true,
+      "StreamingEnabled": true,
+      "AllowThirdPartySales": false,
+      "Retargeting": {
+        "value": "Enum.AnimatorRetargetingMode.Default",
+        "type": "EnumItem"
+      },
+      "AirTurbulenceIntensity": 0,
+      "CurrentCamera": {
+        "path": "Workspace.Camera",
+        "type": "Instance"
+      },
+      "ClientAnimatorThrottling": {
+        "value": "Enum.ClientAnimatorThrottlingMode.Default",
+        "type": "EnumItem"
+      },
+      "Name": "Workspace",
+      "PrimaryPart": {
+        "type": "nil"
+      },
+      "Gravity": 196.1999969482422,
+      "GlobalWind": {
+        "value": [
+          0,
+          0,
+          0
+        ],
+        "type": "Vector3"
+      },
+      "AirDensity": 0.0012000000569969416,
+      "ModelStreamingMode": {
+        "value": "Enum.ModelStreamingMode.Default",
+        "type": "EnumItem"
+      }
+    }
+  },
+  "StarterGui": {
+    "skipped": [
+      "ClipsDescendantsSupportsRotation",
+      "RtlTextSupport",
+      "VirtualCursorMode"
+    ],
+    "class": "StarterGui",
+    "attributes": [],
+    "properties": {
+      "ShowDevelopmentGui": true,
+      "ScreenOrientation": {
+        "value": "Enum.ScreenOrientation.Sensor",
+        "type": "EnumItem"
+      },
+      "Name": "StarterGui",
+      "ResetPlayerGuiOnSpawn": true,
+      "Capabilities": {
+        "value": "",
+        "type": "SecurityCapabilities"
+      }
+    }
+  },
+  "Teams": {
+    "skipped": [],
+    "class": "Teams",
+    "attributes": [],
+    "properties": {
+      "Name": "Teams",
+      "Capabilities": {
+        "value": "",
+        "type": "SecurityCapabilities"
+      }
+    }
+  },
+  "SoundService": {
+    "skipped": [
+      "VolumetricAudio"
+    ],
+    "class": "SoundService",
+    "attributes": [],
+    "properties": {
+      "ListenerObject": {
+        "type": "nil"
+      },
+      "OcclusionEnabled": true,
+      "AmbientReverb": {
+        "value": "Enum.ReverbType.NoReverb",
+        "type": "EnumItem"
+      },
+      "AcousticSimulationEnabled": false,
+      "DopplerScale": 1,
+      "DiffractionEnabled": true,
+      "RolloffScale": 1,
+      "ReverbEnabled": true,
+      "Capabilities": {
+        "value": "",
+        "type": "SecurityCapabilities"
+      },
+      "Name": "SoundService",
+      "ListenerType": {
+        "value": "Enum.ListenerType.Camera",
+        "type": "EnumItem"
+      },
+      "RespectFilteringEnabled": true,
+      "ListenerCFrame": {
+        "value": [
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "type": "CFrame"
+      },
+      "DistanceFactor": 3.3299999237060547,
+      "CharacterSoundsUseNewApi": {
+        "value": "Enum.RolloutState.Default",
+        "type": "EnumItem"
+      }
+    }
+  },
+  "ServerScriptService": {
+    "skipped": [
+      "LoadStringEnabled"
+    ],
+    "class": "ServerScriptService",
+    "attributes": [],
+    "properties": {
+      "Name": "ServerScriptService",
+      "Capabilities": {
+        "value": "",
+        "type": "SecurityCapabilities"
+      }
+    }
+  },
+  "ReplicatedStorage": {
+    "skipped": [],
+    "class": "ReplicatedStorage",
+    "attributes": [],
+    "properties": {
+      "Name": "ReplicatedStorage",
+      "Capabilities": {
+        "value": "",
+        "type": "SecurityCapabilities"
+      }
+    }
+  }
+}

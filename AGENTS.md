@@ -9,6 +9,12 @@ Stack: Roblox Studio, Rojo, Rokit, GitHub, Codex. Git is the source of truth.
 
 ## Core Rules
 
+### Studio synchronization restriction
+
+- Work on code changes only in the local repository. Do not sync, upload, or apply repository code to Roblox Studio without the user's explicit authorization for that specific synchronization.
+- A collaborator edits the live project directly in Studio. Never overwrite their scripts, configuration, models, or other local Studio changes.
+- Running tests does not authorize synchronization to Studio.
+
 ### 1. Preserve existing architecture
 
 - Inspect relevant modules before coding.

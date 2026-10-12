@@ -18,8 +18,9 @@ function Spawner.Spawn(id: number, template: Model, network: Types.Network, sens
  local pool=table.clone(network.spawns)
  local positions: {Vector3}={}
  for _,player in Players:GetPlayers() do
-  local root=player.Character and player.Character.PrimaryPart
-  if root then table.insert(positions,root.Position) end
+  local character=player.Character
+  local root=if character then (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart) else nil
+  if root and root:IsA("BasePart") then table.insert(positions,root.Position) end
  end
  if #positions==0 then return nil end
  for _=1,math.min(#pool,Config.MaxSpawnAttempts) do
@@ -35,7 +36,7 @@ function Spawner.Spawn(id: number, template: Model, network: Types.Network, sens
   for _,edge in route do length+=network.paths[edge].length end
   if #route<2 or length<Config.MinRouteDistance then continue end
   local vehicle=Adapter.Prepare(template)
-  local frame=sensor:Ground(node.position,node.direction,vehicle.bounds)
+  local frame=sensor:Ground(node.position,node.direction,vehicle.bounds,vehicle.wheelbase)
   if not frame or not sensor:Clear(nil,frame,vehicle.bounds+Vector3.new(8,0,8)) then vehicle.model:Destroy();continue end
   vehicle.model:PivotTo(frame);vehicle.model.Name="PoliceCar_"..id
   vehicle.model:SetAttribute("PoliceVehicle",true);vehicle.model.Parent=parent

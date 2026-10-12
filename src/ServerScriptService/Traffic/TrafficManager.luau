@@ -110,8 +110,9 @@ function Manager.Start(): boolean
 		if senseClock>=1/Config.SenseRate then
 			senseClock=0; table.clear(players)
 			for _,player in Players:GetPlayers() do
-				local character=player.Character; local part=if character then character.PrimaryPart else nil
-				if part then table.insert(players,part.Position) end
+				local character=player.Character
+				local part=if character then (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart) else nil
+				if part and part:IsA("BasePart") then table.insert(players,part.Position) end
 			end
 			refreshBodies()
 			if police then
@@ -129,7 +130,11 @@ function Manager.Start(): boolean
 				else car.irrelevantSince=nil end
 			end
 			-- Remove a jammed owner before releasing its reservation; never grant through a live blocker.
-			for _,id in intersections:Expired(now) do for _,car in cars do if car.id==id then car:Fail("IntersectionTimeout") end end end
+			for _,id in intersections:Expired(now) do
+				for _,car in cars do
+					if car.id==id and car:RecoveryBlocked() then car:Fail("IntersectionTimeout") end
+				end
+			end
 		end
 		if moveClock>=1/Config.UpdateRate then
 			-- Bound the step after a server stall; skip elapsed simulation rather than jump through obstacles.

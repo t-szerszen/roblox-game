@@ -9,12 +9,12 @@ local Layout = require(ReplicatedStorage.Shared.UI.Layout)
 local ShopConfig = require(ReplicatedStorage.Shared.Shop.ShopConfig)
 type Product = ShopConfig.Product
 type TabId = ShopConfig.TabId
-type State = { coins: number, coinSystemReady: boolean, owned: { [string]: boolean } }
+type State = { coins: number, coinSystemReady: boolean, owned: { [string]: boolean },equipped: {[string]: boolean}?,available: {[string]: boolean}? }
 type Actions = {
 	Toggle: () -> (), Close: () -> (), Tab: (TabId) -> (),
-	Purchase: (Product) -> (), Confirm: () -> (), Cancel: () -> (), Refresh: () -> (),
+	Purchase: (Product, boolean?) -> (), Confirm: () -> (), Cancel: () -> (), Refresh: () -> (),
 }
-type Card = { product: Product, button: TextButton }
+type Card = { product: Product, button: TextButton, coinButton: TextButton?, status: TextLabel }
 local ShopView = {}
 
 function ShopView.new(gui: ScreenGui, owner: Scope.Scope, actions: Actions)
@@ -104,6 +104,25 @@ function ShopView.new(gui: ScreenGui, owner: Scope.Scope, actions: Actions)
 	refresh.Position = UDim2.new(1, -16, 0, 122)
 	refresh.Size = UDim2.fromOffset(100, Theme.TouchTarget)
 	refresh.TextSize = 12
+	local selectedCategory="Pojazdy"
+	local lastTab: TabId="Classic"
+	local mount: ((Frame,string,Scope.Scope)->())?=nil
+	local lastState: State?=nil
+	local lastBusy=false
+	local render: (TabId,(Frame,string,Scope.Scope)->())->()
+	local update: (State,boolean)->()
+	local categories=UI.Frame(window,"Categories")
+	categories.BackgroundTransparency=1;categories.Position=UDim2.fromOffset(16,176)
+	categories.Size=UDim2.new(1,-32,0,Theme.TouchTarget);categories.Visible=false
+	local categoryButtons: {[string]: TextButton}={}
+	for index,category in {"Pojazdy","Walka","Dodatki do pojazdów","Dodatki"} do
+		local button=UI.Button(categories,if category=="Dodatki do pojazdów" then "Do pojazdu" else category,owner,function()
+			selectedCategory=category
+			if mount then render(lastTab,mount) end
+		end)
+		button.TextSize=11;button.Position=UDim2.new((index-1)/4,0,0,0);button.Size=UDim2.new(0.25,-6,1,0)
+		categoryButtons[category]=button
+	end
 	local scroll = Instance.new("ScrollingFrame")
 	scroll.Name = "Products"
 	scroll.Position = UDim2.fromOffset(16, 176)
@@ -178,17 +197,16 @@ function ShopView.new(gui: ScreenGui, owner: Scope.Scope, actions: Actions)
 	confirm.Name = "Buy"
 	confirm.Position = UDim2.new(0.5, 6, 1, -64)
 	confirm.Size = UDim2.new(0.5, -26, 0, Theme.TouchTarget)
-	return {
-		Overlay = overlay, Window = window, Scroll = scroll, HUD = hud,
-		Tabs = tabs, CancelButton = cancel, Dialog = confirmOverlay,
-		SetConfirmation = function(product: Product?, coins: number)
-			confirmOverlay.Visible = product ~= nil
-			if product then
-				details.Text = string.format("%s\n\nCena: %s Coins\nSaldo po zakupie: %s Coins", product.name,
-					Layout.FormatCoins(product.price), Layout.FormatCoins(math.max(0, coins - product.price)))
+	render = function(tabId: TabId, mountPreview: (Frame, string, Scope.Scope) -> ())
+			if lastTab~=tabId then selectedCategory="Pojazdy" end
+			lastTab=tabId;mount=mountPreview
+			categories.Visible=tabId=="Premium"
+			local top=if categories.Visible then 232 else 176
+			scroll.Position=UDim2.fromOffset(16,top);scroll.Size=UDim2.new(1,-32,1,-top-16)
+			for category,button in categoryButtons do
+				button.BackgroundColor3=if category==selectedCategory then Theme.Colors.Accent else Theme.Colors.Raised
+				button.TextColor3=if category==selectedCategory then Theme.Colors.AccentText else Theme.Colors.Text
 			end
-		end,
-		Render = function(tabId: TabId, mountPreview: (Frame, string, Scope.Scope) -> ())
 			cardsScope:Clean()
 			cardsScope = Scope.new()
 			table.clear(cards)
@@ -214,6 +232,7 @@ function ShopView.new(gui: ScreenGui, owner: Scope.Scope, actions: Actions)
 				return
 			end
 			for index, product in ShopConfig.GetProductsByTab(tabId) do
+				if tabId=="Premium" and product.category~=selectedCategory then continue end
 				local card = UI.Frame(scroll, product.id, Theme.Shop.CardBackground)
 				card.LayoutOrder = index
 				UI.Corner(card)
@@ -247,31 +266,45 @@ function ShopView.new(gui: ScreenGui, owner: Scope.Scope, actions: Actions)
 				description.Position = UDim2.fromOffset(14, 180)
 				description.Size = UDim2.new(1, -28, 0, 32)
 				description.TextWrapped = true
-				local specs = UI.Label(card, if product.speed then string.format("%d km/h", product.speed) else "Odblokowanie na stałe", 12, true)
+				local specs = UI.Label(card, if product.speed then string.format("%d km/h", product.speed) else (product.category or "Odblokowanie na stałe"), 12, true)
 				specs.Position = UDim2.fromOffset(14, 216)
 				specs.Size = UDim2.new(1, -28, 0, 18)
 				local buy = UI.Button(card, "", cardsScope, function() actions.Purchase(product) end, true)
 				buy.Name = "Purchase"
 				buy.Position = UDim2.fromOffset(12, 242)
 				buy.Size = UDim2.new(1, -24, 0, Theme.TouchTarget)
-				table.insert(cards, { product = product, button = buy })
+				local coinButton: TextButton?=nil
+				if product.coinPrice then
+					coinButton=UI.Button(card,"",cardsScope,function() actions.Purchase(product,true) end)
+					coinButton.TextSize=12;coinButton.Name="PurchaseCoins";coinButton.Position=UDim2.fromOffset(12,242)
+					coinButton.Size=UDim2.new(0.58,-18,0,Theme.TouchTarget)
+					buy.Position=UDim2.new(0.58,0,0,242);buy.Size=UDim2.new(0.42,-12,0,Theme.TouchTarget)
+				end
+				table.insert(cards, { product = product, button = buy,coinButton=coinButton,status=specs })
 			end
 			layout()
-		end,
-		Update = function(state: State, busy: boolean)
+			if lastState then update(lastState,lastBusy) end
+	end
+	update = function(state: State, busy: boolean)
+			lastState=state;lastBusy=busy
 			balance.Text = if state.coinSystemReady then Layout.FormatCoins(state.coins) .. " Coins" else "— Coins"
 			UI.SetEnabled(refresh, not busy)
 			for _, card in cards do
 				local product = card.product
 				local owned = state.owned[product.id] == true
-				local unavailable = product.currency == "Robux" and (product.productId or 0) <= 0
+				card.status.Text=if state.equipped and state.equipped[product.id] then "Wyposażony" elseif owned then "Odblokowany" elseif product.speed then string.format("%d km/h",product.speed) else "Odblokowanie na stałe"
+				local unavailable = product.assetReady==false or (state.available and state.available[product.id]==false and product.modelName~=nil) or (not owned and product.currency == "Robux" and ((product.productId or 0) <= 0 or (state.available and state.available[product.id]==false)))
 				local insufficient = product.currency == "Coins" and state.coins < product.price
-				card.button.Text = if owned then "Posiadasz" elseif unavailable then "Premium · Wkrótce"
+				card.button.Text = if owned then (if product.modelName then "Przywołaj" elseif state.equipped and state.equipped[product.id] then "Wyłącz" else "Wyposaż") elseif unavailable then "Niedostępny"
 					elseif product.currency == "Coins" and not state.coinSystemReady then "Dane niedostępne"
 					elseif insufficient then "Brakuje " .. Layout.FormatCoins(product.price - state.coins) .. " Coins"
-					else Layout.FormatCoins(product.price) .. " " .. product.currency
-				local available = not busy and not owned and not unavailable and not insufficient
+					elseif product.price==0 then "Darmowy" else Layout.FormatCoins(product.price) .. " " .. product.currency
+				local available = not busy and not unavailable and (owned or not insufficient)
 					and (product.currency ~= "Coins" or state.coinSystemReady)
+				if card.coinButton then
+					card.coinButton.Text=if owned then "Posiadasz" else Layout.FormatCoins(product.coinPrice :: number).." Coins"
+					UI.SetEnabled(card.coinButton,not busy and not owned and state.coinSystemReady and state.coins >= (product.coinPrice :: number))
+				end
 				UI.SetEnabled(card.button, available)
 				card.button.BackgroundColor3 = if available then Theme.Colors.Accent else Theme.Shop.DisabledBackground
 				card.button.TextColor3 = if available then Theme.Colors.AccentText else Theme.Colors.Muted
@@ -279,7 +312,24 @@ function ShopView.new(gui: ScreenGui, owner: Scope.Scope, actions: Actions)
 				card.button.TextTransparency = 0
 				card.button.BackgroundTransparency = 0
 			end
+	end
+	return {
+		Overlay = overlay, Window = window, Scroll = scroll, HUD = hud,
+		SetCategory = function(category: string)
+			if not categoryButtons[category] then return end
+			selectedCategory=category
+			if mount then render(lastTab,mount) end
 		end,
+		Tabs = tabs, CancelButton = cancel, Dialog = confirmOverlay,
+		SetConfirmation = function(product: Product?, coins: number)
+			confirmOverlay.Visible = product ~= nil
+			if product then
+				details.Text = string.format("%s\n\nCena: %s Coins\nSaldo po zakupie: %s Coins", product.name,
+					Layout.FormatCoins(product.price), Layout.FormatCoins(math.max(0, coins - product.price)))
+			end
+		end,
+		Render = render,
+		Update = update,
 	}
 end
 

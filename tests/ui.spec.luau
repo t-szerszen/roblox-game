@@ -33,10 +33,10 @@ for _, aspect in {0.3, 0.5, 1, 2, 4} do
 	check(distance * math.sin(halfAngle) >= 5, "Camera encloses product at all rotations/aspects")
 end
 check(Layout.PreviewDistance({ Magnitude = 10 }, 0.5) > Layout.PreviewDistance({ Magnitude = 10 }, 2), "Narrow preview fits horizontal field of view")
-check(#Shop.Tabs == 3 and Shop.GetProductsByTab("Dopalacze")[1] == nil, "Only approved categories remain")
+check(#Shop.Tabs == 2 and Shop.Tabs[1].id=="Classic" and Shop.Tabs[2].id=="Premium", "Approved Classic/Premium categories")
 for index, product in Shop.CoinProducts do
 	check(Previews.Sources[product.previewKey] ~= nil, "Each scooter resolves a visual source")
-	check(product.price == ({0, 1000, 4500, 12000, 26000})[index], "Redesign preserves the economy")
+	check(product.price == ({0, 10000, 40000})[index], "Approved classic prices")
 end
 
 local scope = Scope.new()

@@ -3,6 +3,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("MinimapConfig"))
+local CoinsHUDConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"):WaitForChild("CoinsHUDConfig"))
 local DzordzConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("DzordzQuestConfig"))
 local player = Players.LocalPlayer
 local connections: {RBXScriptConnection} = {}
@@ -17,7 +18,7 @@ gui.Parent = player:WaitForChild("PlayerGui")
 local panel = Instance.new("Frame")
 panel.Name = "MapWindow"
 panel.AnchorPoint = Vector2.new(0, 1)
-panel.Position = UDim2.new(0, 18, 1, -18)
+panel.Position = UDim2.new(0, CoinsHUDConfig.Margin, 1, -(CoinsHUDConfig.Margin + CoinsHUDConfig.Height + CoinsHUDConfig.Gap))
 panel.Size = UDim2.fromOffset(224, 224)
 panel.BackgroundColor3 = Color3.fromRGB(19, 28, 40)
 panel.BorderSizePixel = 0
@@ -112,6 +113,7 @@ end
 marker("Dzordz Automatowicz", "D", DzordzConfig.NpcPosition.X, DzordzConfig.NpcPosition.Z, Color3.fromRGB(209, 184, 249), nil)
 marker("Torba Dzordza", "T", DzordzConfig.BagPosition.X, DzordzConfig.BagPosition.Z, Color3.fromRGB(255, 204, 83), "DzordzBagPickup", "seeking")
 marker("Oddaj torbę Dzordzowi", "D", DzordzConfig.NpcPosition.X, DzordzConfig.NpcPosition.Z, Color3.fromRGB(255, 204, 83), "DzordzBagReturn", "carrying")
+marker("Cel dostawy", "Z", 0, 0, Color3.fromRGB(255,209,82), "ActiveDelivery")
 local arrow = text(map, "Player", "▲", UDim2.fromOffset(22, 22), UDim2.fromScale(0.5, 0.5))
 arrow.AnchorPoint = Vector2.new(0.5, 0.5)
 arrow.TextSize = 20
@@ -143,10 +145,14 @@ table.insert(connections, RunService.Heartbeat:Connect(function(dt)
 	local nearestName = ""
 	local edgePositions = {}
 	for _, item in markers do
+		local delivery=item.id=="ActiveDelivery"
+		local target=if delivery then player:GetAttribute("DeliveryTargetPosition") else nil
+		if delivery and typeof(target)=="Vector3" then item.x=target.X;item.z=target.Z end
 		local dx, dz = item.x - centerX, item.z - centerZ
 		local x, y = 0.5 + dx / span, 0.5 + dz / span
 		local inside = x >= 0.06 and x <= 0.94 and y >= 0.15 and y <= 0.83
 		local visible = if item.id then active and player:GetAttribute("PosterQuest_" .. item.id) ~= true else inside
+		if delivery then visible=player:GetAttribute("DeliveryActive")==true and typeof(target)=="Vector3" end
 		if item.stage then
 			visible = dzordzStatus == item.stage or (item.stage == "seeking" and dzordzStatus == "picking")
 		end

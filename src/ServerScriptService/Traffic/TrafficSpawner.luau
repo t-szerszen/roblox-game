@@ -35,8 +35,9 @@ function Spawner.Spawn(id: number, network: Types.Network, template: Model, pare
 		if occupied or nearby>=Config.MaxVehiclesPerArea or roadCount>=Config.MaxVehiclesPerRoad then continue end
 		local visible=false
 		for _,player in Players:GetPlayers() do
-			local character=player.Character; local root=if character then character.PrimaryPart else nil
-			if root then
+			local character=player.Character
+			local root=if character then (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart) else nil
+			if root and root:IsA("BasePart") then
 				local delta=node.position-root.Position
 				if delta.Magnitude<Config.SpawnVisibilityDistance and delta.Magnitude>0
 					and root.CFrame.LookVector:Dot(delta.Unit)>Config.SpawnForwardDot then visible=true; break end
@@ -49,7 +50,7 @@ function Spawner.Spawn(id: number, network: Types.Network, template: Model, pare
 		for _,edgeId in route do routeDistance+=network.paths[edgeId].length end
 		if routeDistance<Config.MinSpawnRouteDistance then continue end
 		local prepared=Adapter.Prepare(template)
-		local frame=sensor:Ground(node.position,node.direction,prepared.bounds)
+		local frame=sensor:Ground(node.position,node.direction,prepared.bounds,prepared.wheelbase)
 		if not frame or not sensor:Clear(nil,frame,prepared.bounds+Vector3.new(Config.SafeGap,0,Config.SafeGap)) then prepared.model:Destroy(); continue end
 		prepared.model:PivotTo(frame); prepared.model.Name="TrafficCar_"..id
 		prepared.model.Parent=parent

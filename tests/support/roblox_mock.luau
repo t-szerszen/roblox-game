@@ -125,10 +125,19 @@ function instanceMethods:GetChildren()
 	for _, child in self._children do table.insert(children, child) end
 	return children
 end
+function instanceMethods:GetDescendants()
+	local result={}
+	local function visit(node)
+		for _,child in node:GetChildren() do table.insert(result,child);visit(child) end
+	end
+	visit(self)
+	return result
+end
 function instanceMethods:Destroy() self.Parent = nil end
 
 local function node(path)
 	return setmetatable({ _path = path }, { __index = function(_, key)
+		if key == "WaitForChild" then return function(_, name) return node(path .. "/" .. name) end end
 		if key == "Parent" then return node(string.match(path, "^(.*)/[^/]+$") or "") end
 		return node(path .. "/" .. key)
 	end })
@@ -154,6 +163,8 @@ function marketplaceService:UserOwnsGamePassAsync(userId, passId)
 end
 local dataStoreService = {}
 dataStoreService.failLoads = {}
+dataStoreService.failSaves = {}
+dataStoreService.updateHook = nil
 function dataStoreService:GetDataStore(_)
 	return {
 		GetAsync = function(_, id)
@@ -161,6 +172,15 @@ function dataStoreService:GetDataStore(_)
 			return savedProfiles[id]
 		end,
 		SetAsync = function(_, id, value) writes[id] = value end,
+		UpdateAsync = function(_, id, transform)
+			if dataStoreService.failLoads[id] then error("mock DataStore unavailable") end
+			if (dataStoreService.failSaves[id] or 0)>0 then dataStoreService.failSaves[id]-=1;error("mock save failure") end
+			if dataStoreService.updateHook then dataStoreService.updateHook(id) end
+			local old=if writes[id]~=nil then writes[id] else savedProfiles[id]
+			local value=transform(old)
+			if value~=nil then writes[id]=value end
+			return value
+		end,
 	}
 end
 local services = {
@@ -170,6 +190,8 @@ local services = {
 	Players = playersService,
 	MarketplaceService = marketplaceService,
 }
+local nextGuid=0
+services.HttpService={GenerateGUID=function() nextGuid+=1;return "mock-session-"..nextGuid end}
 local gameMock = {}
 function gameMock:GetService(name)
 	assert(services[name], "Unsupported mocked service: " .. name)

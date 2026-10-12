@@ -1,5 +1,17 @@
 # NPC police
 
+## Current repair — 2026-10-12
+
+See [police/traffic repair](POLICE_TRAFFIC_REPAIR.md) for causes, implementation,
+changed files, executed checks and outstanding native acceptance. Police now
+handle validated impacts and 12-second civilian blockages, preserve active units
+through routine retirement, track the physical scooter and weld a standard R15
+officer above the roof before a faster supported exit. The current offence limit
+is 25 km/h; the 50 km/h values below describe the initial implementation. Pursuit
+tuning is now 160 stud/s, acceleration/braking 36/42, visibility 350 studs,
+sensing horizon 380 studs and route refresh 0.5 seconds. Walking is 18 stud/s and
+exit interpolation 0.3 seconds. The sections below retain the original history.
+
 ## Inspected architecture (2026-10-08)
 
 The repository was clean on `main` at `8bd9697`; implementation uses

@@ -27,7 +27,7 @@ local scope = Scope.new()
 local alive = true
 local isOpen = false
 local busy = false
-local currentTab: TabId = "Hulajnogi"
+local currentTab: TabId = "Classic"
 local state: ShopState = { coins = 0, coinSystemReady = false, owned = {} }
 local pendingProduct: Product? = nil
 local awaitingPass: { id: number, product: Product }? = nil
@@ -59,7 +59,7 @@ toggleEvent.Parent = gui
 
 local setOpen: (boolean) -> ()
 local cancelConfirmation: () -> ()
-local purchase: (Product) -> ()
+local purchase: (Product, boolean?) -> ()
 local refresh: () -> ()
 local view: ShopView.View
 local previews: ProductPreview.Controller
@@ -124,22 +124,22 @@ cancelConfirmation = function()
 	focusShop()
 end
 
-purchase = function(product: Product)
+purchase = function(product: Product, useCoins: boolean?)
 	if busy or not alive then return end
 	busy = true
 	update()
 	runRequest(function()
-		local success, message, productId = serverCall(if product.currency == "Coins" then "PurchaseCoins" else "PrepareRobux", product.id)
-		if not alive then return end
-		if success and product.currency == "Robux" and productId then
-			awaitingPass = { id = productId, product = product }
-			local prompted, problem = pcall(function() MarketplaceService:PromptGamePassPurchase(player, productId) end)
-			if prompted then return end
-			awaitingPass = nil
-			warn("Shop prompt: " .. tostring(problem))
-			message = "Nie można otworzyć okna zakupu. Spróbuj ponownie."
-			success = false
+		if product.currency=="Robux" and not useCoins and not state.owned[product.id] then
+			awaitingPass={id=product.productId or 0,product=product}
 		end
+		local success, message, productId = serverCall(if state.owned[product.id] then "Equip" elseif product.currency == "Coins" or useCoins then "PurchaseCoins" else "PrepareRobux", product.id)
+		if not alive then return end
+		if success and productId then
+			if awaitingPass then awaitingPass.id=productId end
+			-- The server owns the prompt reservation, including the radio's alternative payment lock.
+			return
+		end
+		awaitingPass=nil
 		busy = false
 		update()
 		feedback.Show(message, not success)
@@ -158,12 +158,14 @@ view = ShopView.new(gui, scope, {
 		update()
 		focusShop()
 	end,
-	Purchase = function(product: Product)
+	Purchase = function(product: Product, useCoins: boolean?)
 		if busy or pendingProduct then return end
 		feedback.Click()
-		if product.currency == "Coins" then
-			pendingProduct = product
-			view.SetConfirmation(product, state.coins)
+		if state.owned[product.id] then purchase(product);return end
+		if product.currency == "Coins" or useCoins then
+			pendingProduct = if useCoins then table.clone(product) else product
+			if useCoins then (pendingProduct :: Product).currency="Coins";(pendingProduct :: Product).price=product.coinPrice :: number end
+			view.SetConfirmation(pendingProduct, state.coins)
 			-- Cancel is the initial gamepad selection to prevent accidental purchases.
 			focusShop()
 		else purchase(product) end
@@ -273,6 +275,28 @@ scope:Give(MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(bu
 		focusShop()
 	end)
 end))
+
+local balanceConnection: RBXScriptConnection?=nil
+local function bindBalance()
+	if balanceConnection then balanceConnection:Disconnect();balanceConnection=nil end
+	local stats=player:FindFirstChild("leaderstats")
+	local coins=if stats then stats:FindFirstChild("Coins") else nil
+	if coins and coins:IsA("IntValue") then
+		balanceConnection=coins.Changed:Connect(function(value) state.coins=value;update() end)
+		state.coins=coins.Value;update()
+	end
+end
+scope:Give(function() if balanceConnection then balanceConnection:Disconnect() end end)
+local statsScope=Scope.new()
+scope:Give(function() statsScope:Clean() end)
+local function bindStats()
+	statsScope:Clean();statsScope=Scope.new()
+	local stats=player:FindFirstChild("leaderstats")
+	if stats then statsScope:Give(stats.ChildAdded:Connect(bindBalance)) end
+	bindBalance()
+end
+scope:Give(player.ChildAdded:Connect(function(child) if child.Name=="leaderstats" then bindStats() end end))
+bindStats()
 
 local function cleanup()
 	if not alive then return end

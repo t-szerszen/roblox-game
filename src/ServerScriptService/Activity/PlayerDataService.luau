@@ -4,15 +4,32 @@ local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local UpgradeCatalog=require(ReplicatedStorage.Shared.ScooterUpgradeCatalog)
+local CustomConfig=require(ReplicatedStorage.Shared.ScooterCustomConfig)
+local Persistence = require(script.Parent.ProfilePersistence)
+local EconomyConfig = require(ReplicatedStorage.Shared.Activity.EconomyConfig)
+
 local ActivityConfig = require(ReplicatedStorage.Shared.Activity.ActivityConfig)
 local PhoneConfig = require(ReplicatedStorage.Shared.Phone.PhoneConfig)
 local ShopConfig = require(ReplicatedStorage.Shared.Shop.ShopConfig)
 local ScooterConfig = require(ReplicatedStorage.Shared.ScooterConfig)
+local CustomConfig = require(ReplicatedStorage.Shared.ScooterCustomConfig)
+local UpgradeCatalog = require(ReplicatedStorage.Shared.ScooterUpgradeCatalog)
 
 export type VisualPreference = { enabled: boolean, color: { number } }
 
 export type Profile = {
 	coins: number,
+	unlocks: { [string]: boolean },
+	selectedScooter: string,
+	equippedItems: {[string]: boolean},
+	visualsByModel: { [string]: { Smoke: VisualPreference, Neon: VisualPreference } },
+	rainbowModels: { [string]: boolean },
+	scooterEquipment: {[string]: {owned: {[string]: boolean},equipped: {[string]: boolean}}},
+	scooterDesigns: {[string]: {[string]: {[string]: string}}},
+	paintByModel: { [string]: { [string]: { number } } },
+	rewardProgress: { rideStuds: number, rideCoins: number, rideRemainder: number, burnoutRemainder: number, gangRemainder: number },
+	transactions: { { reason: string, amount: number, at: number } },
 	xp: number,
 	deliveries: number,
 	raceWins: number,
@@ -25,6 +42,8 @@ export type Profile = {
 	loginStreak: number,
 	owned: { [string]: boolean },
 	scooterUpgrades: { [string]: number },
+	scooterDesigns: {[string]: {[string]: {[string]: string}}},
+	scooterEquipment: {[string]: {owned: {[string]: boolean}, equipped: {[string]: boolean}}},
 	scooterVisuals: { Smoke: VisualPreference, Neon: VisualPreference },
 	canCreateGang: boolean,
 	ownsPepperSpray: boolean,
@@ -35,6 +54,10 @@ local profileStore = DataStoreService:GetDataStore("PlayerProfiles_v1")
 local profiles: { [Player]: Profile } = {}
 local canSave: { [Player]: boolean } = {}
 local statConnections: { [Player]: { RBXScriptConnection } } = {}
+local tokens: { [Player]: string } = {}
+local saving: { [Player]: boolean } = {}
+local purchasing: { [Player]: boolean } = {}
+local queuedCredits: { [Player]: { {coins: number, xp: number, reason: string} } } = {}
 local started = false
 local shuttingDown = false
 
@@ -49,6 +72,10 @@ end
 local function defaultProfile(): Profile
 	return {
 		coins = 0,
+		unlocks = {}, selectedScooter = ScooterConfig.DefaultModel, equippedItems = {},
+		visualsByModel = {}, rainbowModels = {}, paintByModel = {}, scooterEquipment = {}, scooterDesigns = {},
+		rewardProgress = {rideStuds=0,rideCoins=0,rideRemainder=0,burnoutRemainder=0,gangRemainder=0},
+		transactions = {},
 		xp = 0,
 		deliveries = 0,
 		raceWins = 0,
@@ -61,6 +88,8 @@ local function defaultProfile(): Profile
 		loginStreak = 0,
 		owned = {},
 		scooterUpgrades = {},
+		scooterEquipment = {},
+		scooterDesigns = {},
 		scooterVisuals = {
 			Smoke = { enabled = false, color = { 1, 1, 1 } },
 			Neon = { enabled = false, color = { 0, 1, 1 } },
@@ -114,6 +143,32 @@ local function deserialize(value: unknown): Profile
 			end
 		end
 	end
+	if typeof(data.scooterEquipment) == "table" then
+		for modelName in ScooterConfig.Models do
+			local state = data.scooterEquipment[modelName]
+			if typeof(state) == "table" then
+				profile.scooterEquipment[modelName] = UpgradeCatalog.Normalize(state)
+			end
+		end
+	end
+	if typeof(data.scooterDesigns) == "table" then
+		for modelName in ScooterConfig.Models do
+			local saved = data.scooterDesigns[modelName]
+			if typeof(saved) ~= "table" then continue end
+			local slots: {[string]: {[string]: string}} = {}
+			for index=1,CustomConfig.DesignSlots do
+				local palette=saved[tostring(index)]
+				if typeof(palette) ~= "table" then continue end
+				local clean: {[string]: string} = {}
+				for _,group in CustomConfig.Groups do
+					local hex=palette[group.Id]
+					if typeof(hex)=="string" and #hex==6 and hex:match("^%x+$") then clean[group.Id]=hex end
+				end
+				if next(clean) then slots[tostring(index)]=clean end
+			end
+			profile.scooterDesigns[modelName]=slots
+		end
+	end
 	if typeof(data.scooterVisuals) == "table" then
 		for _, kind in { "Smoke", "Neon" } do
 			local preference = data.scooterVisuals[kind]
@@ -128,6 +183,52 @@ local function deserialize(value: unknown): Profile
 						profile.scooterVisuals.Neon = visual
 					end
 				end
+			end
+		end
+	end
+	if typeof(data.unlocks) == "table" then
+		for _, product in ShopConfig.GetScooters() do
+			profile.unlocks[product.id] = product.price == 0 or data.unlocks[product.id] == true or (product.stat ~= nil and profile.owned[product.stat] == true)
+		end
+		for _, product in ShopConfig.RobuxProducts do profile.unlocks[product.id] = data.unlocks[product.id] == true end
+	else
+		for _, product in ShopConfig.GetScooters() do profile.unlocks[product.id] = product.price == 0 or (product.stat ~= nil and profile.owned[product.stat] == true) end
+	end
+	if profile.ownsPepperSpray then profile.unlocks.pepper_spray = true end
+	if typeof(data.equippedItems)=="table" then for _,id in {"radio","pepper_spray"} do profile.equippedItems[id]=data.equippedItems[id]==true and profile.unlocks[id]==true end end
+	local selected = if typeof(data.selectedScooter) == "string" then ShopConfig.GetScooterProduct(data.selectedScooter) else nil
+	if selected and profile.unlocks[selected.id] then profile.selectedScooter = data.selectedScooter end
+	if typeof(data.rewardProgress) == "table" then
+		for key in profile.rewardProgress do
+			local limit = if key == "rideStuds" then EconomyConfig.StudsPerKilometer else (if key == "rideCoins" then 200 else 1)
+			profile.rewardProgress[key] = math.clamp(finiteNumber(data.rewardProgress[key],0),0,limit-0.000001)
+		end
+	end
+	local function validRGB(color: any): boolean
+		return typeof(color)=="table" and #color==3 and finiteNumber(color[1],-1)>=0 and finiteNumber(color[1],2)<=1
+			and finiteNumber(color[2],-1)>=0 and finiteNumber(color[2],2)<=1 and finiteNumber(color[3],-1)>=0 and finiteNumber(color[3],2)<=1
+	end
+	for modelName in ScooterConfig.Models do
+		local visual = if typeof(data.visualsByModel)=="table" then data.visualsByModel[modelName] else nil
+		if typeof(visual)=="table" then
+			profile.visualsByModel[modelName] = Persistence.Copy(profile.scooterVisuals)
+			for _, kind in {"Smoke","Neon"} do
+				if typeof(visual[kind])=="table" and validRGB(visual[kind].color) then profile.visualsByModel[modelName][kind]={enabled=visual[kind].enabled==true,color=table.clone(visual[kind].color)} end
+			end
+		end
+		if typeof(data.rainbowModels)=="table" then profile.rainbowModels[modelName]=data.rainbowModels[modelName]==true end
+		local paint = if typeof(data.paintByModel)=="table" then data.paintByModel[modelName] else nil
+		if typeof(paint)=="table" then
+			profile.paintByModel[modelName]={}
+			for key,color in paint do if typeof(key)=="string" and #key<=40 and validRGB(color) then profile.paintByModel[modelName][key]=table.clone(color) end end
+		end
+	end
+	profile.visualsByModel[ScooterConfig.DefaultModel] = profile.visualsByModel[ScooterConfig.DefaultModel] or Persistence.Copy(profile.scooterVisuals)
+	if typeof(data.transactions)=="table" then
+		for index=math.max(1,#data.transactions-EconomyConfig.TransactionHistoryLimit+1),#data.transactions do
+			local entry=data.transactions[index]
+			if typeof(entry)=="table" and typeof(entry.reason)=="string" and #entry.reason<=80 then
+				table.insert(profile.transactions,{reason=entry.reason,amount=finiteNumber(entry.amount,0),at=finiteNumber(entry.at,0)})
 			end
 		end
 	end
@@ -153,13 +254,15 @@ local function syncAttributes(player: Player, profile: Profile)
 	player:SetAttribute("TotalDistanceKm", profile.totalDistanceKm)
 	player:SetAttribute("DailyLoginStreak", profile.loginStreak)
 	player:SetAttribute("CanCreateGang", profile.canCreateGang)
-	player:SetAttribute("OwnsPepperSpray", profile.ownsPepperSpray)
+	player:SetAttribute("OwnsPepperSpray", profile.unlocks.pepper_spray==true)
+	player:SetAttribute("RadioEquipped", profile.equippedItems.radio==true)
+	player:SetAttribute("SelectedScooter",profile.selectedScooter)
 	for key, value in profile.daily do
 		player:SetAttribute(key, value)
 	end
-	for _, product in ShopConfig.CoinProducts do
+	for _, product in ShopConfig.GetScooters() do
 		if product.stat then
-			player:SetAttribute(product.stat, product.price == 0 or profile.owned[product.stat] == true)
+			player:SetAttribute(product.stat, product.price == 0 or profile.unlocks[product.id] == true)
 		end
 	end
 end
@@ -185,7 +288,8 @@ local function makeLeaderstats(player: Player, profile: Profile)
 	coins.Value = profile.coins
 	coins.Parent = leaderstats
 	table.insert(connections, coins.Changed:Connect(function(value: number)
-		profile.coins = math.max(0, math.floor(value))
+		-- leaderstats is presentation; economic writes must use the central API.
+		if value ~= profile.coins then coins.Value = profile.coins end
 	end))
 	local xp = Instance.new("IntValue")
 	xp.Name = "XP"
@@ -205,57 +309,42 @@ local function applyDailyLogin(player: Player, profile: Profile)
 	profile.loginStreak = if profile.loginDay == today - 1 then (profile.loginStreak % 7) + 1 else 1
 	profile.loginDay = today
 	local reward = ActivityConfig.DailyLoginCoinRewards[profile.loginStreak] or 0
-	profile.coins += reward
+	PlayerDataService.AddCurrency(player,reward,0,"DailyLogin")
 	player:SetAttribute("DailyLoginStreak", profile.loginStreak)
 	player:SetAttribute("DailyLoginReward", reward)
 end
 
-local function savePlayer(player: Player)
+local function savePlayer(player: Player, release: boolean?): boolean
 	local profile = profiles[player]
-	if not profile or not canSave[player] then
-		return
+	if not profile or not canSave[player] or saving[player] or purchasing[player] then return false end
+	saving[player] = true
+	local ok, reason = Persistence.Save(profileStore,tostring(player.UserId),tokens[player],profile,release == true)
+	saving[player] = nil
+	if not ok then
+		warn(string.format("PlayerDataService: %s for %s",reason,player.Name))
+		if reason == "SessionLost" then canSave[player]=false;player:SetAttribute("DataPersistenceAvailable",false) end
 	end
-	local leaderstats = player:FindFirstChild("leaderstats")
-	local coins = if leaderstats then leaderstats:FindFirstChild("Coins") else nil
-	local xp = if leaderstats then leaderstats:FindFirstChild("XP") else nil
-	if coins and coins:IsA("IntValue") then
-		profile.coins = coins.Value
-	end
-	if xp and xp:IsA("IntValue") then
-		profile.xp = xp.Value
-	end
-	for _, product in ShopConfig.CoinProducts do
-		if product.stat and player:GetAttribute(product.stat) == true then
-			profile.owned[product.stat] = true
-		end
-	end
-	profile.canCreateGang = player:GetAttribute("CanCreateGang") == true
-	profile.ownsPepperSpray = player:GetAttribute("OwnsPepperSpray") == true
-	local success, message = pcall(function()
-		profileStore:SetAsync(tostring(player.UserId), profile)
-	end)
-	if not success then
-		warn(string.format("PlayerDataService: save failed for %s: %s", player.Name, tostring(message)))
-	end
+	player:SetAttribute("LastSaveSucceeded",ok)
+	return ok
 end
 
+function PlayerDataService.Save(player: Player): boolean return savePlayer(player) end
+
 local function loadPlayer(player: Player)
-	local loaded: unknown = nil
-	local success, message = pcall(function()
-		loaded = profileStore:GetAsync(tostring(player.UserId))
-	end)
-	if not success then
-		warn(string.format("PlayerDataService: load failed for %s; using session data: %s", player.Name, tostring(message)))
-	end
-	-- An outstanding datastore request can complete after the player has left.
+	local token = Persistence.Token()
+	local success, loaded = Persistence.Acquire(profileStore,tostring(player.UserId),token)
+	if not success then warn("PlayerDataService: profile unavailable for "..player.Name) end
 	if player.Parent ~= Players or shuttingDown then
+		if success then Persistence.Save(profileStore,tostring(player.UserId),token,loaded,true) end
 		return
 	end
-	local profile = deserialize(loaded)
+	tokens[player] = token
+	local profile = deserialize(if success then loaded else nil)
 	resetDailyIfNeeded(profile)
 	profiles[player] = profile
 	-- Never overwrite a real profile after a failed read with temporary defaults.
 	canSave[player] = success
+	player:SetAttribute("DataPersistenceAvailable",success)
 	applyDailyLogin(player, profile)
 	makeLeaderstats(player, profile)
 	syncAttributes(player, profile)
@@ -273,99 +362,163 @@ function PlayerDataService.OwnsScooter(player: Player, modelName: string): boole
 		return false
 	end
 	local profile = profiles[player]
-	return product.price == 0 or (profile ~= nil and profile.owned[product.stat] == true)
+	return product.price == 0 or (profile ~= nil and (profile.unlocks[product.id] == true or profile.owned[product.stat] == true))
 end
 
-local function transactionCoins(player: Player): (Profile?, IntValue?)
-	local profile = profiles[player]
-	if not profile or not canSave[player] or player.Parent ~= Players then
-		return nil, nil
-	end
-	local leaderstats = player:FindFirstChild("leaderstats")
-	local coins = if leaderstats then leaderstats:FindFirstChild("Coins") else nil
-	return profile, if coins and coins:IsA("IntValue") then coins else nil
-end
 
-function PlayerDataService.PurchaseScooter(player: Player, modelName: string): (boolean, string)
-	local product = ShopConfig.GetScooterProduct(modelName)
-	if not product or not product.stat then
-		return false, "InvalidModel"
-	end
-	local profile, coins = transactionCoins(player)
-	if not profile or not coins then
-		return false, "DataUnavailable"
-	end
-	if PlayerDataService.OwnsScooter(player, modelName) then
-		return false, "AlreadyOwned"
-	end
-	if coins.Value < product.price then
-		return false, "InsufficientCoins"
-	end
-	-- Validation, debit and ownership update must remain in one non-yielding transaction.
-	profile.coins = coins.Value - product.price
-	profile.owned[product.stat] = true
-	coins.Value = profile.coins
-	player:SetAttribute(product.stat, true)
-	return true, "Purchased"
+local function publishCoins(player: Player, profile: Profile)
+	local stats=player:FindFirstChild("leaderstats")
+	local coins=if stats then stats:FindFirstChild("Coins") else nil
+	if coins and coins:IsA("IntValue") then coins.Value=profile.coins end
+end
+local function journal(profile: Profile, amount: number, reason: string)
+	table.insert(profile.transactions,{amount=amount,reason=reason,at=os.time()})
+	if #profile.transactions>EconomyConfig.TransactionHistoryLimit then table.remove(profile.transactions,1) end
+end
+function PlayerDataService.Ready(player: Player): boolean
+	return not shuttingDown and profiles[player]~=nil and canSave[player]==true and player.Parent==Players and player:GetAttribute("DataPersistenceAvailable")==true
+end
+function PlayerDataService.OwnsProduct(player: Player, id: string): boolean
+	local product=ShopConfig.GetProduct(id)
+	local profile=profiles[player]
+	return product~=nil and ((product.currency=="Coins" and product.price==0) or (profile~=nil and profile.unlocks[id]==true))
+end
+local function credit(player: Player, profile: Profile, amount: number, xpAmount: number, reason: string)
+	profile.coins+=amount;profile.xp+=xpAmount
+	if amount~=0 then journal(profile,amount,reason) end
+	publishCoins(player,profile)
+	local stats=player:FindFirstChild("leaderstats")
+	local xp=if stats then stats:FindFirstChild("XP") else nil
+	if xp and xp:IsA("IntValue") then xp.Value=profile.xp end
+end
+function PlayerDataService.AddCoins(player: Player, amount: number, reason: string): boolean
+	return PlayerDataService.AddCurrency(player,amount,0,reason)
+end
+local function durable(player: Player, modify: (Profile) -> (boolean,string)): (boolean,string)
+	local profile=profiles[player]
+	if not PlayerDataService.Ready(player) or not profile then return false,"DataUnavailable" end
+	if purchasing[player] or saving[player] then return false,"Busy" end
+	purchasing[player]=true
+	local candidate=Persistence.Copy(profile) :: Profile
+	local checked,allowed,reason=pcall(modify,candidate)
+	if not checked or not allowed then purchasing[player]=nil;return false,if checked then reason else "InvalidTransaction" end
+	local saved,saveReason=Persistence.Save(profileStore,tostring(player.UserId),tokens[player],candidate,false)
+	if saved then
+		-- Other stat/progress updates may have occurred while persistence yielded.
+		profile.coins=candidate.coins;profile.unlocks=candidate.unlocks;profile.owned=candidate.owned
+		profile.scooterUpgrades=candidate.scooterUpgrades;profile.transactions=candidate.transactions
+		profile.selectedScooter=candidate.selectedScooter;profile.ownsPepperSpray=candidate.ownsPepperSpray
+		profile.equippedItems=candidate.equippedItems
+		publishCoins(player,profile);syncAttributes(player,profile)
+	elseif saveReason=="SessionLost" then canSave[player]=false;player:SetAttribute("DataPersistenceAvailable",false) end
+	purchasing[player]=nil
+	local credits=queuedCredits[player];queuedCredits[player]=nil
+	if credits and canSave[player] then for _,entry in credits do credit(player,profile,entry.coins,entry.xp,entry.reason) end end
+	return saved,if saved then reason else saveReason
+end
+function PlayerDataService.PurchaseProduct(player: Player, id: string): (boolean,string)
+	local product=ShopConfig.GetProduct(id)
+	local price=if product then (if product.currency=="Coins" then product.price else product.coinPrice) else nil
+	if not product or price==nil or product.retired or product.assetReady==false then return false,"InvalidProduct" end
+	return durable(player,function(candidate)
+		if PlayerDataService.OwnsProduct(player,id) then return false,"AlreadyOwned" end
+		if candidate.coins<price then return false,"InsufficientCoins" end
+		candidate.coins-=price;candidate.unlocks[id]=true
+		if product.stat then candidate.owned[product.stat]=true end
+		journal(candidate,-price,"Purchase:"..id)
+		return true,"Purchased"
+	end)
+end
+function PlayerDataService.PurchaseScooter(player: Player, modelName: string): (boolean,string)
+	local product=ShopConfig.GetScooterProduct(modelName)
+	if not product then return false,"InvalidModel" end
+	return PlayerDataService.PurchaseProduct(player,product.id)
+end
+function PlayerDataService.GrantProduct(player: Player, id: string): (boolean,string)
+	local product=ShopConfig.GetProduct(id)
+	if not product or product.kind~="GamePass" then return false,"InvalidProduct" end
+	if PlayerDataService.OwnsProduct(player,id) then return true,"AlreadyOwned" end
+	return durable(player,function(candidate)
+		candidate.unlocks[id]=true
+		if id=="pepper_spray" then candidate.ownsPepperSpray=true end
+		journal(candidate,0,"VerifiedGamePass:"..id)
+		return true,"Unlocked"
+	end)
+end
+function PlayerDataService.SelectScooter(player: Player, modelName: string): (boolean,string)
+	if not PlayerDataService.OwnsScooter(player,modelName) then return false,"NotOwned" end
+	return durable(player,function(candidate) candidate.selectedScooter=modelName;return true,"Selected" end)
+end
+function PlayerDataService.SpendCoins(player: Player, amount: number, reason: string): (boolean,string)
+	if typeof(amount)~="number" or amount~=amount or amount<=0 or amount%1~=0 or amount==math.huge
+		or typeof(reason)~="string" or #reason==0 or #reason>80 then return false,"InvalidTransaction" end
+	return durable(player,function(candidate)
+		if candidate.coins<amount then return false,"InsufficientCoins" end
+		candidate.coins-=amount;journal(candidate,-amount,reason);return true,"Debited"
+	end)
 end
 
 function PlayerDataService.PurchaseSpeedUpgrade(player: Player, modelName: string, expectedTier: number): (boolean, string)
 	if not ScooterConfig.Models[modelName] or not ScooterConfig.IsValidSpeedTier(expectedTier) then
 		return false, "InvalidUpgrade"
 	end
-	local profile, coins = transactionCoins(player)
-	if not profile or not coins then
-		return false, "DataUnavailable"
-	end
-	if not PlayerDataService.OwnsScooter(player, modelName) then
-		return false, "NotOwned"
-	end
-	local currentTier = profile.scooterUpgrades[modelName] or 0
-	if currentTier ~= expectedTier then
-		return false, "StaleTier"
-	end
-	local price = ScooterConfig.GetUpgradeCost(modelName, currentTier)
-	if not price then
-		return false, "MaximumTier"
-	end
-	if coins.Value < price then
-		return false, "InsufficientCoins"
-	end
-	-- Checking the expected tier makes delayed duplicate requests harmless.
-	profile.coins = coins.Value - price
-	profile.scooterUpgrades[modelName] = currentTier + 1
-	coins.Value = profile.coins
-	return true, "Purchased"
+	return durable(player,function(candidate)
+		if not PlayerDataService.OwnsScooter(player,modelName) then return false,"NotOwned" end
+		local tier=candidate.scooterUpgrades[modelName] or 0
+		if tier~=expectedTier then return false,"StaleTier" end
+		local price=ScooterConfig.GetUpgradeCost(modelName,tier)
+		if not price then return false,"MaximumTier" end
+		if candidate.coins<price then return false,"InsufficientCoins" end
+		candidate.coins-=price;candidate.scooterUpgrades[modelName]=tier+1
+		journal(candidate,-price,"SpeedUpgrade:"..modelName)
+		return true,"Purchased"
+	end)
 end
 
-function PlayerDataService.SetScooterVisual(player: Player, kind: "Smoke" | "Neon", enabled: boolean, color: Color3): boolean
-	local profile = profiles[player]
-	if not profile or not canSave[player] or player.Parent ~= Players then
-		return false
-	end
-	local preference = { enabled = enabled, color = { color.R, color.G, color.B } }
-	if kind == "Smoke" then
-		profile.scooterVisuals.Smoke = preference
-	else
-		profile.scooterVisuals.Neon = preference
-	end
+function PlayerDataService.SetScooterVisual(player: Player, kind: "Smoke" | "Neon", enabled: boolean, color: Color3, modelName: string?): boolean
+	local profile=profiles[player]
+	local model=modelName or (if profile then profile.selectedScooter else ScooterConfig.DefaultModel)
+	if not profile or not PlayerDataService.Ready(player) or not PlayerDataService.OwnsScooter(player,model)
+		or not PlayerDataService.OwnsProduct(player,if kind=="Smoke" then "burnout_smoke" else "scooter_neons") then return false end
+	local visual=profile.visualsByModel[model]
+	if not visual then visual={Smoke={enabled=false,color={1,1,1}},Neon={enabled=false,color={0,1,1}}};profile.visualsByModel[model]=visual end
+	visual[kind]={enabled=enabled,color={color.R,color.G,color.B}}
+	if model==ScooterConfig.DefaultModel then profile.scooterVisuals[kind]=visual[kind] end
 	return true
 end
+function PlayerDataService.SetRainbow(player: Player, modelName: string, enabled: boolean): boolean
+	local profile=profiles[player]
+	if not profile or not PlayerDataService.Ready(player) or not PlayerDataService.OwnsScooter(player,modelName)
+		or not PlayerDataService.OwnsProduct(player,"rainbow_paint") then return false end
+	profile.rainbowModels[modelName]=enabled;return true
+end
+function PlayerDataService.SetPaint(player: Player, modelName: string, colors: {[string]: Color3}): boolean
+	local profile=profiles[player]
+	if not profile or not PlayerDataService.Ready(player) or not PlayerDataService.OwnsScooter(player,modelName) then return false end
+	local saved: {[string]: {number}}={}
+	for id,color in colors do saved[id]={color.R,color.G,color.B} end
+	profile.paintByModel[modelName]=saved
+	profile.rainbowModels[modelName]=false
+	return true
+end
+function PlayerDataService.SetItemEquipped(player: Player, id: string, enabled: boolean): (boolean,string)
+	if (id~="radio" and id~="pepper_spray") or not PlayerDataService.OwnsProduct(player,id) then return false,"NotOwned" end
+	return durable(player,function(candidate) candidate.equippedItems[id]=enabled;return true,"Equipped" end)
+end
 
-function PlayerDataService.AddCurrency(player: Player, coinsAmount: number, xpAmount: number)
-	local profile = profiles[player]
-	if not profile then
-		return
-	end
-	local leaderstats = player:FindFirstChild("leaderstats")
-	local coins = if leaderstats then leaderstats:FindFirstChild("Coins") else nil
-	local xp = if leaderstats then leaderstats:FindFirstChild("XP") else nil
-	if coins and coins:IsA("IntValue") then
-		coins.Value += math.max(0, math.floor(coinsAmount))
-	end
-	if xp and xp:IsA("IntValue") then
-		xp.Value += math.max(0, math.floor(xpAmount))
-	end
+function PlayerDataService.AddCurrency(player: Player, coinsAmount: number, xpAmount: number, reason: string?): boolean
+	local profile=profiles[player]
+	local label=reason or "LegacyReward"
+	if not profile or not PlayerDataService.Ready(player) or typeof(coinsAmount)~="number" or typeof(xpAmount)~="number"
+		or coinsAmount~=coinsAmount or xpAmount~=xpAmount or coinsAmount<0 or xpAmount<0
+		or coinsAmount>=math.huge or xpAmount>=math.huge or typeof(label)~="string" or #label==0 or #label>80 then return false end
+	local amount,xp=math.floor(coinsAmount),math.floor(xpAmount)
+	if profile.coins+amount>9007199254740991 then return false end
+	if purchasing[player] then
+		local queue=queuedCredits[player] or {};queuedCredits[player]=queue
+		table.insert(queue,{coins=amount,xp=xp,reason=label})
+	else credit(player,profile,amount,xp,label) end
+	return true
 end
 
 function PlayerDataService.Increment(player: Player, key: string, amount: number)
@@ -413,6 +566,41 @@ function PlayerDataService.SetBest(player: Player, key: string, value: number)
 	end
 end
 
+function PlayerDataService.RecordRide(player: Player, studs: number, multiplier: number): boolean
+	local profile=profiles[player]
+	if not profile or not PlayerDataService.Ready(player) or studs~=studs or studs<=0 or studs==math.huge
+		or multiplier~=multiplier or multiplier<1 or multiplier>EconomyConfig.WheelieMaxMultiplier then return false end
+	local progress=profile.rewardProgress
+	local remaining=studs
+	while remaining>0 do
+		local distance=math.min(remaining,EconomyConfig.StudsPerKilometer-progress.rideStuds)
+		progress.rideStuds+=distance
+		progress.rideCoins+=distance/EconomyConfig.StudsPerKilometer*EconomyConfig.RideCoinsPerKilometer*multiplier
+		remaining-=distance
+		if progress.rideStuds>=EconomyConfig.StudsPerKilometer-0.000001 then
+			local value=progress.rideCoins+progress.rideRemainder
+			local coins=math.floor(value+0.0000001)
+			PlayerDataService.AddCoins(player,coins,"RideKilometer")
+			progress.rideStuds=0;progress.rideCoins=0;progress.rideRemainder=math.max(0,value-coins)
+		end
+	end
+	return true
+end
+
+function PlayerDataService.RecordTimedReward(player: Player, kind: "Burnout" | "Gang", seconds: number, flags: number?): boolean
+	local profile=profiles[player]
+	if not profile or not PlayerDataService.Ready(player) or seconds~=seconds or seconds<=0 or seconds==math.huge then return false end
+	local key=if kind=="Burnout" then "burnoutRemainder" else "gangRemainder"
+	if kind~="Burnout" and kind~="Gang" then return false end
+	if kind=="Gang" and (typeof(flags)~="number" or flags~=flags or flags<0 or flags==math.huge or flags%1~=0) then return false end
+	local rate=if kind=="Burnout" then EconomyConfig.BurnoutCoinsPerMinute else EconomyConfig.FlagCoinsPerMinute*(flags or 0)
+	local value=profile.rewardProgress[key]+seconds/60*rate
+	local coins=math.floor(value+0.0000001)
+	if coins>0 then PlayerDataService.AddCoins(player,coins,if kind=="Burnout" then "BurnoutTime" else "GangFlagControl") end
+	profile.rewardProgress[key]=math.max(0,value-coins)
+	return true
+end
+
 function PlayerDataService.Start()
 	if started then
 		return
@@ -422,17 +610,23 @@ function PlayerDataService.Start()
 		task.spawn(loadPlayer, player)
 	end
 	Players.PlayerAdded:Connect(loadPlayer)
+	local function discard(player: Player)
+		local listeners=statConnections[player]
+		if listeners then for _,connection in listeners do connection:Disconnect() end end
+		statConnections[player]=nil;profiles[player]=nil;canSave[player]=nil;tokens[player]=nil;queuedCredits[player]=nil
+	end
 	Players.PlayerRemoving:Connect(function(player: Player)
-		savePlayer(player)
-		local playerStatConnections = statConnections[player]
-		if playerStatConnections then
-			for _, connection in playerStatConnections do
-				connection:Disconnect()
+		while saving[player] or purchasing[player] do task.wait() end
+		if savePlayer(player,true) or not canSave[player] then discard(player);return end
+		-- Retain the final snapshot briefly for a transient outage, without allowing a newer session to be overwritten.
+		task.spawn(function()
+			for _=1,5 do
+				task.wait(30)
+				if shuttingDown or not profiles[player] then return end
+				if savePlayer(player,true) or not canSave[player] then discard(player);return end
 			end
-		end
-		statConnections[player] = nil
-		profiles[player] = nil
-		canSave[player] = nil
+			warn("PlayerDataService: final save unavailable for "..player.Name);discard(player)
+		end)
 	end)
 	task.spawn(function()
 		while not shuttingDown do
@@ -443,11 +637,17 @@ function PlayerDataService.Start()
 		end
 	end)
 	game:BindToClose(function()
-		shuttingDown = true
-		for _, player in Players:GetPlayers() do
-			task.spawn(savePlayer, player)
+		shuttingDown=true
+		local pending=0
+		for player in profiles do
+			pending+=1
+			task.spawn(function()
+				while saving[player] or purchasing[player] do task.wait() end
+				savePlayer(player,true);pending-=1
+			end)
 		end
-		task.wait(2)
+		local deadline=os.clock()+25
+		while pending>0 and os.clock()<deadline do task.wait(0.1) end
 	end)
 end
 

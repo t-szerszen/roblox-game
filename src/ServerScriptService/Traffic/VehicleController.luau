@@ -6,10 +6,12 @@ local RoadNetwork=require(script.Parent.RoadNetwork)
 local Adapter=require(script.Parent.VehicleAdapter)
 local Sensors=require(script.Parent.TrafficSensors)
 local Intersections=require(script.Parent.IntersectionManager)
+local Lifecycle=require(script.Parent.VehicleLifecycle)
 local Controller={}; Controller.__index=Controller
-export type Driving = {maxSpeed: number, acceleration: number, braking: number, emergencyBraking: number, edgeSpeedMultiplier: number}
+export type Driving = {maxSpeed: number, acceleration: number, braking: number, emergencyBraking: number, edgeSpeedMultiplier: number, obstacleRange: number?}
 export type Vehicle = typeof(setmetatable({} :: {
 	driving: Driving, managed: boolean, hold: boolean, destinationDistance: number?, role: string?,
+	lifecycleProtected: boolean, noProgressTime: number, progressDistance: number, recoveryWait: number,
 	id: number, vehicle: Adapter.Vehicle, network: Types.Network, route: {string}, index: number,
 	distance: number, traveled: number, speed: number, target: number, reason: string,
 	obstacle: Instance?, targetPoint: Vector3, blockedTime: number, recoveryAttempts: number,
@@ -19,7 +21,7 @@ export type Vehicle = typeof(setmetatable({} :: {
 function Controller.new(id: number, vehicle: Adapter.Vehicle, network: Types.Network, route: {string}, random: Random, driving: Driving?): Vehicle
 	assert(#route>0,"Vehicle requires route")
 	return setmetatable({driving=driving or {maxSpeed=Config.MaxSpeed,acceleration=Config.Acceleration,
-		braking=Config.Braking,emergencyBraking=Config.EmergencyBraking,edgeSpeedMultiplier=1},managed=false,hold=false,destinationDistance=nil,role=nil,id=id,vehicle=vehicle,network=network,route=route,index=1,distance=0,traveled=0,
+		braking=Config.Braking,emergencyBraking=Config.EmergencyBraking,edgeSpeedMultiplier=Config.EdgeSpeedMultiplier},managed=false,hold=false,destinationDistance=nil,role=nil,lifecycleProtected=false,noProgressTime=0,progressDistance=0,recoveryWait=0,id=id,vehicle=vehicle,network=network,route=route,index=1,distance=0,traveled=0,
 		speed=0,target=0,reason="Starting",obstacle=nil,targetPoint=vehicle.root.Position,blockedTime=0,
 		recoveryAttempts=0,blockedSince=nil,routeEndSince=nil,stoppedTime=0,irrelevantSince=nil,random=random,
 		reservations={},lastFrame=vehicle.root.CFrame,remove=false,exitReason=nil},Controller)
@@ -38,8 +40,14 @@ function Controller.Preview(self: Vehicle, distance: number): (Types.Sample?,Typ
 	end
 	return nil,nil
 end
-function Controller.Fail(self: Vehicle, reason: string)
+function Controller.Fail(self: Vehicle, reason: string): boolean
+	if not Lifecycle.CanRemove(self.lifecycleProtected,reason) then return false end
 	self.remove=true; self.exitReason=reason; self.speed=0; self.target=0; self.reason=reason
+	return true
+end
+function Controller.RecoveryBlocked(self: Vehicle): boolean
+	return not self.hold and not Lifecycle.NormalWait(self.reason,self.obstacle)
+		and (self.target<0.1 or self.reason=="NoRoadSupport" or self.reason=="LaneRecovery")
 end
 function Controller.Sense(self: Vehicle, sensor: Sensors.Sensor, intersections: Intersections.State, now: number)
  if not self.vehicle.root:IsDescendantOf(self.vehicle.model) or self.vehicle.model.PrimaryPart~=self.vehicle.root then self:Fail("RemovedRoot");return end
@@ -62,7 +70,7 @@ function Controller.Sense(self: Vehicle, sensor: Sensors.Sensor, intersections: 
 	end
 	local endSpeed=Trajectory.SafeSpeed(remaining,(if self.managed then 0 else self.vehicle.bounds.Z/2+Config.SafeGap),self.driving.braking)
 	if endSpeed<=self.target then self.target=endSpeed; self.reason="RouteEnd" end
-	local range=math.min(Config.ObstacleRange,math.max(Config.LookAhead,
+	local range=math.min(self.driving.obstacleRange or Config.ObstacleRange,math.max(Config.LookAhead,
 		self.speed^2/(2*self.driving.braking)+self.speed*Config.Headway+self.vehicle.bounds.Z))
 	local gateDistance=0
 	for i=self.index,math.min(#self.route,self.index+3) do
@@ -116,7 +124,7 @@ function Controller.Sense(self: Vehicle, sensor: Sensors.Sensor, intersections: 
 	self.routeEndSince=nil
 	if self.target<0.1 and self.speed<0.1 then
 		if not self.blockedSince then self.blockedSince=now end
-		if now-(self.blockedSince :: number)>Config.MaxRecoveryLifetime then self:Fail("RecoveryTimeout") end
+		if self:RecoveryBlocked() and self.noProgressTime>Config.MaxRecoveryLifetime then self:Fail("RecoveryTimeout") end
 	else self.blockedSince=nil end
 end
 function Controller.Step(self: Vehicle, dt: number, sensor: Sensors.Sensor, intersections: Intersections.State)
@@ -145,7 +153,7 @@ function Controller.Step(self: Vehicle, dt: number, sensor: Sensors.Sensor, inte
 		self.speed=0; self.target=0; self.reason="IntersectionYield"; advance=0
 		sample=Trajectory.At(path,self.distance)
 	end
-	local desired=sensor:Ground(sample.position,sample.direction,self.vehicle.bounds)
+	local desired=sensor:Ground(sample.position,sample.direction,self.vehicle.bounds,self.vehicle.wheelbase)
 	if not desired then self.speed=0; self.reason="NoRoadSupport"; advance=0
 	else
 		local error=root.Position-self.lastFrame.Position
@@ -175,15 +183,23 @@ function Controller.Step(self: Vehicle, dt: number, sensor: Sensors.Sensor, inte
 	end
 	if advance<0.001 then
 		self.stoppedTime+=dt; self.blockedTime+=dt
-	else self.stoppedTime=0; self.blockedTime=0; self.recoveryAttempts=0 end
+	else self.stoppedTime=0; self.blockedTime=0 end
+	self.noProgressTime+=dt
+	if self.traveled-self.progressDistance>=Config.ProgressDistance then
+		self.noProgressTime=0;self.progressDistance=self.traveled
+		self.recoveryAttempts=0;self.recoveryWait=0
+	end
 	if self.reason=="RouteEnd" and self.speed<0.1 and self.target<0.1 then
 		self.blockedTime=0; self.recoveryAttempts=0
 		return
 	end
 	if self.hold then self.blockedTime=0; return end
 	if self.managed then return end
-	if self.blockedTime>Config.StuckTimeout then
-		self.blockedTime=0; self.recoveryAttempts+=1
+	if not self:RecoveryBlocked() then self.recoveryWait=0;return end
+	if self.noProgressTime>=Config.StuckTimeout then
+		self.recoveryWait+=dt
+		if self.recoveryAttempts>0 and self.recoveryWait<Config.RecoveryRetryInterval then return end
+		self.recoveryWait=0; self.recoveryAttempts+=1
 		if self.recoveryAttempts>Config.MaxRecoveryAttempts then self:Fail("Stuck")
 		else
 			-- Replan only from a node before entering its movement. Never jump to another road.

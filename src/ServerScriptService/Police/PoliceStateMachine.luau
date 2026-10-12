@@ -1,7 +1,7 @@
 --!strict
 local Machine={};Machine.__index=Machine
 local allowed: {[string]: {[string]: boolean}}={
- PATROL={OBSERVING=true,RECOVERING=true},
+ PATROL={OBSERVING=true,PURSUIT=true,RECOVERING=true},
  OBSERVING={PATROL=true,PURSUIT=true,RECOVERING=true},
  PURSUIT={APPROACHING=true,RETURNING=true,RECOVERING=true},
  APPROACHING={PURSUIT=true,STOPPING=true,RETURNING=true,RECOVERING=true},

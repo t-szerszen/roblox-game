@@ -1,5 +1,6 @@
 --!strict
 local Players=game:GetService("Players")
+local Workspace=game:GetService("Workspace")
 local ServerStorage=game:GetService("ServerStorage")
 local ReplicatedStorage=game:GetService("ReplicatedStorage")
 local ScooterConfig=require(ReplicatedStorage.Shared.Scooter.ScooterConfig)
@@ -26,10 +27,12 @@ type Unit={car: Controller.Vehicle, machine: Machine.State, officer: Officer.Con
  nextRoute: number, slowSince: number?, sequenceSince: number?, resume: boolean,
  recoveries: number, recoveryStart: number, speed: number, wheelie: boolean, violation: string,
  scanCursor: number}
+type ContactSample={model: Model, velocity: Vector3, at: number, contacts: {[number]: boolean}, lastIncident: number}
 export type Service=typeof(setmetatable({} :: {context: Context, units: {[number]: Unit},
  templates: {Model}, officerTemplate: Model?, pursuits: Pursuits.Registry, arrests: Arrest.Service,
  now: number, destroyed: boolean, nextSpawn: number, nextScan: number, scanOffset: number, templateIndex: number,
- officers: Folder, connections: {RBXScriptConnection}},Police))
+ officers: Folder, connections: {RBXScriptConnection}, contacts: {[Player]: ContactSample},
+ blocks: {[number]: Rules.BlockEvidence}},Police))
 local function characterRoot(character: Model?): BasePart?
  local root=if character then character:FindFirstChild("HumanoidRootPart") else nil
  local human=if character then character:FindFirstChildOfClass("Humanoid") else nil
@@ -54,7 +57,7 @@ function Police.new(context: Context): Service
    end
    return false
   end),
-  now=0,destroyed=false,nextSpawn=0,nextScan=0,scanOffset=0,templateIndex=0,officers=folder,connections={}},Police)
+  now=0,destroyed=false,nextSpawn=0,nextScan=0,scanOffset=0,templateIndex=0,officers=folder,connections={},contacts={},blocks={}},Police)
  if not Config.Enabled then return self end
  local assets=ServerStorage:FindFirstChild("PoliceVehicleModels")
  for _,entry in Config.Vehicles do
@@ -70,6 +73,8 @@ function Police.new(context: Context): Service
   if self.destroyed then template:Destroy() else self.officerTemplate=template end
  end)
  table.insert(self.connections,Players.PlayerRemoving:Connect(function(player)
+  self.contacts[player]=nil
+  for id,evidence in self.blocks do if evidence.player==player then self.blocks[id]=nil end end
   self.arrests:Release(player)
   for _,unit in self.units do if unit.target==player or unit.observed==player then self:Finish(unit,self.now,"Disconnected",false) end end
  end))
@@ -77,7 +82,118 @@ function Police.new(context: Context): Service
 end
 function Police.Transition(self: Service, unit: Unit, state: string, now: number, reason: string)
  unit.machine:Transition(state,now,reason)
+ unit.car.lifecycleProtected=unit.target~=nil or unit.officer.outside
  Debug.Write(unit.car.vehicle.model,{PoliceState=state,PoliceReason=reason})
+end
+function Police.Begin(self: Service, unit: Unit, player: Player, position: Vector3, now: number, reason: string): boolean
+ if unit.target or unit.car.remove or (unit.machine.state~="PATROL" and unit.machine.state~="OBSERVING") then return false end
+ local root=characterRoot(player.Character)
+ if player.Parent~=Players or not root or not Rules.Eligible(player,root.Position)
+  or not self.pursuits:Claim(player,unit,position,now) then return false end
+ unit.target=player;unit.character=player.Character;unit.observed=nil;unit.evidence=nil;unit.violation=reason
+ unit.sequenceSince=nil;unit.slowSince=nil;unit.nextRoute=0;unit.resume=false
+ unit.car.driving.maxSpeed=Config.MaxPursuitSpeed
+ unit.car.driving.obstacleRange=Config.PursuitObstacleRange
+ unit.car.driving.edgeSpeedMultiplier=Config.MaxPursuitSpeed/TrafficConfig.MaxSpeed*TrafficConfig.EdgeSpeedMultiplier
+ self:Transition(unit,"PURSUIT",now,reason);Debug.Signal(player,unit.car.id)
+ return true
+end
+function Police.Dispatch(self: Service, player: Player, position: Vector3, now: number, reason: string)
+ if self.pursuits.owners[player] then return end
+ local selected: Unit?=nil;local nearest=Config.PursuitRange
+ local riding=Rules.Read(player)
+ local character=player.Character
+ if not character then return end
+ for _,unit in self.units do
+  local distance=(position-unit.car.vehicle.root.Position).Magnitude
+  if not unit.target and not unit.car.remove and distance<nearest
+   and (unit.machine.state=="PATROL" or unit.machine.state=="OBSERVING")
+   and Rules.Visible(unit.car.vehicle.model,unit.car.vehicle.root.CFrame,character,if riding then riding.model else nil,true) then
+   selected=unit;nearest=distance
+  end
+ end
+ if selected then self:Begin(selected,player,position,now,reason) end
+end
+function Police.Incidents(self: Service, players: {Player}, now: number)
+ local riders: {[Model]: {player: Player, state: Rules.ReadState}}={}
+ local models: {Instance}={};local active: {[Player]: boolean}={}
+ for _,player in players do
+  local riding=Rules.Read(player)
+  if riding then
+   active[player]=true;riders[riding.model]={player=player,state=riding};table.insert(models,riding.model)
+  end
+ end
+ local function riderFor(part: Instance): {player: Player, state: Rules.ReadState}?
+  local current: Instance?=part
+  while current do
+   local rider=riders[current :: Model]
+   if rider then return rider end
+   current=current.Parent
+  end
+  return nil
+ end
+ local contacts: {[Player]: {[number]: boolean}}={}
+ if #models>0 then
+  local overlap=OverlapParams.new();overlap.FilterType=Enum.RaycastFilterType.Include
+  overlap.FilterDescendantsInstances=models;overlap.RespectCanCollide=true
+  for _,unit in self.units do
+   if unit.car.remove then continue end
+   local chassis=unit.car.vehicle.root
+   local parts=Workspace:GetPartBoundsInBox(chassis.CFrame,chassis.Size+Vector3.one*Config.ImpactContactPadding*2,overlap)
+   for _,part in parts do
+    local rider=riderFor(part)
+    if not rider then continue end
+    local player=rider.player;local state=rider.state
+    local seen=contacts[player]
+    if not seen then seen={};contacts[player]=seen end
+    if seen[unit.car.id] then continue end
+    seen[unit.car.id]=true
+    local previous=self.contacts[player]
+    local currentVelocity=state.root.AssemblyLinearVelocity
+    local velocity=currentVelocity
+    if previous and previous.model==state.model and now-previous.at<=2/Config.ObservationRate then
+     if previous.contacts[unit.car.id] then continue end
+     if previous.velocity.Magnitude>velocity.Magnitude then velocity=previous.velocity end
+     if now-previous.lastIncident<Config.IncidentCooldown then continue end
+    end
+    local toCar=chassis.Position-state.root.Position
+    if Rules.Impact(velocity,chassis.CFrame.LookVector*unit.car.speed,toCar)
+     and self:Begin(unit,player,state.root.Position,now,"PoliceImpact") then
+     if previous then previous.lastIncident=now end
+    end
+   end
+  end
+ end
+ for _,rider in riders do
+  local player=rider.player;local old=self.contacts[player]
+  self.contacts[player]={model=rider.state.model,velocity=rider.state.root.AssemblyLinearVelocity,at=now,
+   contacts=contacts[player] or {},lastIncident=if self.pursuits.owners[player] then now else (if old then old.lastIncident else -math.huge)}
+ end
+ for player in self.contacts do if not active[player] then self.contacts[player]=nil end end
+ local present: {[number]: boolean}={}
+ for _,car in self.context.cars do
+  present[car.id]=true
+  local culprit: Player?=nil;local position: Vector3?=nil
+  if car.role~="Police" and not car.remove and not car.hold and car.speed<=Config.TrafficBlockMaxSpeed
+   and car.target<=Config.TrafficBlockMaxSpeed and car.obstacle
+   and (car.reason=="Obstacle" or car.reason=="EmergencyBrake") then
+   local rider=riderFor(car.obstacle)
+   if rider then culprit=rider.player;position=rider.state.root.Position
+   else
+    for _,player in players do
+     local character=player.Character;local root=characterRoot(character)
+     if root and character and (car.obstacle==character or car.obstacle:IsDescendantOf(character)) and Rules.Eligible(player,root.Position) then
+      culprit=player;position=root.Position;break
+     end
+    end
+   end
+   if position and (position-car.vehicle.root.Position).Magnitude>Config.TrafficBlockRange then culprit=nil end
+  end
+  local evidence,confirmed=Rules.Blocking(self.blocks[car.id],culprit,now)
+  self.blocks[car.id]=evidence
+  if confirmed and culprit and position then self:Dispatch(culprit,position,now,"TrafficBlocking") end
+ end
+ for id in self.blocks do if not present[id] then self.blocks[id]=nil end end
 end
 function Police.Finish(self: Service, unit: Unit, now: number, reason: string, resume: boolean)
  unit.resume=resume
@@ -115,11 +231,7 @@ function Police.Observe(self: Service, unit: Unit, players: {Player}, now: numbe
   and Rules.Visible(unit.car.vehicle.model,unit.car.vehicle.root.CFrame,player.Character :: Model,(riding :: Rules.ReadState).model)
  unit.speed=if riding then riding.speedKmh else 0;unit.wheelie=riding~=nil and riding.wheelie
  local reason=Rules.Accumulate(evidence,now,visible,riding~=nil,unit.speed,unit.wheelie)
- if reason and riding and self.pursuits:Claim(player,unit,riding.root.Position,now) then
-  unit.target=player;unit.character=player.Character;unit.observed=nil;unit.evidence=nil;unit.violation=reason
-  unit.car.driving.maxSpeed=Config.MaxPursuitSpeed
-  unit.car.driving.edgeSpeedMultiplier=Config.MaxPursuitSpeed/TrafficConfig.MaxSpeed
-  self:Transition(unit,"PURSUIT",now,reason);Debug.Signal(player,unit.car.id)
+ if reason and riding and self:Begin(unit,player,riding.root.Position,now,reason) then
  elseif not riding or (not visible and now-evidence.lastSeen>Config.OcclusionTolerance)
   or (unit.speed<=Config.SpeedLimitKmh and not unit.wheelie) or self.pursuits.owners[player] then
   unit.observed=nil;unit.evidence=nil;self:Transition(unit,"PATROL",now,"ObservationEnded")
@@ -148,7 +260,7 @@ function Police.Intervene(self: Service, unit: Unit, root: BasePart, speed: numb
   car.hold=true
   if state=="APPROACHING" and now-(unit.slowSince or now)>=Config.StopConfirmation and car.speed<0.5 then
    self:Transition(unit,"STOPPING",now,"VehicleStopped")
-  elseif state=="STOPPING" and now-unit.machine.since>=0.4 then
+  elseif state=="STOPPING" and now-unit.machine.since>=Config.OfficerStopDelay then
    self:Transition(unit,"OFFICER_EXITING",now,"OfficerExit")
   end
  elseif state=="OFFICER_EXITING" then
@@ -183,19 +295,20 @@ function Police.UpdateUnit(self: Service, unit: Unit, now: number)
   elseif Combat.IsInSafeZone(root.Position) then self:Finish(unit,now,"SafeZone",false)
   else
    local riding=Rules.Read(player)
-   local visible=Rules.Visible(car.vehicle.model,car.vehicle.root.CFrame,unit.character :: Model,if riding then riding.model else nil)
+   local targetRoot=if riding then riding.root else root
+   local visible=Rules.Visible(car.vehicle.model,car.vehicle.root.CFrame,unit.character :: Model,if riding then riding.model else nil,true)
    if not visible and unit.officer.outside then
-    visible=Rules.Visible(unit.officer.model,unit.officer.root.CFrame,unit.character :: Model,if riding then riding.model else nil)
+    visible=Rules.Visible(unit.officer.model,unit.officer.root.CFrame,unit.character :: Model,if riding then riding.model else nil,true)
    end
    if visible then
     unit.speed=if riding then riding.speedKmh else 0;unit.wheelie=riding~=nil and riding.wheelie
    end
-   self.pursuits:Observe(player,unit,if visible then root.Position else nil,now)
+   self.pursuits:Observe(player,unit,if visible then targetRoot.Position else nil,now)
    local memory=self.pursuits.memories[player]
    local expired=if memory then Pursuits.Expired(memory,car.vehicle.root.Position,now) else "AuthorityLost"
    if expired then self:Finish(unit,now,expired,false)
    elseif state~="RETURNING" and state~="RECOVERING" then
-    local velocity=if riding then riding.root.AssemblyLinearVelocity else root.AssemblyLinearVelocity
+    local velocity=targetRoot.AssemblyLinearVelocity
     local speed=Vector3.new(velocity.X,0,velocity.Z).Magnitude
     if state=="PURSUIT" and now>=unit.nextRoute then
      unit.nextRoute=now+Config.RouteInterval
@@ -203,7 +316,7 @@ function Police.UpdateUnit(self: Service, unit: Unit, now: number)
      local gap=car:SetDestination(goal)
      if gap==math.huge then car:Patrol() end
     end
-    self:Intervene(unit,root,speed,visible,now)
+    self:Intervene(unit,targetRoot,speed,visible,now)
    end
   end
  end
@@ -216,12 +329,15 @@ function Police.UpdateUnit(self: Service, unit: Unit, now: number)
     unit.officer:Navigate(door,now)
     if (unit.officer.root.Position-door).Magnitude<Config.OfficerWaypointTolerance+1 then unit.officer:Board() end
    end
-   if now-unit.machine.since>Config.OfficerApproachTimeout then car:Fail("OfficerReturnTimeout") end
+   if now-unit.machine.since>Config.OfficerApproachTimeout then
+    if unit.target then self:Finish(unit,now,"OfficerReturnTimeout",false) end
+    car:Fail("OfficerReturnTimeout")
+   end
   elseif now-unit.machine.since>=Config.ReturnDuration then
    car.hold=false
    if unit.resume and unit.target then self:Transition(unit,"PURSUIT",now,"ResumedPursuit");unit.nextRoute=0
    else
-    car.driving.maxSpeed=Config.PatrolSpeed;car.driving.edgeSpeedMultiplier=1;car:Patrol()
+    car.driving.maxSpeed=Config.PatrolSpeed;car.driving.edgeSpeedMultiplier=1;car.driving.obstacleRange=nil;car:Patrol()
     self:Transition(unit,"PATROL",now,"Returned")
    end
   end
@@ -229,15 +345,16 @@ function Police.UpdateUnit(self: Service, unit: Unit, now: number)
   if car.traveled-unit.recoveryStart>4 then
    self:Transition(unit,if unit.target then "PURSUIT" else "PATROL",now,"RouteRecovered");unit.nextRoute=0
   elseif now-unit.machine.since>=Config.RecoveryTimeout then
-   unit.recoveries+=1
-   if unit.recoveries>=Config.MaxRecoveryAttempts then car:Fail("PoliceStuck")
+   unit.recoveries=math.min(Config.MaxRecoveryAttempts,unit.recoveries+1)
+   if unit.recoveries>=Config.MaxRecoveryAttempts and not unit.target then car:Fail("PoliceStuck")
    else unit.machine.since=now;car:Patrol() end
   end
- elseif not car.hold and car.blockedTime>=Config.StuckTimeout then
+ elseif car:RecoveryBlocked() and car.blockedTime>=Config.StuckTimeout then
   unit.recoveryStart=car.traveled;unit.recoveries=0;car:Patrol()
   self:Transition(unit,"RECOVERING",now,"BlockedRoute")
  end
  unit.officer:Animate(now,unit.sequenceSince~=nil)
+ car.lifecycleProtected=unit.target~=nil or unit.officer.outside
  Adapter.Signals(car.vehicle.model,unit.target~=nil,now)
  if Debug.Enabled(self.context.root) then
   Debug.Write(car.vehicle.model,{ObservedUserId=if unit.observed then unit.observed.UserId else 0,
@@ -252,6 +369,7 @@ function Police.Update(self: Service, now: number)
  if now<self.nextScan then return end
  self.nextScan=now+1/Config.ObservationRate
  local players=Players:GetPlayers();local budget=Config.MaxScansPerTick;local ordered: {Unit}={}
+ self:Incidents(players,now)
  for _,unit in self.units do table.insert(ordered,unit) end
  local count=#ordered;local initialCount=count
  local desired=Spawner.Target()
@@ -289,12 +407,14 @@ function Police.Removing(self: Service, car: Controller.Vehicle, now: number)
  local unit=self.units[car.id];if not unit then return end
  if unit.target then Debug.Signal(unit.target,nil);self.pursuits:Release(unit.target,unit) end
  self.arrests:ReleaseOwner(unit);unit.officer:Destroy();self.units[car.id]=nil
+ self.blocks[car.id]=nil
  self.nextSpawn=math.max(self.nextSpawn,now+Config.RespawnCooldown)
 end
 function Police.Destroy(self: Service)
  if self.destroyed then return end
  self.destroyed=true;self.arrests:Destroy()
  for _,connection in self.connections do connection:Disconnect() end;table.clear(self.connections)
+ table.clear(self.contacts);table.clear(self.blocks)
  for _,unit in self.units do self:Removing(unit.car,0) end
  for _,template in self.templates do template:Destroy() end;table.clear(self.templates)
  if self.officerTemplate then self.officerTemplate:Destroy();self.officerTemplate=nil end

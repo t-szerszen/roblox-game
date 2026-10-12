@@ -71,7 +71,8 @@ local function run(source: Instance): number
 		check(next(junction.held)==nil and next(junction.queues)==nil,"Reservation cleanup")
 		local template=Adapter.Placeholder(); template.Parent=folder
 		local prepared=Adapter.Prepare(template); prepared.model.Parent=folder
-		check(prepared.bounds==Config.Vehicle.Bounds,"Adapter bounds")
+		check((prepared.bounds-Config.Vehicle.Bounds*Config.Vehicle.PlaceholderScale).Magnitude<0.001,"Uniformly scaled adapter bounds")
+		check(math.abs(prepared.wheelbase-Config.Vehicle.Wheelbase*Config.Vehicle.PlaceholderScale)<0.001,"Scaled axle spacing")
 		check(prepared.root.CanCollide and prepared.root.Anchored,"Anchored collision chassis")
 		check(prepared.root:FindFirstChild("FrontAxle").Position.Z<0,"Front axle is -Z")
 		local wheels=0; for _,p in prepared.model:GetChildren() do if p.Name=="Wheel" then wheels+=1 end end
@@ -111,7 +112,7 @@ local function run(source: Instance): number
 		check(car.vehicle.model.Parent==nil and #car.route==0,"Controller cleanup")
 		-- Seeing the end within look-ahead must not delete a newly stopped car.
 		prepared=Adapter.Prepare(template); prepared.model.Parent=folder
-		local terminalDistance=network.paths.E3.length-Config.Vehicle.Bounds.Z/2-Config.SafeGap
+		local terminalDistance=network.paths.E3.length-prepared.bounds.Z/2-Config.SafeGap
 		local stoppedSample=Trajectory.At(network.paths.E3,terminalDistance)
 		prepared.model:PivotTo(fakeSensor:Ground(stoppedSample.position,stoppedSample.direction,prepared.bounds))
 		car=Controller.new(2,prepared,network,{"E3"},Random.new(1)); car.distance=terminalDistance

@@ -2,6 +2,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("PepperSprayConfig"))
+local Data = require(script.Parent.Activity.PlayerDataService)
 local Ragdoll = require(script.Parent:WaitForChild("PepperSpray"):WaitForChild("Ragdoll"))
 local remotes = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("PepperSpray")
 local request = remotes:WaitForChild("Use") :: RemoteEvent
@@ -90,6 +91,10 @@ table.insert(connections, request.OnServerEvent:Connect(function(player: Player,
  local now = workspace:GetServerTimeNow()
  if now - (lastRequest[player] or -math.huge) < Config.RequestInterval then return end
  lastRequest[player] = now
+ local profile=Data.GetProfile(player)
+ if not Data.OwnsProduct(player,"pepper_spray") or not profile or not profile.equippedItems.pepper_spray then return end
+ local sharedCooldown=player:GetAttribute("PepperSprayNextUse")
+ if typeof(sharedCooldown)=="number" and sharedCooldown>now then return end
  if select("#", ...) ~= 0 or typeof(direction) ~= "Vector3" or not finite(direction) then return end
  if direction.Magnitude < .95 or direction.Magnitude > 1.05 or now < (nextUse[player] or 0) then return end
  local character = player.Character

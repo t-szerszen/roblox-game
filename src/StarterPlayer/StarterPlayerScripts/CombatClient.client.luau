@@ -10,13 +10,6 @@ local player = Players.LocalPlayer
 local actionRemote = ReplicatedStorage:WaitForChild(CombatConfig.RemoteFolderName):WaitForChild(CombatConfig.ActionRemoteName) :: RemoteEvent
 local pepperBound = false
 
-local function requestMelee(_name: string, inputState: Enum.UserInputState): Enum.ContextActionResult
-	if inputState == Enum.UserInputState.Begin and UserInputService:GetFocusedTextBox() == nil then
-		actionRemote:FireServer("Melee")
-	end
-	return Enum.ContextActionResult.Sink
-end
-
 local function requestPepper(_name: string, inputState: Enum.UserInputState): Enum.ContextActionResult
 	if inputState == Enum.UserInputState.Begin and UserInputService:GetFocusedTextBox() == nil then
 		actionRemote:FireServer("Pepper")
@@ -24,9 +17,6 @@ local function requestPepper(_name: string, inputState: Enum.UserInputState): En
 	return Enum.ContextActionResult.Sink
 end
 
-ContextActionService:BindAction("CombatMelee", requestMelee, true, Enum.KeyCode.F, Enum.KeyCode.ButtonR2)
-ContextActionService:SetTitle("CombatMelee", "Uderz")
-ContextActionService:SetPosition("CombatMelee", UDim2.new(1, -150, 1, -150))
 
 local function updatePepperBinding()
 	local shouldBind = player:GetAttribute(CombatConfig.PepperOwnershipAttribute) == true
@@ -48,6 +38,5 @@ updatePepperBinding()
 
 script.Destroying:Connect(function()
 	pepperConnection:Disconnect()
-	ContextActionService:UnbindAction("CombatMelee")
 	ContextActionService:UnbindAction("CombatPepper")
 end)

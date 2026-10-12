@@ -1,5 +1,11 @@
 # Arcade curb handling — selected scale 0.25
 
+The current controller replaces tire climbing forces with
+[smooth arcade traversal](SCOOTER_SMOOTH_ARCADE_STEPS.md): verified small obstacles
+do not physically hit the scooter, the chassis follows a smooth height path,
+and suspension compression is presentation. The force-based passes below are
+historical and retained as development/recovery behavior.
+
 The [larger-wheel follow-up](SCOOTER_LARGE_WHEELS.md) retains this height limit and
 horizontal momentum behavior, with gentler vertical support for small curbs
 and a 1.95-stud tire diameter. The latest refinement adds one-degree entry,

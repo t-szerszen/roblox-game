@@ -72,12 +72,12 @@ function StudioTests.Client(): number
 	end
 	view.Overlay.Visible = true
 	previews.SetActive(true)
-	local state = { coins = 2000, coinSystemReady = true, owned = { kukirin_g2_pro = true } }
+	local state = { coins = 15000, coinSystemReady = true, owned = { kukirin_g2_pro = true } }
 	local ok, problem = pcall(function()
-		view.Render("Hulajnogi", previews.Mount)
+		view.Render("Classic", previews.Mount)
 		view.Update(state, false)
 		task.wait(0.2)
-		check(not purchaseButton("kukirin_g2_pro").Active, "Owned products cannot be purchased")
+		check(purchaseButton("kukirin_g2_pro").Active and purchaseButton("kukirin_g2_pro").Text=="Przywołaj", "Owned vehicle can be selected without buying again")
 		check(purchaseButton("kukirin_g2_max").Active, "Affordable product is actionable")
 		check(not purchaseButton("kukirin_g2_master").Active, "Insufficient Coins are explained without a request")
 		local art = assert(assert(view.Scroll:FindFirstChild("kukirin_g2_max")):FindFirstChild("Artwork"))
@@ -94,17 +94,18 @@ function StudioTests.Client(): number
 		view.SetConfirmation(ShopConfig.CoinProducts[2], state.coins)
 		check(view.Dialog.Visible, "Coins purchase opens confirmation")
 		local details = assert(assert(view.Dialog:FindFirstChild("Confirmation")):FindFirstChild("Details")) :: TextLabel
-		check(string.find(details.Text, "1 000 Coins", 1, true) ~= nil, "Confirmation shows cost and resulting balance")
+		check(string.find(details.Text, "10 000 Coins", 1, true) ~= nil, "Confirmation shows approved cost and resulting balance")
 		view.SetConfirmation(nil, state.coins)
 		check(not view.Dialog.Visible, "Cancel closes confirmation")
 		for index = 1, 60 do
-			if index % 3 == 1 then view.Render("Hulajnogi", previews.Mount)
+			if index % 3 == 1 then view.Render("Classic", previews.Mount)
 			elseif index % 3 == 2 then view.Render("Premium", previews.Mount)
 			else view.Render("Kody", previews.Mount) end
 			view.Update(state, false)
 		end
 		check(#owner._tasks == before, "Tab churn does not retain retired card scopes")
 		view.Render("Premium", previews.Mount)
+		view.SetCategory("Walka")
 		view.Update(state, false)
 		check(not purchaseButton("pepper_spray").Active, "Unconfigured premium stays unavailable")
 		check(view.Scroll:FindFirstChild("kukirin_g2_pro") == nil, "Retired product cards are destroyed")
