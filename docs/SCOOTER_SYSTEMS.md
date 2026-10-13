@@ -7,6 +7,11 @@ separate suspension compression and animated coils. See
 [SCOOTER_SMOOTH_ARCADE_STEPS.md](SCOOTER_SMOOTH_ARCADE_STEPS.md) for the active
 traversal rules, verification and native-collision fallback.
 
+Small anchored obstacles now use a smooth server-controlled height path with
+separate suspension compression and animated coils. See
+[SCOOTER_SMOOTH_ARCADE_STEPS.md](SCOOTER_SMOOTH_ARCADE_STEPS.md) for the active
+traversal rules, verification and native-collision fallback.
+
 ## Studio setup
 
 1. Capture current Studio work before a separately authorized sync. Do not connect Rojo or sync over a collaborator’s active work without explicit authorization; see `ROJO_STUDIO_SYNC.md`.
