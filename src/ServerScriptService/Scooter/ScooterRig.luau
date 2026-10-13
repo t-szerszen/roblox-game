@@ -7,11 +7,11 @@ local Collision = require(script.Parent.ScooterCollision)
 local Suspension = require(script.Parent.ScooterSuspension)
 
 export type Rig = {
-	body: MeshPart,
-	frontWheel: MeshPart,
-	backWheel: MeshPart,
-	handleBar: MeshPart,
-	stick: MeshPart,
+	body: BasePart,
+	frontWheel: BasePart,
+	backWheel: BasePart,
+	handleBar: BasePart,
+	stick: BasePart,
 	frontAxle: Part,
 	wheelSteering: HingeConstraint?,
 	backAxle: Part,
@@ -50,17 +50,17 @@ end
 
 function ScooterRig.Inspect(source: Instance): Rig
 	assert(source:IsA("Folder") or source:IsA("Model"), "Select the scooter Folder or Model")
-	local body = child(source, "ScooterBody", "MeshPart") :: MeshPart
-	local stick = child(source, "HandleBarStick", "MeshPart") :: MeshPart
-	local handleBar = child(source, "HandleBar", "MeshPart") :: MeshPart
-	local frontWheel = child(source, "FrontWheel", "MeshPart") :: MeshPart
-	local backWheel = child(source, "BackWheel", "MeshPart") :: MeshPart
+	local body = child(source, "ScooterBody", "BasePart") :: BasePart
+	local stick = child(source, "HandleBarStick", "BasePart") :: BasePart
+	local handleBar = child(source, "HandleBar", "BasePart") :: BasePart
+	local frontWheel = child(source, "FrontWheel", "BasePart") :: BasePart
+	local backWheel = child(source, "BackWheel", "BasePart") :: BasePart
 	local frontAxle = child(source, "VirtualFrontAxle", "Part") :: Part
 	local backAxle = child(source, "VirtualBackAxle", "Part") :: Part
 	local central = source:GetAttribute("CentralShockRig") == true
 	local independent = source:GetAttribute("IndependentFrontSteering") == true
-	child(source, "FootRest", if central then "BasePart" else "MeshPart")
-	if not central then child(source, "BackFender", "MeshPart") end
+	child(source, "FootRest", "BasePart")
+	if not central then child(source, "BackFender", "BasePart") end
 	local steering = child(body, "HingeConstraint", "HingeConstraint") :: HingeConstraint
 	assert(not steering.LimitsEnabled or (steering.LowerAngle <= 0 and steering.UpperAngle >= 0),
 		"ScooterBody.HingeConstraint limits must include neutral steering (0 degrees)")
@@ -73,7 +73,7 @@ function ScooterRig.Inspect(source: Instance): Rig
 		local axle = if endName == "Front" then frontAxle else backAxle
 		for _, side in { "Left", "Right" } do
 			local suffix = endName .. "Suspension" .. side
-			local arm = child(source, suffix, "MeshPart") :: MeshPart
+			local arm = child(source, suffix, "BasePart") :: BasePart
 			local hinge = child(base, "PivotHinge_" .. suffix, "HingeConstraint") :: HingeConstraint
 			checkLink(hinge, child(base, "PivotAttBase_" .. suffix, "Attachment") :: Attachment,
 				child(arm, "PivotAtt_" .. suffix, "Attachment") :: Attachment)
@@ -145,7 +145,7 @@ local function configureModel(model: Model, Config: typeof(Config)): Model
 	assert(not model:FindFirstChild("Root"), "Unprepared scooter contains an unrelated Root")
 	for _, side in { "Left", "Right" } do
 		local suffix = "FrontSuspension" .. side
-		local point = child(child(model, suffix, "MeshPart"), "PivotAtt_" .. suffix, "Attachment") :: Attachment
+		local point = child(child(model, suffix, "BasePart"), "PivotAtt_" .. suffix, "Attachment") :: Attachment
 		if point:GetAttribute("AuthoredPivotCFrame") == nil then point:SetAttribute("AuthoredPivotCFrame", point.CFrame) end
 	end
 	local direction = rig.frontPoint.WorldPosition - rig.backPoint.WorldPosition
@@ -154,7 +154,7 @@ local function configureModel(model: Model, Config: typeof(Config)): Model
 	forward = forward.Unit
 	local central = model:GetAttribute("CentralShockRig") == true
 	local footRest = child(model, "FootRest", "BasePart") :: BasePart
-	local deckPart = if central then footRest else rig.body
+	local deckPart = if central or model:GetAttribute("AuthoredSuspensionRig") == true then footRest else rig.body
 	local root = Instance.new("Part")
 	root.Name = "Root"
 	root.Size = Vector3.new(1.6, 0.24, 1.5)
@@ -165,9 +165,9 @@ local function configureModel(model: Model, Config: typeof(Config)): Model
 	root.CanQuery = false
 	root.RootPriority = 127
 	root.CustomPhysicalProperties = PhysicalProperties.new(0.9, 0.1, 0, 10, 10)
-	if central then
+	if central or model:GetAttribute("RuntimeChassisMass") ~= nil then
 		local mass = model:GetAttribute("RuntimeChassisMass")
-		assert(typeof(mass) == "number" and mass > 0 and mass < math.huge, "Central rig requires positive chassis mass")
+		assert(typeof(mass) == "number" and mass > 0 and mass < math.huge, "Authored rig requires positive chassis mass")
 		local density = mass / (root.Size.X * root.Size.Y * root.Size.Z)
 		assert(density <= 100, "Chassis mass exceeds supported density")
 		root.CustomPhysicalProperties = PhysicalProperties.new(density, 0.1, 0, 10, 10)
@@ -188,7 +188,7 @@ local function configureModel(model: Model, Config: typeof(Config)): Model
 	attachment(root, "RiderRootAttachment", deckCenter)
 	-- Targets live on the moving steering assembly, never on the chassis.
 	for _, side in { "Left", "Right" } do
-		local grip = if central then model:FindFirstChild(side .. "Grip") else nil
+		local grip = model:FindFirstChild(side .. "Grip")
 		local position = if grip and grip:IsA("BasePart") then grip.Position
 			else rig.handleBar.Position + right * Config.RiderGripHalfWidth * (if side == "Left" then -1 else 1)
 		attachment(rig.handleBar, side .. "HandGrip", position)
@@ -246,7 +246,7 @@ end
 
 local function tryFrontRest(model: Model, configuration: typeof(Config)): Model
 	-- The new rig's mounts were accepted in Studio; legacy repair must not rebase them.
-	if model:GetAttribute("CentralShockRig") == true then
+	if model:GetAttribute("CentralShockRig") == true or model:GetAttribute("AuthoredSuspensionRig") == true then
 		model:SetAttribute("FrontRestPoseStatus", "Authored")
 		return model
 	end

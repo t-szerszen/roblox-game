@@ -22,7 +22,7 @@ function ScooterCollision.ResolveRadius(model: Instance, wheel: BasePart): (numb
 	return dimensions[2] * 0.5, "mesh bounds (verify in Studio)"
 end
 
-local function contact(model: Model, wheel: MeshPart, name: string, radius: number, configuration: typeof(Config))
+local function contact(model: Model, wheel: BasePart, name: string, radius: number, configuration: typeof(Config))
 	local center = wheel:FindFirstChild("WheelCenter")
 	assert(center and center:IsA("Attachment"), wheel.Name .. " requires WheelCenter")
 	local existing = model:FindFirstChild(name)
@@ -111,7 +111,7 @@ function ScooterCollision.Configure(model: Model, configuration: typeof(Config)?
 	local settings = configuration or Config
 	local front = model:FindFirstChild("FrontWheel")
 	local back = model:FindFirstChild("BackWheel")
-	assert(front and front:IsA("MeshPart") and back and back:IsA("MeshPart"), "Scooter requires both authored wheels")
+	assert(front and front:IsA("BasePart") and back and back:IsA("BasePart"), "Scooter requires both authored wheels")
 	local frontRadius, frontSource = ScooterCollision.ResolveRadius(model, front)
 	local backRadius, backSource = ScooterCollision.ResolveRadius(model, back)
 	contact(model, front, "FrontWheelCollider", frontRadius, settings)

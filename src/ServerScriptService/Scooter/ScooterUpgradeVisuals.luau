@@ -18,7 +18,9 @@ function Visuals.Create(model: Model)
     part.Transparency = if hidden then 1 else saved[part].transparency
    elseif part:IsA("SurfaceGui") or part:IsA("BillboardGui") then
     if not saved[part] then saved[part] = {enabled=part.Enabled} end
-    part.Enabled = if hidden then false else saved[part].enabled
+    local state: any = saved[part]
+    local gui = part :: LayerCollector
+    gui.Enabled = if hidden then false else state.enabled
    end
   end
  end
@@ -27,9 +29,11 @@ function Visuals.Create(model: Model)
    for _,name in {"BackFender", "FrontFender"} do hide(model:FindFirstChild(name), equipped.WheelieMode == true) end
    for _,name in {"Display", "ScooterDashboard", "FrontLight"} do hide(model:FindFirstChild(name), false) end
    for _,part in model:GetDescendants() do
-    if part:IsA("BasePart") and (part.Name == "BrakeDisc" or part.Name:find("BrakeCaliper",1,true)) then
+    if part:IsA("BasePart") and (part.Name == "BrakeDisc" or part.Name:find("BrakeCaliper",1,true)
+     or part:GetAttribute("ScooterCustomGroup") == "BrakeDiscs") then
      remember(part)
-     local factor = if equipped.Brakes then (if part.Name == "BrakeDisc" then Catalog.BrakeVisualScale else Catalog.CaliperVisualScale) else 1
+     local disc = part.Name == "BrakeDisc" or part:GetAttribute("ScooterCustomGroup") == "BrakeDiscs"
+     local factor = if equipped.Brakes then (if disc then Catalog.BrakeVisualScale else Catalog.CaliperVisualScale) else 1
      part.Size = saved[part].size * factor
     end
    end
@@ -45,18 +49,27 @@ function Visuals.Create(model: Model)
      clone.Size=Vector3.new(front.Size.X,front.Size.Y,rear.Size.Z)
      clone.Massless=true
      clone.Anchored=false
-     clone.CanCollide=false clone.CanTouch=false clone.CanQuery=false
+     clone.CanCollide=false
+     clone.CanTouch=false
+     clone.CanQuery=false
      local weld=Instance.new("WeldConstraint")
-     weld.Part0=front weld.Part1=clone weld.Parent=clone
-     clone.Parent=model motorVisual=clone
+     weld.Part0=front
+     weld.Part1=clone
+     weld.Parent=clone
+     clone.Parent=model
+     motorVisual=clone
     elseif not equipped.DualMotor and motorVisual then
-     motorVisual:Destroy() motorVisual=nil
+     motorVisual:Destroy()
+     motorVisual=nil
     end
     hide(front,equipped.DualMotor == true)
    end
   end,
   Destroy=function()
-   if motorVisual then motorVisual:Destroy() motorVisual=nil end
+   if motorVisual then
+    motorVisual:Destroy()
+    motorVisual=nil
+   end
    table.clear(saved)
   end,
  }

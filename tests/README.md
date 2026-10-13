@@ -1,5 +1,27 @@
 # Scooter verification
 
+## KuKirin G4 preparation
+
+`scooter_g4.studio.luau` exports `Run(builder, rig, compound, config, source,
+reference, basePose?)`. Supply fresh `DevScooterG4Build`, `ScooterRig`,
+`ScooterCompoundVisuals`, shared tuning, the raw `Workspace.KuKirin G4`,
+the preserved active template and optionally `ScooterBasePose`.
+Run in Edit with unparented fixture modules. The test creates and destroys
+detached model copies; with basePose it also generates a detached R15 reference
+avatar and scales only that fixture to eight studs. It neither installs a
+template nor changes a player or the map. Do not synchronize production scripts
+to run it without the user's separate authorization.
+
+The current native run passes 12208 assertions for source preservation, uniform
+scaling, mass, contact proxy coverage, four-shock travel/restoring torque,
+static calipers, repeatable cloning, malformed rig rejection, neutral R15 reach,
+compound wheel/coil presentation, label visibility, paint updates and streaming
+cleanup. Native serialization round-trip checks supplement these tests.
+See [G4 preparation and remaining Play checks](../docs/SCOOTER_G4_MIGRATION.md).
+`scooter_g4_paint.studio.luau`.Run(paint, candidate, legacyTemplate) separately
+checks all eight actual G4 color groups and the existing primary deck-color
+ordering on a detached candidate (17 native assertions).
+
 ## Base riding pose, stage 1
 
 After Rojo sync, start Play and mount the scooter with the intended 8-stud R15

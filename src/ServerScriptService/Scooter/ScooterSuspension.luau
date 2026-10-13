@@ -71,7 +71,7 @@ local function planEnd(model: Model, endName: string, mass: number, configuratio
 	local settings = configuration.Suspension
 	local tune = if endName == "Front" then settings.Front else settings.Back
 	local base = child(model, if endName == "Front" and model:GetAttribute("IndependentFrontSteering") ~= true then "HandleBarStick" else "ScooterBody")
-	local wheel = child(model, endName .. "Wheel") :: MeshPart
+	local wheel = child(model, endName .. "Wheel") :: BasePart
 	local radius = Collision.ResolveRadius(model, wheel)
 	local leftPoint = child(base, "PivotAttBase_" .. endName .. "SuspensionLeft") :: Attachment
 	local axis, pivot = leftPoint.WorldAxis, leftPoint.WorldPosition
@@ -196,9 +196,9 @@ function ScooterSuspension.Configure(model: Model, configuration: typeof(Config)
 	-- Clones retain calibrated rest limits; never use a compressed live pose as a new rest pose.
 	if model:GetAttribute("SuspensionRevision") == config.Suspension.Revision then return end
 	local mass = config.Suspension.ReferenceRiderMass
-	if model:GetAttribute("CentralShockRig") == true then
+	if model:GetAttribute("CentralShockRig") == true or model:GetAttribute("AuthoredSuspensionRig") == true then
 		local riderMass = model:GetAttribute("SuspensionRiderMass")
-		assert(typeof(riderMass) == "number" and riderMass > 0 and riderMass < math.huge, "Central rig requires positive reference rider mass")
+		assert(typeof(riderMass) == "number" and riderMass > 0 and riderMass < math.huge, "Authored rig requires positive reference rider mass")
 		mass = riderMass
 	end
 	for _, instance in model:GetDescendants() do

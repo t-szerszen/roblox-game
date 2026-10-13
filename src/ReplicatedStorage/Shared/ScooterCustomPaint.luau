@@ -4,18 +4,28 @@ local Paint = {}
 type ColorTarget = SurfaceAppearance | BasePart
 function Paint.Targets(model: Model): {[string]: {ColorTarget}}
  local targets: {[string]: {ColorTarget}} = {}
- local parts: {[string]: {BasePart}} = {}
+ local parts: {BasePart} = {}
  for _,part in model:GetDescendants() do
   if part:IsA("BasePart") then
-   parts[part.Name]=parts[part.Name] or {}
-   table.insert(parts[part.Name],part)
+   table.insert(parts,part)
   end
  end
  for _,group in Config.Groups do
   local list: {ColorTarget} = {}
+  local ordered: {BasePart} = {}
+  local seen: {[BasePart]: boolean} = {}
+  -- Preserve legacy primary-color ordering, then include tagged compound parts.
   for _,name in group.Parts do
-   for _,part in parts[name] or {} do
-   if part:IsA("BasePart") and (part:GetAttribute(Config.Attribute) == group.Id or (group.Mode=="WholePart" and part:GetAttribute(Config.Attribute)==nil)) then
+   for _,part in parts do
+    if part.Name==name and not seen[part] then table.insert(ordered,part); seen[part]=true end
+   end
+  end
+  for _,part in parts do
+   if part:GetAttribute(Config.Attribute)==group.Id and not seen[part] then table.insert(ordered,part); seen[part]=true end
+  end
+  for _,part in ordered do
+   local tag = part:GetAttribute(Config.Attribute)
+   if tag == group.Id or (tag == nil and group.Mode=="WholePart" and table.find(group.Parts,part.Name)) then
     local appearance = part:FindFirstChildOfClass("SurfaceAppearance")
     if part:GetAttribute("ScooterCustomSolidColor") == true then
      table.insert(list, part)
@@ -25,7 +35,6 @@ function Paint.Targets(model: Model): {[string]: {ColorTarget}}
     elseif appearance and appearance.AlphaMode == Enum.AlphaMode.TintMask then
      table.insert(list, appearance)
     end
-   end
    end
   end
   targets[group.Id] = list

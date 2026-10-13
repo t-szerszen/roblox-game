@@ -171,7 +171,7 @@ function ScooterRigGeometry.Repair(model: Instance, configuration: typeof(Config
 	local steeringBase = namedAttachment(body, "SteerBase")
 	local axis = steeringBase.WorldAxis
 	if math.abs(axis.Y) < (configuration or Config).RigValidation.MinimumSteeringAxisUpDot then
-		local handleBar = model:FindFirstChild("HandleBar") :: MeshPart
+		local handleBar = model:FindFirstChild("HandleBar") :: BasePart
 		local shaft = handleBar.Position - steeringBase.WorldPosition
 		assert(shaft.Magnitude > 0.1, "Cannot infer steering shaft: position SteerBase and HandleBar first")
 		axis = shaft.Unit
@@ -246,7 +246,7 @@ end
 -- Match tire bottom heights to the working rear by rotating the entire front linkage.
 function ScooterRigGeometry.AlignFrontRest(model: Model, configuration: typeof(Config)?): { string }
 	local config = configuration or Config
-	if model:GetAttribute("CentralShockRig") == true then
+	if model:GetAttribute("CentralShockRig") == true or model:GetAttribute("AuthoredSuspensionRig") == true then
 		model:SetAttribute("FrontRestPoseStatus", "Authored")
 		return {}
 	end
@@ -256,8 +256,8 @@ function ScooterRigGeometry.AlignFrontRest(model: Model, configuration: typeof(C
 	local right = namedAttachment(stick, "PivotAttBase_FrontSuspensionRight")
 	local pivot = (left.WorldPosition + right.WorldPosition) * 0.5
 	local axis = left.WorldAxis
-	local front = model:FindFirstChild("FrontWheel") :: MeshPart
-	local back = model:FindFirstChild("BackWheel") :: MeshPart
+	local front = model:FindFirstChild("FrontWheel") :: BasePart
+	local back = model:FindFirstChild("BackWheel") :: BasePart
 	local center = namedAttachment(front, "WheelCenter")
 	local backCenter = namedAttachment(back, "WheelCenter")
 	local up = if model.PrimaryPart then model.PrimaryPart.CFrame.UpVector else Vector3.yAxis

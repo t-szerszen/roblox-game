@@ -1,0 +1,47 @@
+{
+  "date": "2026-10-13",
+  "placeId": 127535941224851,
+  "source": "Workspace.KuKirin G4",
+  "preview": "Workspace.KuKirin G4 Rig",
+  "candidate": "ServerStorage.ScooterModels.scooter_g4",
+  "activeTemplatePreserved": "ServerStorage.ScooterModels.scooter",
+  "existingStudioScriptsModified": 0,
+  "hinges": 7,
+  "physicalSprings": 4,
+  "wheelRadius": 0.8182201385498047,
+  "previewNonColliding": true,
+  "sourceParts": 1731,
+  "stagedParts": 1743,
+  "gripHeight": 5.67434224486351,
+  "visualCopies": 1084,
+  "avatarTargetError": 5.960464477539063e-08,
+  "stagedAttachments": 28,
+  "wheelbase": 6.023015975952148,
+  "scale": 0.642215244384538,
+  "previewAnchored": true,
+  "verification": {
+    "nativeAssertions": 12208,
+    "runtimeAssertions": 230,
+    "arcadeAssertions": 8332,
+    "luauCompilation": "PASS",
+    "robloxTypeAnalysis": "PASS",
+    "rojoBuild": "PASS",
+    "nativeSerializationRoundTrip": "PASS",
+    "playtest": "Not run; production scripts are not synchronized",
+    "legacyFullSuite": "Existing undefined make helper in scooter_visuals.spec.luau",
+    "nativePaintAssertions": 17,
+    "uiAssertions": 129
+  },
+  "archives": {
+    "source": {
+      "file": "assets/scooter/kukirin-g4-source.rbxm",
+      "bytes": 83877,
+      "sha256": "cd2c9be7a8f2754f26e418c2456546733f02497443cac8522d5a47432cf2925b"
+    },
+    "rig": {
+      "file": "assets/scooter/kukirin-g4-rig.rbxm",
+      "bytes": 144649,
+      "sha256": "d13392fe57afb7bcfbe4aa97093565f82d9411fa9a61d7009044d8d0db6d8196"
+    }
+  }
+}
