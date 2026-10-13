@@ -964,12 +964,6 @@ function ScooterServer.Start()
 	driveInputRemote = getOrCreateRemote("DriveInput")
 	toggleDriveModeRemote = getOrCreateRemote(ScooterConfig.DriveModes.ToggleRemoteName)
 	toggleHeadlightRemote = getOrCreateRemote(ScooterConfig.Headlight.ToggleRemoteName)
-	local pausedGarage = remotesFolder:FindFirstChild("GarageRequest")
-	if pausedGarage and pausedGarage:IsA("RemoteFunction") then
-		pausedGarage.OnServerInvoke = function(_player: Player)
-			return false, "Unavailable", nil
-		end
-	end
 
 	table.insert(connections, requestSpawnRemote.OnServerEvent:Connect(function(player: Player, requestedModel: unknown)
 		if typeof(requestedModel) ~= "string" or #requestedModel > 64 then return end
@@ -1056,11 +1050,7 @@ function ScooterServer.Start()
 			end
 			local input = record.input
 			record.throttle = if input.throttleHeld == input.brakeHeld then 0 else if input.throttleHeld then 1 else -1
-			local previousSteering = record.steering
-			record.steering = input.steering
-			-- A released or reversed key must not keep following the old turn target.
-			local resetTurnLead = input.steering == 0 or previousSteering * input.steering < 0
-			if previousSteering * input.steering < 0 then record.yawRate = 0 end
+			record.steering = ScooterPhysics.SmoothSteering(record.steering, input.steering, deltaTime)
 			setAttributeIfChanged(record.model, "ThrottleInput", record.throttle)
 			local tuning = record.tuning
 			local root = record.root
@@ -1136,7 +1126,7 @@ function ScooterServer.Start()
 			setAttributeIfChanged(record.model, "SteeringInput", math.round(record.steering * 100) / 100)
 			local servo = record.rig.steering
 			local reversedAttachments = servo.Attachment0 ~= nil and servo.Attachment0.Parent == record.rig.stick
-			local targetAngle, commandedSteering = ScooterPhysics.GetServoSteering(effectiveSteering,
+			local targetAngle = ScooterPhysics.GetServoSteering(effectiveSteering,
 				reversedAttachments, servo.LimitsEnabled, servo.LowerAngle, servo.UpperAngle)
 			servo.TargetAngle = targetAngle
 			local wheelServo = record.rig.wheelSteering
@@ -1145,11 +1135,15 @@ function ScooterServer.Start()
 			local measuredAngle = math.round(servo.CurrentAngle / anglePrecision) * anglePrecision
 			local measuredSteerAngle = math.rad(measuredAngle) / ScooterConfig.SteeringServoSign
 				* (if reversedAttachments then -1 else 1)
-			setAttributeIfChanged(record.model, "Steering", math.round(commandedSteering * 100) / 100)
+			local driveSteerAngle = if wheelServo then math.rad(wheelServo.CurrentAngle) / ScooterConfig.SteeringServoSign else measuredSteerAngle
+			effectiveSteering = math.clamp(driveSteerAngle / ScooterConfig.MaxHandlebarAngle, -1, 1)
+			setAttributeIfChanged(record.model, "Steering", math.round(effectiveSteering * 100) / 100)
 			setAttributeIfChanged(record.model, "SteeringAngle", measuredSteerAngle)
-			-- Start yaw from the validated command, rather than waiting for the hinge
-			-- and then filtering its movement again. Measured angle still drives rider IK.
-			record.turnSteering = if math.abs(record.steering) < 0.01 then 0 else commandedSteering
+			-- Road forces may perturb the physical servo. Neutral rider input must
+			-- not turn those small errors into self-amplifying chassis yaw/lean.
+			local controlledTarget = if math.abs(record.steering) < 0.01 then 0 else effectiveSteering
+			record.turnSteering += (controlledTarget - record.turnSteering)
+				* (1 - math.exp(-ScooterConfig.TurnSteeringResponse * deltaTime))
 			local controlledSteering = record.turnSteering
 			local turnSteering = if grounded
 				then (if canBurnout then controlledSteering else ScooterPhysics.GetTurnSteering(controlledSteering, headingSpeed))
@@ -1160,7 +1154,7 @@ function ScooterServer.Start()
 			local requestedYawRate = ScooterPhysics.GetYawRate(turnSteering, headingSpeed, record.wheelBase, canBurnout)
 			record.yawRate = ScooterPhysics.SmoothYawRate(record.yawRate, requestedYawRate, deltaTime)
 			local desired = ScooterPhysics.AdvanceForward(
-				if resetTurnLead then actualHeading else record.desiredForward,
+				record.desiredForward,
 				turnSteering,
 				headingSpeed,
 				deltaTime,
@@ -1294,8 +1288,7 @@ function ScooterServer.Start()
 				and actualPitch >= ScooterConfig.WheelieBalance.MinimumPhysicalAngle
 			setAttributeIfChanged(record.model, "WheeliePhysical", physicalWheelie)
 			local ridingState = if not occupied then "IdleOnScooter"
-				else if record.wheelieActive then (if not input.throttleHeld or input.brakeHeld then "WheelieEnd"
-					else if physicalWheelie then "WheelieBalance" else "WheelieStart")
+				else if record.wheelieActive then (if physicalWheelie then "WheelieBalance" else "WheelieStart")
 				else if actualPitch > ScooterConfig.WheelieBalance.MinimumPhysicalAngle and not frontGrounded then "WheelieEnd"
 				else if input.brakeHeld and headingSpeed > ScooterConfig.StopSpeed then "Braking"
 				else if speed < ScooterConfig.StopSpeed then "IdleOnScooter"

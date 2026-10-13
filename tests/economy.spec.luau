@@ -300,3 +300,4 @@ Data.SetRainbow(shopPlayer,'KuKirin G2 Pro',false);Cosmetics.ApplyPaint(shopPlay
 check(deck.Color.G==0.4,"Disabling rainbow restores prior paint")
 painted:Destroy()
 print(string.format('PASS: %d economy, persistence, rewards and shop assertions',testCount))
+

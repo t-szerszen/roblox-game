@@ -1,6 +1,6 @@
 # Ekonomia, sklep i dostawy — raport implementacji
 
-Stan: implementacja i testy lokalne; aktualny kod Studio scalony w worktree `roblox-game-integration`. Użytkownik 2026-10-12 osobno zlecił jeden sync po utworzeniu PR; zakres i wynik opisuje `STUDIO_INTEGRATION.md`. Bez publikacji i przebudowy mapy. Poprzednia nieautoryzowana synchronizacja została wycofana: 30 źródeł przywrócono i porównano z kopią, dodane obiekty usunięto. Kopie znajdują się w `/Users/tobiasz/.codex/backups/studio-before-economy-sync-20261012/`. Po wycofaniu wykonano wyłącznie odczyt struktury folderów budynków w Studio.
+Stan: implementacja i testy lokalne. **Bez synchronizacji do Studio, publikacji i zmian na mapie.** Poprzednia nieautoryzowana synchronizacja została wycofana: 30 źródeł przywrócono i porównano z kopią, dodane obiekty usunięto. Kopie znajdują się w `/Users/tobiasz/.codex/backups/studio-before-economy-sync-20261012/`. Po wycofaniu wykonano wyłącznie odczyt struktury folderów budynków w Studio.
 
 ## 1. Analiza i zakres
 
@@ -103,8 +103,8 @@ Testy CLI używają faktycznych modułów produkcyjnych i kontrolowanych atrap u
 | `run_police_tests.py` | 809 asercji PASS |
 | `run_traffic_tests.py` | 2655 asercji PASS |
 | `run_police_traffic_tests.py` | 75 asercji PASS |
-| Kompilacja wszystkich 186 źródeł Luau | PASS |
-| `rojo build default.project.json` | PASS, lokalny `/tmp/studio-economy-integration.rbxlx` |
+| Kompilacja wszystkich 177 źródeł Luau | PASS |
+| `rojo build default.project.json` | PASS, lokalny `/tmp/roblox-game-economy-local.rbxlx` |
 | `git diff --check` | PASS |
 
 Ekonomia obejmuje m.in. ceny, brak nadmiernych wydatków, duplikaty, błąd i retry zapisu, kolejkę równoczesnej nagrody, odtworzenie profilu i niepełnego kilometra, sesje różnych serwerów, zachowanie nieznanych pól, idempotencję premium/radio, serwerowy przebieg dostawy, anulowanie, brak odbioru, teleport na heartbeat i tuż przed promptem, wyposażenie efektów bez garażu, odrębność konfiguracji pojazdów, przywrócenie zapisanego malowania po wyłączeniu tęczy oraz sprzątanie zleceń. Testy telefonu obejmują odrzucenie sfałszowanego payloadu dostawy i przekazanie prawidłowych akcji.

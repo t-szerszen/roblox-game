@@ -39,3 +39,4 @@ function Inventory.Lock(humanoid: Humanoid): () -> ()
 end
 
 return Inventory
+

@@ -66,3 +66,4 @@ mathCopy:Destroy();storeCopy:Destroy()
 assert(ok,problem)
 print("PASS: "..count.." native economy/asset/UI assertions")
 return count
+
