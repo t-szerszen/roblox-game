@@ -2,7 +2,8 @@
 
 Aktualny stan Studio: G4 jest podłączona do kontrolera i dostępna do jazdy w Play,
 obok zachowanej G2 Pro. Użytkownik potwierdził rozwiązanie problemu sprężyn.
-Nowsza poprawka przewodów jest przygotowana lokalnie; nie była synchronizowana.
+Nowsza korekta wspólnej wiązki przewodów jest zastosowana w Studio Edit
+do szablonu i podglądu oraz zapisana w natywnym pliku rigu.
 Instrukcja i wyniki są w sekcji **Aktywacja jazdy**
 na końcu dokumentu. Wcześniejsze sekcje opisują kolejne etapy historycznie.
 
@@ -378,3 +379,42 @@ Sprawdzono zachowanie geometrii w spoczynku, poprawione weldy, mocowania przy
 skręcie/ugięciu, ciągłość wszystkich odcinków, opaskę, przejazd poza spawn,
 cleanup i pominięcie G2. Analiza typów zmienionych modułów i Rojo build PASS.
 Testy lokalne używają doubles i nie zastępują wizualnego odbioru w Studio.
+
+## Wspólna górna wiązka — zastosowana w Studio, 2026-10-13
+
+Użytkownik zgłosił, że poprzednia poprawka nadal zostawia dwa osobne widoczne
+przebiegi, i jawnie zlecił zmianę w Studio według drugiego zdjęcia. Sama obsługa
+ruchu zachowywała wcześniejszy kształt i nie łączyła obu górnych odcinków.
+
+Rewizja 2 `ScooterG4Cables` prowadzi górny odcinek tylnej linii po przebiegu
+przedniej, pod wspólną osłoną spiralną. Ukrywa 12 nadmiarowych górnych części
+tylnej linii, zachowując rozgałęzienie do podwozia poniżej osłony. Przednia
+linia i osłona pozostają na kolumnie do wspólnego połączenia; uginanie zaczyna
+się dopiero poniżej dolnej krawędzi osłony. Dzięki temu osobna pętla nie jest
+rysowana obok spiralnego odcinka. Pierwotne współrzędne i rozmiary zmienionych
+części są zachowane w atrybutach G4CableOriginalFrame/G4CableOriginalSize.
+
+Zastosowano korektę do `ServerStorage.ScooterModels.scooter_g4` i
+`Workspace.KuKirin G4 Rig`. Wyłącznie weldy zmienianych przewodów były czasowo
+wyłączone podczas ustawiania geometrii; następnie przywrócono ich stan.
+Weryfikacja potwierdziła zachowanie Root i poprawność mechanicznych połączeń.
+Nie modyfikowano oryginalnego KuKirin G4, G2 Pro ani mapy. Kopie obu modeli
+sprzed operacji są w `ServerStorage.ScooterRigDraftBackups`, z nazwami
+zawierającymi `_BeforeCableHarnessJoin_`.
+
+Sprawdzono zgodność Source i bufora edytora zmienianego modułu. W trakcie pracy
+źródło Studio zostało już zaktualizowane do tej samej wersji co repozytorium;
+pierwszy zapis zatrzymał guard chroniący zmiany współpracownika. Po potwierdzeniu
+pełnej zgodności kontynuowano wyłącznie korektę modeli i weryfikację kodu.
+Pozostałych modułów nie synchronizowano.
+
+Aktualny `assets/scooter/kukirin-g4-rig.rbxm` jest natywnym eksportem poprawionego
+szablonu, wraz z metadanymi wiązki i rewizją 2; uaktualniono rozmiar i SHA-256
+w manifeście. Natywny zapis/odczyt RBXM zachowuje poprawną geometrię i rewizję.
+Lokalnie: 75 asercji przewodów, 57 sprężyn, 230 runtime, kompilacja,
+analiza typów modułu i Rojo build PASS. Pełnego historycznego testu 12208 asercji
+nie powtarzano; jego kontrakt dopuszcza teraz jawną korektę tylko tylnego przewodu
+oraz sprawdza zachowane współrzędne sprzed połączenia. Przechwycenie viewportu
+przez MCP nie zwróciło obrazu; nie deklarujemy odbioru ze screenshotu.
+Nie uruchamiano Play. Użytkownik testuje świeżo przywołaną G4 podczas skrętu
+i pracy zawieszenia; istniejące obiekty poprzedniej sesji należy zastąpić nowym spawnem.

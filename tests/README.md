@@ -54,6 +54,13 @@ distance culling, streaming cleanup and exclusion of G2 Pro. It does not edit
 Studio. For the user's manual visual test, update the four runtime modules
 listed in the [cable follow-up](../docs/SCOOTER_G4_MIGRATION.md) and spawn a fresh G4.
 
+The joined upper harness revision adds three checks (75 cable assertions total):
+shared column entry, concealed duplicate upper rear line and a sleeve fully fixed
+to the column. Studio Edit now has the corrected template/preview, with native
+RBXM export and mechanical validation. Play visual acceptance remains with the
+user. The native preparation fixture permits the intentional rear route correction
+while checking its preserved authoring coordinates; its full suite was not rerun.
+
 ## Base riding pose, stage 1
 
 After Rojo sync, start Play and mount the scooter with the intended 8-stud R15

@@ -67,7 +67,23 @@ for _, part in members do snapshots[part] = part.CFrame end
 RigCables.Configure(model)
 check(welds[tie].Part0 == front and tie:GetAttribute("ScooterAssembly") == "front", "Lower fork clip belongs to the axle")
 check(welds[grommet].Part0 == stick and grommet:GetAttribute("ScooterAssembly") == "steering", "Handlebar grommet follows the column")
-for _, part in members do near(part.Position, snapshots[part].Position, "Cable rigging preserves authored geometry") end
+for _, part in members do
+	local original = part:GetAttribute("G4CableOriginalFrame")
+	if original then near((model.PrimaryPart.CFrame * original).Position, snapshots[part].Position, "Joined rear route retains the original authoring coordinates")
+	else near(part.Position, snapshots[part].Position, "Front geometry remains preserved") end
+	snapshots[part] = part.CFrame
+end
+for _, route in routes do
+	for index, joint in route.joints do route.points[index] = model.PrimaryPart.CFrame:PointToObjectSpace(joint.Position) end
+end
+near(routes.FrontBrakeLine.joints[1].Position, routes.RearBrakeLine.joints[1].Position, "Both upper cables share the same column entry")
+check(routes.RearBrakeLine.cylinders[1].Transparency == 1, "Redundant upper rear loop is concealed inside the shared sleeve")
+for _, part in members do
+	if part.Name == "SpiralWrap" then
+		check(part:GetAttribute("G4CableAWeight") == 0 and part:GetAttribute("G4CableBWeight") == 0,
+			"Spiral sleeve remains entirely fixed to the column")
+	end
+end
 local revision = model:GetAttribute("G4CableRigRevision")
 RigCables.Configure(model)
 check(model:GetAttribute("G4CableRigRevision") == revision, "Repeated preparation retains its rest calibration")

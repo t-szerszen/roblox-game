@@ -50,8 +50,16 @@ function Test.Run(builder, rig, compound, config, source, reference, basePose)
 					check(original and original.ClassName == part.ClassName, "Original Part/Union/Wedge geometry retained")
 					local relative = sourceDeck:ToObjectSpace(original.CFrame)
 					local expected = sourceDeck * CFrame.new(relative.Position * scale) * relative.Rotation
-					check(sameFrame(part.CFrame, expected), "Uniform scaling preserves authored orientation and layout")
-					check((part.Size - original.Size * scale).Magnitude < 0.001, "Original dimensions scaled uniformly")
+					local beforeJoin = part:GetAttribute("G4CableOriginalFrame")
+					local beforeSize = part:GetAttribute("G4CableOriginalSize")
+					if beforeJoin then
+						check(original.Name == "RearBrakeLine" or original.Name == "RearBrakeLineJ", "Only the rear cable route is artistically joined")
+						check(sameFrame(model.Root.CFrame * beforeJoin, expected), "Joined route retains scaled authoring coordinates")
+						check((beforeSize - original.Size * scale).Magnitude < 0.001, "Joined route retains original dimensions")
+					else
+						check(sameFrame(part.CFrame, expected), "Uniform scaling preserves authored orientation and layout")
+						check((part.Size - original.Size * scale).Magnitude < 0.001, "Original dimensions scaled uniformly")
+					end
 				end
 			end
 		end
