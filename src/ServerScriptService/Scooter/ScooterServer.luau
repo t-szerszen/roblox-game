@@ -85,6 +85,7 @@ type ScooterRecord = {
 	riderConnections: { Connection },
 	riderInventoryCleanup: (() -> ())?,
 	riderCollisionStates: { [BasePart]: boolean },
+	riderMassStates: { [BasePart]: boolean },
 	cleaning: boolean,
 }
 
@@ -294,13 +295,17 @@ local function alignRiderToDeck(record: ScooterRecord, humanoid: Humanoid)
 	seatWeld.C0 = record.seat.CFrame:ToObjectSpace(desiredWeldedPartCFrame) * seatWeld.C1
 end
 
-local function restoreRiderCollisions(record: ScooterRecord)
+local function restoreRiderPhysics(record: ScooterRecord)
 	for part, canCollide in record.riderCollisionStates do
 		if part.Parent ~= nil then
 			part.CanCollide = canCollide
 		end
 	end
 	table.clear(record.riderCollisionStates)
+	for part, massless in record.riderMassStates do
+		if part.Parent ~= nil then part.Massless = massless end
+	end
+	table.clear(record.riderMassStates)
 end
 
 local function releaseRider(record: ScooterRecord)
@@ -312,7 +317,7 @@ local function releaseRider(record: ScooterRecord)
 		connection:Disconnect()
 	end
 	table.clear(record.riderConnections)
-	restoreRiderCollisions(record)
+	restoreRiderPhysics(record)
 	local rider = record.rider
 	record.rider = nil
 	if rider then
@@ -354,8 +359,19 @@ local function releaseRider(record: ScooterRecord)
 	end
 end
 
-local function suppressRiderCollisions(record: ScooterRecord, humanoid: Humanoid)
-	restoreRiderCollisions(record)
+local function suppressRiderPartPhysics(record: ScooterRecord, part: BasePart)
+	if record.riderCollisionStates[part] == nil then record.riderCollisionStates[part] = part.CanCollide end
+	part.CanCollide = false
+	if record.model:GetAttribute("ScooterG4Rig") == true then
+		-- G4 suspension responds to road contact, not avatar size/accessory mass.
+		-- The scooter Root stays massive and authoritative; restore the avatar on exit.
+		if record.riderMassStates[part] == nil then record.riderMassStates[part] = part.Massless end
+		part.Massless = true
+	end
+end
+
+local function suppressRiderPhysics(record: ScooterRecord, humanoid: Humanoid)
+	restoreRiderPhysics(record)
 	local character = humanoid.Parent
 	if not character or not character:IsA("Model") then
 		return
@@ -363,8 +379,7 @@ local function suppressRiderCollisions(record: ScooterRecord, humanoid: Humanoid
 
 	for _, descendant in character:GetDescendants() do
 		if descendant:IsA("BasePart") then
-			record.riderCollisionStates[descendant] = descendant.CanCollide
-			descendant.CanCollide = false
+			suppressRiderPartPhysics(record, descendant)
 		end
 	end
 end
@@ -643,6 +658,7 @@ local function spawnForPlayer(player: Player, requestedModel: string?, templateN
 		rider = nil,
 		riderConnections = {},
 		riderCollisionStates = {},
+		riderMassStates = {},
 		cleaning = false,
 	}
 	record.raycastParams.FilterType = Enum.RaycastFilterType.Exclude
@@ -684,7 +700,7 @@ local function spawnForPlayer(player: Player, requestedModel: string?, templateN
 					then { scooter, character }
 					else { scooter }
 				assignScooterNetworkOwner(scooter)
-				suppressRiderCollisions(record, mountedRider)
+				suppressRiderPhysics(record, mountedRider)
 				table.insert(record.riderConnections, mountedRider.Died:Connect(function()
 					resetControls(record)
 					mountedRider.Sit = false
@@ -692,8 +708,7 @@ local function spawnForPlayer(player: Player, requestedModel: string?, templateN
 				if character then
 					table.insert(record.riderConnections, character.DescendantAdded:Connect(function(descendant: Instance)
 						if descendant:IsA("BasePart") then
-							record.riderCollisionStates[descendant] = descendant.CanCollide
-							descendant.CanCollide = false
+							suppressRiderPartPhysics(record, descendant)
 						end
 					end))
 				end
@@ -706,7 +721,7 @@ local function spawnForPlayer(player: Player, requestedModel: string?, templateN
 			else
 				record.raycastParams.FilterDescendantsInstances = { scooter }
 				assignScooterNetworkOwner(scooter)
-				restoreRiderCollisions(record)
+				restoreRiderPhysics(record)
 			end
 			ridePrompt.Enabled = occupant == nil and not seat.Disabled
 		end)

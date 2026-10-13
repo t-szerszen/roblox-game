@@ -1,7 +1,8 @@
 # KuKirin G4 — analiza i wdrożenie jazdy
 
-Aktualny stan: G4 jest podłączona do kontrolera i dostępna do jazdy w Play,
-obok zachowanej G2 Pro. Instrukcja i wyniki są w sekcji **Aktywacja jazdy**
+Aktualny stan Studio: G4 jest podłączona do kontrolera i dostępna do jazdy w Play,
+obok zachowanej G2 Pro. Nowsza poprawka mocowania sprężyn i obciążenia kierowcy
+jest przygotowana lokalnie; nie była synchronizowana. Instrukcja i wyniki są w sekcji **Aktywacja jazdy**
 na końcu dokumentu. Wcześniejsze sekcje opisują kolejne etapy historycznie.
 
 Odczyt 2026-10-13 przez integrację Roblox Studio, place `127535941224851`,
@@ -288,3 +289,39 @@ Przy odtwarzaniu projektu w nowym Studio należy zaimportować zachowany plik
 `assets/scooter/kukirin-g4-rig.rbxm` jako `ServerStorage.ScooterModels.scooter_g4`
 obok istniejącego `scooter`. Generator jest narzędziem jawnym; serwer nie tworzy
 ani nie zastępuje modeli authoringu przy uruchomieniu.
+
+## Poprawka sprężyn i obciążenia kierowcy — lokalnie, 2026-10-13
+
+Użytkownik zgłosił zapadanie się hulajnogi pod kierowcą i odrywanie wizualnych
+amortyzatorów; oczekuje zachowania wysokości po wsiadaniu oraz reakcji zawieszenia
+na przeszkody. Ustalił nowy flow: agent pisze kod, użytkownik testuje jazdę
+w Studio. Nie uruchamiano nowych prób Play ani nie synchronizowano tej poprawki.
+Odczyt istniejącej sesji był diagnostyką, bez modyfikowania obiektów gry.
+
+Grupy CoilVisuals nie mają PrimaryPart. Ich WorldPivot pozostaje przy spawnie,
+podczas gdy części przemieszczają się z zespołami mechanicznymi. W aktualnej sesji
+odległość pivotu od mocowań przekraczała 840 studów. `ScooterCompoundVisuals`
+nie używa już GetPivot tych grup: rekonstruuje pozycję spoczynkową z zawiasu,
+istniejącego AuthoredPivotCFrame i attachmentów. Dolne części przelicza ze
+współrzędnych ruchomego wahacza, więc związanie po ugięciu nie zapisuje ugięcia
+jako nowego stanu spoczynkowego. Obie końcówki wizualnej sprężyny korzystają
+z bieżących mocowań bez osobnego opóźnienia; przednia oś orientacji podąża
+za rzeczywistym skrętem kolumny. Nie potrzeba przebudowy ani importu modelu.
+
+`ScooterServer` ustawia części kierowcy G4 na Massless podczas jazdy, również
+akcesoria dodane już po wsiadaniu. Root hulajnogi pozostaje masywny, z priorytetem
+127 i serwerową własnością sieciową. Po zsiadaniu, śmierci lub usunięciu pojazdu
+przywracane są pierwotne Massless i CanCollide; ponowne dołączenie tej samej części
+nie nadpisuje zapisanych wartości. G2 Pro zachowuje dotychczasową masę kierowcy.
+Nie zablokowano wahaczy ani SpringConstraint i nie zwiększono sztucznie sztywności.
+
+Lokalnie: 57 asercji geometrii na rzeczywistym module Compound, 230 regresji
+runtime, kompilacja Luau i analiza typów modułu prezentacji PASS. Test geometrii
+obejmuje daleki przejazd, związanie po ugięciu i skręcie, dolne/górne mocowanie
+oraz cleanup. Doubles nie symulują fizyki Roblox. Poprzedni raport Play opisuje
+poprzednią wersję; wizualną i fizyczną akceptację poprawki wykonuje użytkownik.
+
+Do selektywnego przeniesienia są tylko `ScooterCompoundVisuals` i `ScooterServer`.
+Po aktualizacji użytkownik sprawdza wsiadanie/zsiadanie na płaskim terenie,
+sprężyny po oddaleniu się od spawnu, skręt i przejazd przez przeszkodę,
+następnie zachowanie G2 Pro. Pełna synchronizacja Rojo nie jest potrzebna.

@@ -11,7 +11,7 @@ type Visual = { source: BasePart, copy: BasePart, rest: CFrame, size: Vector3,
 type Wheel = { source: BasePart, anchor: Attachment, rest: CFrame, radius: number,
 	parts: { Visual }, frame: CFrame, tracking: boolean, spin: number, rate: number }
 type Shock = { source: Model, spring: SpringConstraint, parts: { Visual }, length: number,
-	first: Vector3, second: Vector3, right: Vector3 }
+	fixedPivot: Attachment }
 local Compound = {}
 
 local function visualParts(container: Model): { BasePart }?
@@ -28,7 +28,8 @@ function Compound.Create(model: Model, destination: Instance): Controller?
 	if not sourceVisuals then return nil end
 	-- Wait for complete visual groups instead of capturing half of a streamed wheel.
 	local wheelPlans: { { source: BasePart, parts: { BasePart }, anchor: Attachment, point: Attachment } } = {}
-	local shockPlans: { { source: Model, parts: { BasePart }, spring: SpringConstraint } } = {}
+	local shockPlans: { { source: Model, parts: { BasePart }, spring: SpringConstraint,
+		fixedPivot: Attachment, movingPivot: Attachment, authoredPivot: CFrame } } = {}
 	for _, endName in { "Front", "Back" } do
 		local wheel = model:FindFirstChild(endName .. "Wheel")
 		local group = sourceVisuals:FindFirstChild(endName .. "WheelVisuals")
@@ -50,7 +51,17 @@ function Compound.Create(model: Model, destination: Instance): Controller?
 		local members = visualParts(group)
 		if not members or not spring or not spring:IsA("SpringConstraint")
 			or not spring.Attachment0 or not spring.Attachment1 then return nil end
-		table.insert(shockPlans, { source = group, parts = members, spring = spring })
+		local fixedBase, movingBase = spring.Attachment0.Parent, spring.Attachment1.Parent
+		local hingeName = name:gsub("^ShockAbsorber_", "PivotHinge_")
+		local hinge = if fixedBase then fixedBase:FindFirstChild(hingeName) else nil
+		if not hinge or not hinge:IsA("HingeConstraint") or not hinge.Attachment0 or not hinge.Attachment1 then return nil end
+		local fixedPivot, movingPivot = hinge.Attachment0, hinge.Attachment1
+		if fixedPivot.Parent ~= fixedBase then fixedPivot, movingPivot = movingPivot, fixedPivot end
+		local authoredPivot = movingPivot:GetAttribute("AuthoredPivotCFrame")
+		if fixedPivot.Parent ~= fixedBase or movingPivot.Parent ~= movingBase
+			or not movingBase or not movingBase:IsA("BasePart") or typeof(authoredPivot) ~= "CFrame" then return nil end
+		table.insert(shockPlans, { source = group, parts = members, spring = spring,
+			fixedPivot = fixedPivot, movingPivot = movingPivot, authoredPivot = authoredPivot })
 	end
 	if #shockPlans ~= 4 then return nil end
 	local cleanup = Scope.new()
@@ -102,13 +113,22 @@ function Compound.Create(model: Model, destination: Instance): Controller?
 			tracking = false, spin = 0, rate = 0 })
 	end
 	for _, plan in shockPlans do
-		local first, second = assert(plan.spring.Attachment0).WorldPosition, assert(plan.spring.Attachment1).WorldPosition
-		local at = plan.source:GetPivot()
+		local first = assert(plan.spring.Attachment0).WorldPosition
+		local moving = assert(plan.spring.Attachment1)
+		local movingBase = moving.Parent :: BasePart
+		-- A Model without PrimaryPart retains its spawn WorldPivot while its welded
+		-- parts move. Recover the authored pose from the actual linkage instead.
+		local restMovingFrame = plan.fixedPivot.WorldCFrame * plan.authoredPivot:Inverse()
+		local second = restMovingFrame:PointToWorldSpace(moving.Position)
+		local at = CFrame.fromMatrix((first + second) * 0.5, plan.fixedPivot.WorldAxis, (first - second).Unit)
 		local members: { Visual } = {}
-		for _, part in plan.parts do table.insert(members, copy(part, at:ToObjectSpace(part.CFrame))) end
+		for _, part in plan.parts do
+			local restFrame = if part:GetAttribute("G4ShockSection") == "Lower"
+				then restMovingFrame * movingBase.CFrame:ToObjectSpace(part.CFrame) else part.CFrame
+			table.insert(members, copy(part, at:ToObjectSpace(restFrame)))
+		end
 		table.insert(shocks, { source = plan.source, spring = plan.spring, parts = members,
-			length = (first - second).Magnitude, first = root.CFrame:PointToObjectSpace(first),
-			second = root.CFrame:PointToObjectSpace(second), right = root.CFrame:VectorToObjectSpace(at.RightVector) })
+			length = (first - second).Magnitude, fixedPivot = plan.fixedPivot })
 	end
 	cleanup:Give(function()
 		for _, part in all do
@@ -172,13 +192,13 @@ function Compound.Create(model: Model, destination: Instance): Controller?
 			for _, shock in shocks do
 				local a, b = shock.spring.Attachment0, shock.spring.Attachment1
 				if not shock.spring.Parent or not a or not b then continue end
-				shock.first = shock.first:Lerp(root.CFrame:PointToObjectSpace(a.WorldPosition), alpha)
-				shock.second = shock.second:Lerp(root.CFrame:PointToObjectSpace(b.WorldPosition), alpha)
-				local first, second = root.CFrame:PointToWorldSpace(shock.first), root.CFrame:PointToWorldSpace(shock.second)
+				-- Both eyes must remain on their mounts, including during steering;
+				-- separately smoothing the endpoints leaves the shock behind its arms.
+				local first, second = a.WorldPosition, b.WorldPosition
 				local delta = first - second
 				if delta.Magnitude < 0.001 then continue end
 				local up = delta.Unit
-				local right = root.CFrame:VectorToWorldSpace(shock.right)
+				local right = shock.fixedPivot.WorldAxis
 				right = (right - up * right:Dot(up)).Unit
 				local at = CFrame.fromMatrix((first + second) * 0.5, right, up)
 				local ratio = delta.Magnitude / shock.length

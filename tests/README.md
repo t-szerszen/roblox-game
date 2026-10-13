@@ -38,6 +38,14 @@ on Client. The fixture also verifies switching back to the retained G2 Pro.
 Stop Play to discard the floor/scripts and restore ordinary input. Latest native
 results are versioned in `assets/scooter/kukirin-g4-play-validation.json`.
 
+The follow-up shock attachment fix uses local checks only; the user runs Play.
+`python3 tests/run_scooter_g4_visual_tests.py --luau /path/to/luau` exercises the
+actual Compound presentation with CFrame/instance doubles (57 assertions).
+Covers travelling away from a stationary Model pivot, rebinding with compressed
+arms and steering, live upper/lower mount positions and cleanup. It does not
+simulate Roblox physics or authorize synchronization. The old Play report
+predates this fix; see the local follow-up section in the G4 migration document.
+
 ## Base riding pose, stage 1
 
 After Rojo sync, start Play and mount the scooter with the intended 8-stud R15
