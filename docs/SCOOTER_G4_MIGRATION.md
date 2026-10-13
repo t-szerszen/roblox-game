@@ -418,3 +418,32 @@ oraz sprawdza zachowane współrzędne sprzed połączenia. Przechwycenie viewpo
 przez MCP nie zwróciło obrazu; nie deklarujemy odbioru ze screenshotu.
 Nie uruchamiano Play. Użytkownik testuje świeżo przywołaną G4 podczas skrętu
 i pracy zawieszenia; istniejące obiekty poprzedniej sesji należy zastąpić nowym spawnem.
+
+## Wariant bez odgałęzienia do decku — zastosowany w Studio, 2026-10-13
+
+Użytkownik zaakceptował próbę ukrycia bocznego przewodu skręcającego do decku,
+z możliwością powrotu do wersji z commitu `2ff0cf1`. Wyłączono widoczność całej
+tylnej gałęzi: 32 części RearBrakeLine/RearBrakeLineJ. Pozostaje jeden widoczny
+przewód przedni z osłoną spiralną i mocowaniem przy zawieszeniu. Geometria,
+położenia, weldy i fizyka nie zostały zmienione; nie usuwano części.
+
+`ScooterG4Cables.SetDeckBranchVisible` zapisuje poprzednią Transparency każdego
+fragmentu w G4DeckBranchPreviousTransparency. Przywrócenie zachowuje 12 części
+górnej pętli, które były już ukryte przed tą próbą. Configure ukrywa gałąź również
+w nowych spawnach i przygotowanych kopiach rewizji 2.
+
+W Studio zapisano wariant w `ServerStorage.ScooterModels.scooter_g4` oraz
+`Workspace.KuKirin G4 Rig`. Kopie sprzed zmiany są w ScooterRigDraftBackups,
+z nazwami zawierającymi `_BeforeDeckBranchHide_`. Potwierdzono ukrycie dokładnie
+32 części i zachowanie wszystkich pozostałych fragmentów, ich położeń i rozmiarów.
+Natywny eksport/odczyt RBXM zachował wariant; uaktualniono asset i manifest.
+
+Zatrzymano aktywny Play wyłącznie na czas trwałego zapisu wariantu, po czym
+włączono Play ponownie do testu użytkownika. Agent nie sterował pojazdem ani
+nie wykonywał prób jazdy. Należy przywołać nową G4 ze stanowiska testowego.
+
+Do pełnego powrotu do poprzedniego wariantu można przywrócić modele z kopii
+`_BeforeDeckBranchHide_` oraz kod/asset z commitu `2ff0cf1`, aby nowe spawny
+zachowały widoczne odgałęzienie. Samo SetDeckBranchVisible(model, true) przywraca
+widoczność w istniejącym obiekcie; aktualny Configure nadal wybiera ukryty wariant
+podczas przygotowania nowego pojazdu.

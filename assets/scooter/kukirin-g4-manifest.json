@@ -40,8 +40,8 @@
     },
     "rig": {
       "file": "assets/scooter/kukirin-g4-rig.rbxm",
-      "bytes": 151384,
-      "sha256": "97e839c52e063d67e271d2b9c7a84aa16ce595786a4c6acb41a5f1de6fd792bd"
+      "bytes": 151490,
+      "sha256": "2e0eb3b687c3eb81fbb1f8997e9f75603110ec6c249efac8bc249ebb3a59963d"
     }
   },
   "cableHarness": {
@@ -55,6 +55,9 @@
     ],
     "originalAndG2Preserved": true,
     "playtest": "User performs Play acceptance; no agent Play run for this correction",
-    "priorVerificationScope": "The original verification numbers above describe initial preparation; current cable revision has separate local and Edit checks."
+    "priorVerificationScope": "The original verification numbers above describe initial preparation; current cable revision has separate local and Edit checks.",
+    "deckBranchHidden": true,
+    "hiddenRearParts": 32,
+    "deckBranchBackupPattern": "ServerStorage.ScooterRigDraftBackups.*_BeforeDeckBranchHide_*"
   }
 }

@@ -4,6 +4,26 @@ local Cables = {}
 local REVISION = 2
 type Segment = { part: Part, a: Vector3, b: Vector3, distance: number, length: number }
 
+-- Conceal the deck branch inside the column shroud without removing its geometry.
+-- Retain revision 2's already hidden upper pieces when the user restores this look.
+function Cables.SetDeckBranchVisible(model: Model, visible: boolean)
+	if model:GetAttribute("ScooterG4Rig") ~= true then return end
+	local visuals = model:FindFirstChild("G4Visuals")
+	local group = if visuals then visuals:FindFirstChild("Cables") else nil
+	if not group then return end
+	for _, part in group:GetChildren() do
+		if part:IsA("BasePart") and (part.Name == "RearBrakeLine" or part.Name == "RearBrakeLineJ") then
+			local saved = part:GetAttribute("G4DeckBranchPreviousTransparency")
+			local previous: number = if typeof(saved) == "number" then saved else part.Transparency
+			if typeof(saved) ~= "number" then
+				part:SetAttribute("G4DeckBranchPreviousTransparency", previous)
+			end
+			part.Transparency = if visible then previous else 1
+		end
+	end
+	model:SetAttribute("G4DeckBranchHidden", not visible)
+end
+
 local function closestDistance(segments: { Segment }, position: Vector3): number
 	local best, distance = math.huge, 0
 	for _, segment in segments do
@@ -77,7 +97,11 @@ end
 
 -- Applied only to detached spawn/authoring copies; the authored template is retained.
 function Cables.Configure(model: Model)
-	if model:GetAttribute("ScooterG4Rig") ~= true or model:GetAttribute("G4CableRigRevision") == REVISION then return end
+	if model:GetAttribute("ScooterG4Rig") ~= true then return end
+	if model:GetAttribute("G4CableRigRevision") == REVISION then
+		Cables.SetDeckBranchVisible(model, false)
+		return
+	end
 	local visuals = model:FindFirstChild("G4Visuals")
 	local group = if visuals then visuals:FindFirstChild("Cables") else nil
 	if not group or not group:IsA("Model") then return end
@@ -166,6 +190,7 @@ function Cables.Configure(model: Model)
 	end
 	group:SetAttribute("G4CableVisualPartCount", count)
 	model:SetAttribute("G4CableRigRevision", REVISION)
+	Cables.SetDeckBranchVisible(model, false)
 end
 
 return Cables
