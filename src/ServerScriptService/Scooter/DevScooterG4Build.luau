@@ -302,7 +302,7 @@ function Builder.Build(source: Model, requestedScale: number?, configuration: ty
 		end
 		for _, item in cables:GetChildren() do if item:IsA("BasePart") then
 			local owner: BasePart = if table.find(Settings.BodyCables, item.Name) then body else stick
-			if item.Name == "FrontBrakeLine" or item.Name == "FrontBrakeLineJ" then owner = axles.Front end
+			if item.Name == "FrontBrakeLine" or item.Name == "FrontBrakeLineJ" or item.Name == "CableTie" then owner = axles.Front end
 			decorate(item, owner)
 		end end
 		local tape = one(bodyGroup, "GripTape")

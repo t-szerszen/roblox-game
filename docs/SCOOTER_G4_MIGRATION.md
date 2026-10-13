@@ -1,8 +1,9 @@
 # KuKirin G4 — analiza i wdrożenie jazdy
 
 Aktualny stan Studio: G4 jest podłączona do kontrolera i dostępna do jazdy w Play,
-obok zachowanej G2 Pro. Nowsza poprawka mocowania sprężyn i obciążenia kierowcy
-jest przygotowana lokalnie; nie była synchronizowana. Instrukcja i wyniki są w sekcji **Aktywacja jazdy**
+obok zachowanej G2 Pro. Użytkownik potwierdził rozwiązanie problemu sprężyn.
+Nowsza poprawka przewodów jest przygotowana lokalnie; nie była synchronizowana.
+Instrukcja i wyniki są w sekcji **Aktywacja jazdy**
 na końcu dokumentu. Wcześniejsze sekcje opisują kolejne etapy historycznie.
 
 Odczyt 2026-10-13 przez integrację Roblox Studio, place `127535941224851`,
@@ -325,3 +326,55 @@ Do selektywnego przeniesienia są tylko `ScooterCompoundVisuals` i `ScooterServe
 Po aktualizacji użytkownik sprawdza wsiadanie/zsiadanie na płaskim terenie,
 sprężyny po oddaleniu się od spawnu, skręt i przejazd przez przeszkodę,
 następnie zachowanie G2 Pro. Pełna synchronizacja Rojo nie jest potrzebna.
+
+W kolejnym zgłoszeniu użytkownik potwierdził, że poprawka rozwiązała problem
+sprężyn. Jest to odbiór użytkownika, nie dodatkowy test Play wykonany przez agenta.
+
+## Przewody hamulcowe — lokalnie, 2026-10-13
+
+Odczyt kandydata w Edit wykazał, że wszystkie 52 części przedniego przewodu były
+spawane do VirtualFrontAxle, wszystkie 32 części tylnego do ScooterBody,
+przepust CableGrommet przy kierownicy do podwozia, a dolna opaska CableTie
+do kolumny. Przewody przechodzą pomiędzy zespołami mechanicznymi i nie mogą
+zachowywać się jak jeden sztywny element przypięty do jednej strony połączenia.
+
+`ScooterG4Cables.Configure`, wywoływany przez istniejący ScooterRig.Prepare,
+przygotowuje wyłącznie odłączoną kopię modelu. Naprawia właścicieli weldów,
+przypisując przepust do kolumny i dolną opaskę do przedniej osi. Na oryginalnym
+łańcuchu cylindrów wyznacza odległość wzdłuż przewodu i zapisuje punkty końców
+w lokalnych współrzędnych obu zespołów. Przedni przewód i SpiralWrap przechodzą
+od kolumny do osi; dolny odcinek po opasce porusza się już razem z osią.
+Tylny przewód przechodzi od kolumny do podwozia. Smoothstep zapewnia łagodne
+przejście, a współdzielone punkty końców utrzymują ciągłość segmentów.
+
+`ScooterCableVisuals`, obsługiwany przez istniejący ScooterSpringVisuals,
+tworzy 95 lokalnych części prezentacji, zachowując oryginalny przebieg,
+kolory, materiały i grubość. Aktualizuje długość/obrót cylindrów oraz pozycje
+łączeń jedną operacją BulkMoveTo. Nie porusza fizycznymi częściami spawanych
+zespołów. Prezentacja działa również przy zaparkowanej hulajnodze w istniejącym
+limicie odległości; poza nim przywraca części źródłowe. Usunięcie pojazdu lub
+streaming czyści kopie, połączenia i przywraca widoczność. G2 Pro jest pomijana.
+
+Builder i jego konfiguracja otrzymały też właściwe przypisanie opaski/przepustu
+dla przyszłych kopii authoringu. Obecnego szablonu RBXM nie trzeba przebudowywać:
+metadane i poprawione weldy powstają w kopii podczas przygotowania pojazdu.
+Nie modyfikowano oryginału, szablonu Studio ani mapy i nie wykonywano Play QA.
+
+Do selektywnej aktualizacji runtime:
+
+- nowy `ServerScriptService.Scooter.ScooterG4Cables`;
+- zmieniony `ServerScriptService.Scooter.ScooterRig`;
+- nowy `ReplicatedStorage.Shared.Scooter.ScooterCableVisuals`;
+- zmieniony `StarterPlayer.StarterPlayerScripts.ScooterSpringVisuals`.
+
+Zmiany DevScooterG4Build/DevScooterG4Config dotyczą tylko generatora. Po aktualizacji
+runtime należy rozpocząć nową sesję Play i przywołać nową G4. Użytkownik sprawdza
+ciągłość przewodów na postoju, skręt w obie strony, pracę przedniego zawieszenia
+na przeszkodzie oraz brak rozłączeń po zsiadaniu.
+
+Lokalne kontrole: 72 asercje rzeczywistych modułów konfiguracji/prezentacji
+przewodów, 57 regresji sprężyn, 230 regresji runtime, 8332 ArcadeSteps PASS.
+Sprawdzono zachowanie geometrii w spoczynku, poprawione weldy, mocowania przy
+skręcie/ugięciu, ciągłość wszystkich odcinków, opaskę, przejazd poza spawn,
+cleanup i pominięcie G2. Analiza typów zmienionych modułów i Rojo build PASS.
+Testy lokalne używają doubles i nie zastępują wizualnego odbioru w Studio.

@@ -5,6 +5,7 @@ local Config = require(ReplicatedStorage.Shared.Scooter.ScooterConfig)
 local Geometry = require(script.Parent.ScooterRigGeometry)
 local Collision = require(script.Parent.ScooterCollision)
 local Suspension = require(script.Parent.ScooterSuspension)
+local G4Cables = require(script.Parent.ScooterG4Cables)
 
 export type Rig = {
 	body: BasePart,
@@ -241,6 +242,7 @@ local function configureModel(model: Model, Config: typeof(Config)): Model
 	model:SetAttribute("ArticulatedScooter", true)
 	Collision.Configure(model, Config)
 	Suspension.Configure(model, Config)
+	G4Cables.Configure(model)
 	return model
 end
 

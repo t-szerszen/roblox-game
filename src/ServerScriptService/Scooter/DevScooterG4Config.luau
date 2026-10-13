@@ -26,5 +26,5 @@ return table.freeze({
 	ShockUpper = { "ShockBody", "PreloadNut", "PreloadThread" },
 	ShockLower = { "ShockShaft", "ShockLowerEye", "SpringSeat", "ShockLowerTab", "ShockBrace" },
 	WheelFixed = { "Axle", "AxleEnd", "AxleNut", "Caliper", "CaliperBolt", "CaliperBadge", "BanjoBolt" },
-	BodyCables = { "RearBrakeLine", "RearBrakeLineJ", "CableGrommet" },
+	BodyCables = { "RearBrakeLine", "RearBrakeLineJ" },
 })

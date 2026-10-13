@@ -46,6 +46,14 @@ arms and steering, live upper/lower mount positions and cleanup. It does not
 simulate Roblox physics or authorize synchronization. The old Play report
 predates this fix; see the local follow-up section in the G4 migration document.
 
+The same local runner also executes `scooter_g4_cables.spec.luau`: 72 assertions
+on actual ScooterG4Cables/ScooterCableVisuals with instance/CFrame doubles.
+Checks preserved authored shape, correct clip/grommet weld owners, shared
+segment endpoints, steering/suspension attachment, the lower clip, travel,
+distance culling, streaming cleanup and exclusion of G2 Pro. It does not edit
+Studio. For the user's manual visual test, update the four runtime modules
+listed in the [cable follow-up](../docs/SCOOTER_G4_MIGRATION.md) and spawn a fresh G4.
+
 ## Base riding pose, stage 1
 
 After Rojo sync, start Play and mount the scooter with the intended 8-stud R15

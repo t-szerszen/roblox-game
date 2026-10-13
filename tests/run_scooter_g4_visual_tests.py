@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local regression for G4 shock presentation; does not connect to Studio."""
+"""Local regressions for G4 shock/cable presentation; does not connect to Studio."""
 import argparse
 from pathlib import Path
 import shutil
@@ -21,11 +21,13 @@ def main():
         "ReplicatedStorage/Shared/Scooter/ScooterConfig",
         "ReplicatedStorage/Shared/UI/Scope",
         "ReplicatedStorage/Shared/Scooter/ScooterCompoundVisuals",
+        "ReplicatedStorage/Shared/Scooter/ScooterCableVisuals",
+        "ServerScriptService/Scooter/ScooterG4Cables",
     ]
     source = "local SOURCES = {}\n"
     for path in paths:
         source += f"SOURCES[ {literal(path)} ] = {literal((root / 'src' / f'{path}.luau').read_text())}\n"
-    for path in ("support/roblox_mock.luau", "support/scooter_animation_mock.luau", "scooter_g4_visuals.spec.luau"):
+    for path in ("support/roblox_mock.luau", "support/scooter_animation_mock.luau", "scooter_g4_visuals.spec.luau", "scooter_g4_cables.spec.luau"):
         source += "\n" + (root / "tests" / path).read_text()
     with tempfile.TemporaryDirectory(prefix="g4-visual-tests-") as directory:
         bundle = Path(directory) / "run.luau"
