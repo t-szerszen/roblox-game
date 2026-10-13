@@ -18,16 +18,19 @@ function DevScooterScaleTests.Stop()
 end
 
 function DevScooterScaleTests.Start()
-	if not RunService:IsStudio() or not Config.StudioScaleComparisonEnabled or display then return end
+	local modelsEnabled = Config.StudioModelComparisonEnabled
+	if not RunService:IsStudio() or (not Config.StudioScaleComparisonEnabled and not modelsEnabled) or display then return end
 	local spawn = workspace:FindFirstChildWhichIsA("SpawnLocation", true)
 	local templates = ServerStorage:FindFirstChild("ScooterModels")
 	if not spawn or not templates then return end
 	local folder = Instance.new("Folder")
-	folder.Name = "ScooterScaleTests"
+	folder.Name = if modelsEnabled then "ScooterModelTests" else "ScooterScaleTests"
 	display = folder
-	for _, variant in Config.StudioScaleVariants do
+	local variants = if modelsEnabled then Config.StudioModelVariants else Config.StudioScaleVariants
+	for _, variant in ipairs(variants) do
 		local template = templates:FindFirstChild(variant.TemplateName)
-		if not template or not template:IsA("Model") or template:GetAttribute("StudioScaleVariant") ~= variant.Id then continue end
+		if not template or not template:IsA("Model") or not template.PrimaryPart then continue end
+		if not modelsEnabled and template:GetAttribute("StudioScaleVariant") ~= variant.Id then continue end
 		local model = template:Clone()
 		model.Name = variant.Label
 		local center = spawn.Position + variant.Offset
@@ -43,7 +46,7 @@ function DevScooterScaleTests.Start()
 		end
 		local root = assert(model.PrimaryPart)
 		local prompt = Instance.new("ProximityPrompt")
-		prompt.Name = "ChooseScale"
+		prompt.Name = if modelsEnabled then "ChooseModel" else "ChooseScale"
 		prompt.ObjectText = variant.Label
 		prompt.ActionText = "Przywołaj do testu"
 		prompt.KeyboardKeyCode = Enum.KeyCode.E
@@ -57,7 +60,8 @@ function DevScooterScaleTests.Start()
 			if player.Parent ~= Players or not playerRoot or not playerRoot:IsA("BasePart")
 				or not humanoid or humanoid.Health <= 0 or humanoid.SeatPart ~= nil
 				or (playerRoot.Position - root.Position).Magnitude > prompt.MaxActivationDistance then return end
-			Server.RequestStudioScaleForPlayer(player, variant.Id)
+			if modelsEnabled then Server.RequestStudioModelForPlayer(player, variant.Id)
+			else Server.RequestStudioScaleForPlayer(player, variant.Id) end
 		end))
 		model.Parent = folder
 	end

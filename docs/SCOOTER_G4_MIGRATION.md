@@ -1,4 +1,8 @@
-# KuKirin G4 — analiza przed migracją
+# KuKirin G4 — analiza i wdrożenie jazdy
+
+Aktualny stan: G4 jest podłączona do kontrolera i dostępna do jazdy w Play,
+obok zachowanej G2 Pro. Instrukcja i wyniki są w sekcji **Aktywacja jazdy**
+na końcu dokumentu. Wcześniejsze sekcje opisują kolejne etapy historycznie.
 
 Odczyt 2026-10-13 przez integrację Roblox Studio, place `127535941224851`,
 w trybie Edit. Sprawdzono aktualne źródła Studio, hierarchię, właściwości,
@@ -229,3 +233,58 @@ i obserwacja przez drugiego gracza. Koszt 1731 części oraz 1084 lokalnych kopi
 wizualnych przy bliskim kierowcy nadal wymaga profilowania przed wdrożeniem
 multiplayer. Podgląd viewportu przez MCP zakończył się timeoutem; nie deklarujemy
 wizualnego odbioru końcowej kopii na podstawie screenshotu.
+
+## Aktywacja jazdy — 2026-10-13
+
+Użytkownik zlecił wdrożenie gotowej do jazdy G4 w Play przy zachowaniu G2 Pro.
+Selektywnie zsynchronizowano 14 modułów/skryptów adaptera i konfiguracji;
+przed zapisem porównano zarówno Source, jak i bufor ScriptEditorService,
+a po zapisie sprawdzono ich zgodność. Zastane zmiany strojenia Config/Server
+oraz usunięcie duplikatu SmoothYawRate w Physics zaimportowano do Git i zachowano.
+Nie wykonywano pełnej synchronizacji Rojo. Mapa, oryginały G4/G4v2 i istniejący
+szablon `scooter` pozostały zachowane. Tymczasowe testy znikają po Stop.
+
+W Play, przy pierwszym SpawnLocation, `Workspace.ScooterModelTests` zawiera
+stanowiska **G4 — jazda testowa** i **G2 Pro — jazda testowa**. E na stanowisku
+przywołuje własną hulajnogę przy spawnie; E przy przywołanej hulajnodze wsiada.
+Przełączanie modeli wymaga wcześniejszego zsiadania i zwykłego cooldownu 3 s.
+Zwykły spawn nadal korzysta z wybranego produktu i domyślnego G2 Pro.
+Oryginalny zakotwiczony model w Workspace jest źródłem, a nie pojazdem do jazdy.
+
+`ModelTemplates["KuKirin G4"] = "scooter_g4"` kieruje posiadaną katalogową G4
+na nowy rig z jej zwykłymi statystykami (bazowo 90 km/h w SPORT).
+Jawna serwerowa metoda RequestStudioModelForPlayer jest dostępna tylko w Studio,
+sprawdza skonfigurowaną listę wariantów i używa istniejącej walidacji spawnu.
+Stanowiska testowe korzystają z posiadanego domyślnego G2 Pro i jego tuningu
+(bazowo 55 km/h), zachowując wybór produktu i ekwipunek. Nie przyznają G4
+w sklepie ani nie obchodzą własności produktów poza Studio.
+Klient nadal używa istniejących walidowanych remotes; własność fizyki ma serwer.
+
+Natywna próba przez zwykły server Script i LocalScript w jednoosobowym Play
+sprawdziła: postój z oboma kontaktami, wsiadanie, przyspieszanie do 55 km/h,
+rzeczywisty skręt w lewo/prawo podczas jazdy, wheelie około 37° z kontaktem
+tylnego koła i oderwanym przodem, hamowanie/wsteczny do 18 km/h, burnout,
+Servo kierownicy, ECO 25 km/h, światło, przejazd przez krawężnik 1 studa
+z aktywacją istniejącego ArcadeSteps oraz zsiadanie. Dane faz i statusy
+zapisano w `assets/scooter/kukirin-g4-play-validation.json`.
+Próba używała osobnej podłogi przy `(6000, 1000, 6000)`, poza Workspace.Map.
+Korzystanie z require w kontekście pluginu nie jest odpowiednikiem modułu
+uruchomionej gry; dlatego test metod serwera wykonuje zwykły Script.
+
+Na kliencie potwierdzono wyświetlanie i obrót złożonych kół, ukrycie ich
+oryginałów podczas jazdy oraz usunięcie kopii po przełączeniu na G2 Pro.
+Minimalny zaobserwowany błąd obu dłoni względem gripów wyniósł 0,000061 studa
+na rzeczywistej postaci w Play; jest to najlepsza zaobserwowana klatka,
+a nie gwarancja maksymalnego błędu podczas całego manewru. Serwer potwierdził
+przełączenie z powrotem na zachowany rig G2 Pro i usunięcie wcześniejszej G4.
+
+Kompilacja Luau i lokalny Rojo build przechodzą. Regresje CLI runtime: 230 PASS;
+ArcadeSteps: 8332 PASS. Pełna analiza typów zależności nadal zgłasza zastane
+błędy w Cosmetics, Ragdoll, UpgradeService i typowaniu atrybutów Server;
+nie deklarujemy jej pełnego PASS. Screenshot viewportu, test dwóch klientów
+i profilowanie kosztu szczegółowej geometrii pozostają osobnymi kontrolami.
+
+Przy odtwarzaniu projektu w nowym Studio należy zaimportować zachowany plik
+`assets/scooter/kukirin-g4-rig.rbxm` jako `ServerStorage.ScooterModels.scooter_g4`
+obok istniejącego `scooter`. Generator jest narzędziem jawnym; serwer nie tworzy
+ani nie zastępuje modeli authoringu przy uruchomieniu.

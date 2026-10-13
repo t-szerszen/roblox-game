@@ -17,10 +17,26 @@ scaling, mass, contact proxy coverage, four-shock travel/restoring torque,
 static calipers, repeatable cloning, malformed rig rejection, neutral R15 reach,
 compound wheel/coil presentation, label visibility, paint updates and streaming
 cleanup. Native serialization round-trip checks supplement these tests.
-See [G4 preparation and remaining Play checks](../docs/SCOOTER_G4_MIGRATION.md).
+See [G4 preparation, activation and Play results](../docs/SCOOTER_G4_MIGRATION.md).
 `scooter_g4_paint.studio.luau`.Run(paint, candidate, legacyTemplate) separately
 checks all eight actual G4 color groups and the existing primary deck-color
 ordering on a detached candidate (17 native assertions).
+
+For the native driving test, use a fresh one-player Play session with the G4
+adapter already explicitly authorized and installed. Create a temporary
+Workspace folder `_ScooterG4PlayQA` containing an anchored floor of size
+`(2000, 1, 2000)` at `(6000, 999.5, 6000)`; keep fixtures outside Workspace.Map.
+Paste `scooter_g4_play.client.luau` into a disabled LocalScript named
+`_ScooterG4PlayClient` in the player's PlayerGui, then paste
+`scooter_g4_play.server.luau` into a normal server Script in ServerScriptService.
+Do not run the server body from the plugin command context: module caches differ.
+The server mounts the real seat and enables the client, which temporarily removes
+the running ScooterClient and sends the existing validated remotes. Observe
+`Workspace._ScooterG4PlayQA.Finished` and `Passed` on Server, and the
+`ClientPresentationFinished`, visibility, spin, palm error and cleanup attributes
+on Client. The fixture also verifies switching back to the retained G2 Pro.
+Stop Play to discard the floor/scripts and restore ordinary input. Latest native
+results are versioned in `assets/scooter/kukirin-g4-play-validation.json`.
 
 ## Base riding pose, stage 1
 
