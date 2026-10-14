@@ -199,9 +199,23 @@ local function deserialize(value: unknown): Profile
 	local selected = if typeof(data.selectedScooter) == "string" then ShopConfig.GetScooterProduct(data.selectedScooter) else nil
 	if selected and profile.unlocks[selected.id] then profile.selectedScooter = data.selectedScooter end
 	if typeof(data.rewardProgress) == "table" then
+		local raw = data.rewardProgress
+		-- Older profiles accumulated a whole kilometer; keep the coins already earned as remainder.
+		local legacyRide = finiteNumber(raw.rideStuds, 0) >= EconomyConfig.RideCoinStepStuds
 		for key in profile.rewardProgress do
-			local limit = if key == "rideStuds" then EconomyConfig.StudsPerKilometer else (if key == "rideCoins" then 200 else 1)
-			profile.rewardProgress[key] = math.clamp(finiteNumber(data.rewardProgress[key],0),0,limit-0.000001)
+			local value = finiteNumber(raw[key], 0)
+			local limit = 1
+			if key == "rideStuds" then
+				limit = EconomyConfig.RideCoinStepStuds
+				if legacyRide then value = 0 end
+			elseif key == "rideCoins" then
+				limit = EconomyConfig.RideCoinsPerStep * EconomyConfig.WheelieMaxMultiplier
+				if legacyRide then value = 0 end
+			elseif key == "rideRemainder" then
+				limit = EconomyConfig.RideCoinsPerKilometer * EconomyConfig.WheelieMaxMultiplier + 1
+				if legacyRide then value += finiteNumber(raw.rideCoins, 0) end
+			end
+			profile.rewardProgress[key] = math.clamp(value, 0, limit - 0.000001)
 		end
 	end
 	local function validRGB(color: any): boolean
@@ -372,7 +386,12 @@ local function publishCoins(player: Player, profile: Profile)
 	if coins and coins:IsA("IntValue") then coins.Value=profile.coins end
 end
 local function journal(profile: Profile, amount: number, reason: string)
-	table.insert(profile.transactions,{amount=amount,reason=reason,at=os.time()})
+	local now=os.time()
+	local last=profile.transactions[#profile.transactions]
+	if last and last.reason==reason and amount>0 and last.amount>0 and now-last.at<=EconomyConfig.TransactionMergeSeconds then
+		last.amount+=amount;last.at=now;return
+	end
+	table.insert(profile.transactions,{amount=amount,reason=reason,at=now})
 	if #profile.transactions>EconomyConfig.TransactionHistoryLimit then table.remove(profile.transactions,1) end
 end
 function PlayerDataService.Ready(player: Player): boolean
@@ -571,16 +590,17 @@ function PlayerDataService.RecordRide(player: Player, studs: number, multiplier:
 	if not profile or not PlayerDataService.Ready(player) or studs~=studs or studs<=0 or studs==math.huge
 		or multiplier~=multiplier or multiplier<1 or multiplier>EconomyConfig.WheelieMaxMultiplier then return false end
 	local progress=profile.rewardProgress
+	local step=EconomyConfig.RideCoinStepStuds
 	local remaining=studs
 	while remaining>0 do
-		local distance=math.min(remaining,EconomyConfig.StudsPerKilometer-progress.rideStuds)
+		local distance=math.min(remaining,math.max(0,step-progress.rideStuds))
 		progress.rideStuds+=distance
-		progress.rideCoins+=distance/EconomyConfig.StudsPerKilometer*EconomyConfig.RideCoinsPerKilometer*multiplier
+		progress.rideCoins+=distance/step*EconomyConfig.RideCoinsPerStep*multiplier
 		remaining-=distance
-		if progress.rideStuds>=EconomyConfig.StudsPerKilometer-0.000001 then
+		if progress.rideStuds>=step-0.000001 then
 			local value=progress.rideCoins+progress.rideRemainder
 			local coins=math.floor(value+0.0000001)
-			PlayerDataService.AddCoins(player,coins,"RideKilometer")
+			if coins>0 then PlayerDataService.AddCoins(player,coins,"RideDistance") end
 			progress.rideStuds=0;progress.rideCoins=0;progress.rideRemainder=math.max(0,value-coins)
 		end
 	end

@@ -13,11 +13,11 @@ local ok,problem=pcall(function()
  check(RewardMath.Delivery(0)==100 and RewardMath.Delivery(2000)==250,"Native delivery range")
  local motion=RewardMath.NewMotion(Vector3.zero)
  local total,multiplier=0,1
- for i=1,20 do
+ for i=1,80 do
   local d,m=RewardMath.Sample(motion,Vector3.new(0,0,10*i),Vector3.new(0,0,40),100,true,true,false,0.25)
   total+=d;multiplier=m
  end
- check(total==200 and multiplier==2,"Native vectors produce physical distance and x2 ramp")
+ check(total==800 and multiplier==2,"Native vectors produce physical distance and x2 ramp")
  check(RewardMath.Sample(motion,Vector3.new(0,0,10000),Vector3.new(0,0,40),100,true,true,false,0.25)==0,"Native teleport rejection")
  local store: any={value={coins=80},writes=0}
  function store:UpdateAsync(_key: string,transform: (any)->any)
