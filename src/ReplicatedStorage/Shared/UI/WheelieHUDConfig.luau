@@ -1,0 +1,47 @@
+--!strict
+
+-- Wheelie HUD presentation. Economy values (ramp, max multiplier) live in EconomyConfig.
+return table.freeze({
+	DisplayOrder = 4,
+	TopOffset = 8,
+	Width = 210,
+	Height = 124,
+	WidthScale = 0.9,
+	Padding = 7,
+	CornerRadius = 10,
+	-- Panel stays on screen with the final result before fading out.
+	HideDelay = 1,
+	FadeIn = 0.18,
+	FadeOut = 0.25,
+	PopScale = 0.9,
+	-- Server samples arrive every 0.25 s; the client fills the gap but never runs far ahead.
+	MaxExtrapolationSeconds = 0.3,
+	MultiplierTween = 0.2,
+	Font = Enum.Font.FredokaOne,
+	TitleText = "WHEELIE",
+	MoneyText = "Pieniędzy",
+	BestText = "Najlepszy",
+	TitleSize = 12,
+	TimeSize = 32,
+	DistanceSize = 13,
+	MultiplierSize = 17,
+	BestSize = 10,
+	LineWidth = 38,
+	LineThickness = 2,
+	TitlePadding = 8,
+	StrokeThickness = 1.4,
+	BarWidth = 0.65,
+	BarHeight = 4,
+	BackgroundTransparency = 0.3,
+	TextStrokeTransparency = 0.2,
+	Colors = table.freeze({
+		Background = Color3.fromRGB(16, 44, 70),
+		Border = Color3.fromRGB(64, 120, 150),
+		Accent = Color3.fromRGB(110, 236, 170),
+		Time = Color3.fromRGB(255, 246, 214),
+		Text = Color3.fromRGB(242, 244, 248),
+		Stroke = Color3.fromRGB(14, 22, 30),
+		Track = Color3.fromRGB(10, 26, 40),
+		Maximum = Color3.fromRGB(255, 214, 90),
+	}),
+})

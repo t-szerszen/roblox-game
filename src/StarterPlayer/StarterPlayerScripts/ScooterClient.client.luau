@@ -12,6 +12,7 @@ local ScooterPhysics = require(ReplicatedStorage.Shared.Scooter.ScooterPhysics)
 local Scope = require(ReplicatedStorage.Shared.UI.Scope)
 local Feedback = require(script.Parent.UI.Feedback)
 local Speedometer = require(script.Parent.ScooterSpeedometer)
+local ScooterCamera = require(script.Parent.ScooterCamera)
 type DriveInput = {
 	throttleHeld: boolean,
 	brakeHeld: boolean,
@@ -44,7 +45,8 @@ local wheelieButtonHeld = false
 local focused = true
 local destroyed = false
 local heldKeys: { [Enum.KeyCode]: boolean } = {}
-local mountedActions = { "ScooterBlockJump", "ScooterWheelie", "ScooterDismount", "ScooterDriveMode", "ScooterHeadlight" }
+local activeCameraController: ScooterCamera.Controller? = nil
+local mountedActions = { "ScooterBlockJump", "ScooterWheelie", "ScooterDismount", "ScooterDriveMode", "ScooterHeadlight", "ScooterCameraView" }
 local driveModeKey = Enum.KeyCode.P
 
 local function newMaid(): Maid
@@ -96,12 +98,23 @@ local function cleanupController()
 	clearControls()
 	activeScooter = nil
 	activeSeat = nil
+	activeCameraController = nil
 	if activeMaid then
 		activeMaid:Clean()
 		activeMaid = nil
 	end
 	for _, action in mountedActions do
 		ContextActionService:UnbindAction(action)
+	end
+
+	local char = localPlayer.Character
+	local humanoid = if char then char:FindFirstChildOfClass("Humanoid") else nil
+	local camera = Workspace.CurrentCamera
+	if camera then
+		camera.CameraType = Enum.CameraType.Custom
+		if humanoid then
+			camera.CameraSubject = humanoid
+		end
 	end
 end
 
@@ -160,7 +173,23 @@ local function startController(scooter: Model, seat: VehicleSeat, root: BasePart
 	hintGui.Parent = playerGui
 	maid:Give(function() hintScope:Clean(); hintGui:Destroy() end)
 	local feedback = Feedback.new(hintGui, hintScope)
-	feedback.Show(driveModeKey.Name .. " — ECO / SPORT · L — światła")
+	feedback.Show(
+		string.format('<font color="#6EECAB"><b>%s</b></font>  ECO / SPORT   <font color="#407896">·</font>   <font color="#6EECAB"><b>L</b></font>  ŚWIATŁA   <font color="#407896">·</font>   <font color="#6EECAB"><b>V</b></font>  WIDOK', driveModeKey.Name),
+		false,
+		3.0
+	)
+
+	local function onCameraModeChanged(mode: ScooterCamera.CameraMode)
+		if mode == "ThirdPerson" then
+			feedback.Replace('<font color="#6EECAB"><b>WIDOK:</b></font>  TRZECIA OSOBA', false, 2.0)
+		elseif mode == "FirstPerson" then
+			feedback.Replace('<font color="#6EECAB"><b>WIDOK:</b></font>  PIERWSZA OSOBA', false, 2.0)
+		end
+	end
+
+	local cameraController = ScooterCamera.Start(scooter, seat, root, onCameraModeChanged)
+	activeCameraController = cameraController
+	maid:Give(cameraController.Destroy)
 
 	local function mountedAction(action: string, state: Enum.UserInputState, input: InputObject): Enum.ContextActionResult
 		if playerGui:GetAttribute("GameplayInputBlocked") == true then
@@ -190,6 +219,10 @@ local function startController(scooter: Model, seat: VehicleSeat, root: BasePart
 			elseif action == "ScooterDismount" then
 				clearControls()
 				trickRemote:FireServer("Dismount", true)
+			elseif action == "ScooterCameraView" then
+				if activeCameraController then
+					activeCameraController.CycleMode()
+				end
 			end
 		end
 		-- Space/ButtonA is intentionally inert while mounted and must not reach
@@ -203,10 +236,12 @@ local function startController(scooter: Model, seat: VehicleSeat, root: BasePart
 	ContextActionService:BindActionAtPriority("ScooterDriveMode", mountedAction, true, priority,
 		driveModeKey)
 	ContextActionService:BindActionAtPriority("ScooterHeadlight", mountedAction, true, priority, Enum.KeyCode.L)
+	ContextActionService:BindActionAtPriority("ScooterCameraView", mountedAction, true, priority, Enum.KeyCode.V, Enum.KeyCode.ButtonR3)
 	ContextActionService:SetTitle("ScooterWheelie", "Wheelie")
 	ContextActionService:SetTitle("ScooterDismount", "Exit")
 	ContextActionService:SetTitle("ScooterDriveMode", "ECO / SPORT")
 	ContextActionService:SetTitle("ScooterHeadlight", "Światła")
+	ContextActionService:SetTitle("ScooterCameraView", "Widok (V)")
 
 	maid:Give(UserInputService.InputBegan:Connect(function(input: InputObject, gameProcessed: boolean)
 		if gameProcessed or not focused or UserInputService:GetFocusedTextBox() ~= nil then
