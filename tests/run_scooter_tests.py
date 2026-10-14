@@ -40,6 +40,7 @@ def main() -> None:
         "ServerScriptService/Scooter/ScooterEffects",
         "ServerScriptService/Scooter/ScooterInput",
         "ServerScriptService/Scooter/ScooterRig",
+        "ServerScriptService/Scooter/ScooterG4Cables",
         "ServerScriptService/Scooter/ScooterServer",
         "ServerScriptService/Scooter/ScooterRigGeometry",
         "ServerScriptService/Scooter/ScooterCollision",

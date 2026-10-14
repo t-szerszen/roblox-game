@@ -1,5 +1,66 @@
 # Scooter verification
 
+## KuKirin G4 preparation
+
+`scooter_g4.studio.luau` exports `Run(builder, rig, compound, config, source,
+reference, basePose?)`. Supply fresh `DevScooterG4Build`, `ScooterRig`,
+`ScooterCompoundVisuals`, shared tuning, the raw `Workspace.KuKirin G4`,
+the preserved active template and optionally `ScooterBasePose`.
+Run in Edit with unparented fixture modules. The test creates and destroys
+detached model copies; with basePose it also generates a detached R15 reference
+avatar and scales only that fixture to eight studs. It neither installs a
+template nor changes a player or the map. Do not synchronize production scripts
+to run it without the user's separate authorization.
+
+The current native run passes 12208 assertions for source preservation, uniform
+scaling, mass, contact proxy coverage, four-shock travel/restoring torque,
+static calipers, repeatable cloning, malformed rig rejection, neutral R15 reach,
+compound wheel/coil presentation, label visibility, paint updates and streaming
+cleanup. Native serialization round-trip checks supplement these tests.
+See [G4 preparation, activation and Play results](../docs/SCOOTER_G4_MIGRATION.md).
+`scooter_g4_paint.studio.luau`.Run(paint, candidate, legacyTemplate) separately
+checks all eight actual G4 color groups and the existing primary deck-color
+ordering on a detached candidate (17 native assertions).
+
+For the native driving test, use a fresh one-player Play session with the G4
+adapter already explicitly authorized and installed. Create a temporary
+Workspace folder `_ScooterG4PlayQA` containing an anchored floor of size
+`(2000, 1, 2000)` at `(6000, 999.5, 6000)`; keep fixtures outside Workspace.Map.
+Paste `scooter_g4_play.client.luau` into a disabled LocalScript named
+`_ScooterG4PlayClient` in the player's PlayerGui, then paste
+`scooter_g4_play.server.luau` into a normal server Script in ServerScriptService.
+Do not run the server body from the plugin command context: module caches differ.
+The server mounts the real seat and enables the client, which temporarily removes
+the running ScooterClient and sends the existing validated remotes. Observe
+`Workspace._ScooterG4PlayQA.Finished` and `Passed` on Server, and the
+`ClientPresentationFinished`, visibility, spin, palm error and cleanup attributes
+on Client. The fixture also verifies switching back to the retained G2 Pro.
+Stop Play to discard the floor/scripts and restore ordinary input. Latest native
+results are versioned in `assets/scooter/kukirin-g4-play-validation.json`.
+
+The follow-up shock attachment fix uses local checks only; the user runs Play.
+`python3 tests/run_scooter_g4_visual_tests.py --luau /path/to/luau` exercises the
+actual Compound presentation with CFrame/instance doubles (57 assertions).
+Covers travelling away from a stationary Model pivot, rebinding with compressed
+arms and steering, live upper/lower mount positions and cleanup. It does not
+simulate Roblox physics or authorize synchronization. The old Play report
+predates this fix; see the local follow-up section in the G4 migration document.
+
+The same local runner also executes `scooter_g4_cables.spec.luau`: 72 assertions
+on actual ScooterG4Cables/ScooterCableVisuals with instance/CFrame doubles.
+Checks preserved authored shape, correct clip/grommet weld owners, shared
+segment endpoints, steering/suspension attachment, the lower clip, travel,
+distance culling, streaming cleanup and exclusion of G2 Pro. It does not edit
+Studio. For the user's manual visual test, update the four runtime modules
+listed in the [cable follow-up](../docs/SCOOTER_G4_MIGRATION.md) and spawn a fresh G4.
+
+The joined upper harness revision adds three checks (75 cable assertions total):
+shared column entry, concealed duplicate upper rear line and a sleeve fully fixed
+to the column. Studio Edit now has the corrected template/preview, with native
+RBXM export and mechanical validation. Play visual acceptance remains with the
+user. The native preparation fixture permits the intentional rear route correction
+while checking its preserved authoring coordinates; its full suite was not rerun.
+
 ## Base riding pose, stage 1
 
 After Rojo sync, start Play and mount the scooter with the intended 8-stud R15

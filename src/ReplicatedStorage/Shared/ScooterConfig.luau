@@ -13,6 +13,11 @@ local ScooterConfig = {}
 -- Secondary systems remain parked while validating the drivable Studio MVP.
 ScooterConfig.GarageEnabled = false
 ScooterConfig.StudioScaleComparisonEnabled = false -- 0.25 selected after comparison.
+ScooterConfig.StudioModelComparisonEnabled = true
+ScooterConfig.StudioModelVariants = {
+	{ Id = "g2_pro", TemplateName = "scooter", Label = "G2 Pro — jazda testowa", Offset = Vector3.new(-6, 0, 8) },
+	{ Id = "g4", TemplateName = "scooter_g4", Label = "G4 — jazda testowa", Offset = Vector3.new(6, 0, 8) },
+}
 
 -- Developer comparisons reuse the owned scooter's tuning; they are not shop products.
 ScooterConfig.StudioScaleVariants = {
@@ -75,14 +80,15 @@ ScooterConfig.EntitlementCacheSeconds = 60
 ScooterConfig.GarageRequestFunctionName = "GarageRequest"
 
 ScooterConfig.DefaultModel = "KuKirin G2 Pro"
--- All catalog entries use the single Studio-authored articulated rig.
+-- Products without a dedicated model keep the existing articulated template.
 ScooterConfig.TemplateName = "scooter"
+ScooterConfig.ModelTemplates = { ["KuKirin G4"] = "scooter_g4" } :: { [string]: string }
 ScooterConfig.SteeringServoTorque = 6000
-ScooterConfig.SteeringServoSpeed = 8
-ScooterConfig.SteeringServoResponsiveness = 24
-ScooterConfig.TurnSteeringResponse = 8
-ScooterConfig.YawResponse = 10
-ScooterConfig.MaxYawAcceleration = math.rad(400)
+ScooterConfig.SteeringServoSpeed = 14
+ScooterConfig.SteeringServoResponsiveness = 40
+ScooterConfig.TurnSteeringResponse = 8 -- Retained for existing helpers; the server no longer stacks this filter.
+ScooterConfig.YawResponse = 30
+ScooterConfig.MaxYawAcceleration = math.rad(1800)
 ScooterConfig.SteeringServoSign = -1
 ScooterConfig.SteeringAnglePrecisionDegrees = 0.1
 ScooterConfig.BrakeLight = {
@@ -108,7 +114,7 @@ ScooterConfig.BurnoutTurnRate = math.rad(90)
 ScooterConfig.StudsPerKmH = 1.6
 ScooterConfig.BurnoutMaxSpeedKmh = 5
 ScooterConfig.BurnoutSmokeMaxSpeed = ScooterConfig.BurnoutMaxSpeedKmh * ScooterConfig.StudsPerKmH
-ScooterConfig.CoastingDeceleration = 10
+ScooterConfig.CoastingDeceleration = 6
 ScooterConfig.BrakingDeceleration = 40
 ScooterConfig.DirectionChangeBrakingDeceleration = 60
 ScooterConfig.DirectionChangeSpeedKmh = 2
@@ -131,11 +137,11 @@ ScooterConfig.LowSpeedTurnBoost = 1.2
 ScooterConfig.HillAssistGravityScale = 0.85
 ScooterConfig.WheelieMinSpeedKmh = 10
 ScooterConfig.WheelieMinSpeed = ScooterConfig.WheelieMinSpeedKmh * ScooterConfig.StudsPerKmH
-ScooterConfig.WheelieKickAngle = math.rad(14)
-ScooterConfig.WheeliePitchRate = math.rad(34)
+ScooterConfig.WheelieKickAngle = math.rad(5)
+ScooterConfig.WheeliePitchRate = math.rad(28)
 ScooterConfig.WheelieBrakeDropRate = math.rad(125)
-ScooterConfig.WheelieNaturalDropRate = math.rad(58)
-ScooterConfig.WheelieReturnSpeed = 3.2
+ScooterConfig.WheelieNaturalDropRate = math.rad(24)
+ScooterConfig.WheelieReturnSpeed = 2.6
 ScooterConfig.WheelieBrakeReturnSpeed = 8
 ScooterConfig.WheelieRestAngle = math.rad(0.25)
 ScooterConfig.WheelieLowSpeedDropStart = 6
@@ -166,8 +172,8 @@ ScooterConfig.PredictionMaxError = 2
 ScooterConfig.PredictionMaxAngle = math.rad(12)
 ScooterConfig.PredictionCameraLead = 0.35
 ScooterConfig.PredictionCameraBlendSpeed = 12
-ScooterConfig.MaxSteeringLean = math.rad(16)
-ScooterConfig.SteeringLeanSmoothSpeed = 6
+ScooterConfig.MaxSteeringLean = math.rad(28)
+ScooterConfig.SteeringLeanSmoothSpeed = 8
 ScooterConfig.MaxHandlebarAngle = math.rad(48)
 ScooterConfig.HandlebarSmoothSpeed = 18
 ScooterConfig.HandlebarInputExponent = 0.72
@@ -278,9 +284,9 @@ ScooterConfig.GroundMinNormalY = 0.35
 ScooterConfig.MaxGroundedVerticalSpeed = 8
 ScooterConfig.SpawnCooldown = 3
 ScooterConfig.DriveInputTimeout = 0.75
-ScooterConfig.DriveRemoteMinInterval = 0.04
+ScooterConfig.DriveRemoteMinInterval = 0.01
 ScooterConfig.DriveInputKeepalive = 0.25
-ScooterConfig.DriveInputSendInterval = 0.05
+ScooterConfig.DriveInputSendInterval = 0.025
 ScooterConfig.SteeringSendThreshold = 0.02
 ScooterConfig.BurnoutWheelAngularSpeed = 55
 ScooterConfig.BurnoutSmokeRate = 32
@@ -289,13 +295,14 @@ ScooterConfig.NeonBrightness = 1.5
 ScooterConfig.NeonRange = 7
 ScooterConfig.RiderGripHalfWidth = 0.58
 ScooterConfig.RiderDeckClearance = 0.01
+ScooterConfig.RiderAnimationDistance = 150
 -- Calibrated against the 8-stud R15 rider and the installed FootRest/grips.
 ScooterConfig.Handling = {
  ThrottleResponse = 6,
  BrakeResponse = 12,
- LeanAttackResponse = 6,
- LeanReturnResponse = 5,
- MaxLeanRate = math.rad(85),
+ LeanAttackResponse = 12,
+ LeanReturnResponse = 16,
+ MaxLeanRate = math.rad(180),
 }
 ScooterConfig.RiderDynamics = {
  Response = 8,
@@ -308,9 +315,10 @@ ScooterConfig.RiderDynamics = {
  SteeringTorsoYaw = 0.55,
  SteeringReachLean = math.rad(8),
  MaximumBodyCornering = math.rad(8),
- WheelieRootCounter = 0.45,
- WheelieTorsoCounter = 0.40,
+ WheelieRootCounter = 0.25,
+ WheelieTorsoCounter = 0.30,
  WheelieCrouch = 0.14,
+ WheelieStartCrouch = 0.05,
  AccelerationCrouch = 0.04,
  HeadLevelFraction = 0.55,
  LandingCrouch = 0.16,
@@ -330,14 +338,14 @@ ScooterConfig.WheelieBalance = {
  FallMargin = math.rad(5),
 }
 ScooterConfig.BaseRidingPose = {
-	CrouchHipHeightFraction = 0.045,
-	RootForwardOffset = 0,
-	TorsoLean = math.rad(5),
+	CrouchHipHeightFraction = 0.27,
+	RootForwardOffset = 0.85,
+	TorsoLean = math.rad(7),
 	HandPalmPitch = math.rad(-90),
 	FootLateralOffset = 0.10,
 	DeckMargin = 0.015,
-	ElbowPoleWidth = 2.0,
-	ElbowPoleHeight = 5.5,
+	ElbowPoleWidth = 1.8,
+	ElbowPoleHeight = 4.2,
 	ElbowPoleForwardOffset = 0.6,
 	FrontFootPitch = math.rad(8),
 	RearFootPitch = math.rad(-8),

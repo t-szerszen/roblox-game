@@ -35,13 +35,15 @@ Wszystkie markery należą do runtime `Workspace.DeliveryStations`, **poza `Work
 
 ## 4. Jazda, wheelie, burnout i gangi
 
-- **Jazda:** 100 Coins za ukończony fizyczny kilometr. Skala wynika z istniejącego `ScooterConfig.StudsPerKmH`: 1,6 studa/s na km/h, czyli **5760 studów/km**. Nie zakłada się 1 stud = 1 metr. Postęp niepełnego kilometra i ułamki Coins są zapisywane.
-- **Wheelie:** x1 → x2 liniowo przez 5 sekund poprawnego wheelie; zakończenie, postój lub nieprawidłowa próbka resetuje x1. Kontrola uwzględnia właściciela/kierowcę, kontakt tylnego koła, brak kontaktu przedniego, rzeczywiste pochylenie co najmniej 8° z istniejącej konfiguracji i limit ruchu pionowego. Podstawa fizyki wheelie nie została zastąpiona nową mechaniką. Wypłata za kilometr jest ważona mnożnikiem poszczególnych fragmentów dystansu.
+- **Jazda:** 100 Coins/km, wypłacane co **10 m** (1 Coin na krok, `EconomyConfig.RideCoinStepMeters`). Skala wynika z istniejącego `ScooterConfig.StudsPerKmH`: 1,6 studa/s na km/h, czyli **5760 studów/km** i 57,6 studa na krok 10 m. Nie zakłada się 1 stud = 1 metr. Postęp niepełnego kroku i ułamki Coins są zapisywane. Profile z dawnym postępem niepełnego kilometra przenoszą już naliczone Coins do reszty (`rideRemainder`), która wypłaca się przy następnym kroku. Kolejne wypłaty tego samego typu w ciągu 60 s są scalane w jeden wpis historii transakcji, aby częste małe kwoty nie wypierały reszty historii.
+- **Wheelie:** x1.00 → x2.00 liniowo przez **20 sekund** poprawnego wheelie, w krokach **0,01** (wartość zaokrąglana w dół; ta sama wartość jest wyświetlana i wypłacana). Zakończenie, postój lub nieprawidłowa próbka resetuje x1. Kontrola uwzględnia właściciela/kierowcę, kontakt tylnego koła, brak kontaktu przedniego, rzeczywiste pochylenie co najmniej 8° z istniejącej konfiguracji i limit ruchu pionowego. Podstawa fizyki wheelie nie została zastąpiona nową mechaniką. Wypłata jest ważona mnożnikiem poszczególnych fragmentów dystansu.
 - **Ochrona dystansu:** próbkowanie co 0,25 s, limit prędkości aktualnego pojazdu, brak kredytu za teleport, duży skok pionowy, lot, długą przerwę w próbkowaniu i lokalne oscylowanie. Wymagane przemieszczenie netto ogranicza sztuczne nabijanie dystansu.
 - **Burnout:** 25 Coins/min rzeczywistego poślizgu tylnego koła z kontaktem z podłożem. Sam przycisk nie wystarcza. Ułamki są akumulowane i monety wypłacane w krótszych interwałach. W próbce burnout dystans nie daje jednocześnie zarobku za jazdę. Nagrody za gang lub zakończenie dostawy mogą działać równolegle.
 - **Gangi:** 100 Coins/min/flagę **dla każdego obecnego na serwerze członka gangu z dostępnymi danymi**. Dwóch członków i dwie flagi przez minutę daje po 200 Coins każdemu. Pula nie jest dzielona. Rozliczany jest rzeczywisty upływ czasu; zmiana własności, członkostwa i rozpad gangu aktualizują naliczanie istniejącego systemu terytoriów. Ten sam timestamp nie płaci drugi raz.
 
-HUD Coins znajduje się w lewym dolnym rogu; miejsce grafiki jest puste. Licznik wheelie jest widoczny podczas używania pojazdu, reaguje na serwerowy mnożnik i wyróżnia x2. Korzysta ze zdarzeń i tweenów, bez odpytywania serwera co klatkę. Układ mobilny wymaga ręcznej kontroli na urządzeniu.
+HUD Coins znajduje się w lewym dolnym rogu; miejsce grafiki jest puste.
+
+**Panel WHEELIE** (`RideMultiplierClient`, wygląd w `Shared/UI/WheelieHUDConfig`) pojawia się u góry ekranu tylko podczas wheelie: tytuł z zielonymi liniami, czas na kole (`4.3s`), dystans na kole (`m`, powyżej 1 km `km`), mnożnik `x1.21 Pieniędzy`, rekord gracza `Najlepszy` (`LongestWheelie`) i pasek postępu do x2 (złoty przy x2). Po zakończeniu wheelie panel trzyma końcowy wynik przez 1 s i znika. Dane mierzy serwer (`RewardMath`) i publikuje jako atrybuty gracza `RideWheelieActive`, `RideWheelieSeconds`, `RideWheelieMeters` oraz `RideRewardMultiplier` co 0,25 s; stan wheelie jest publikowany przed resetem mnożnika, więc panel pokazuje końcowy mnożnik. Klient jedynie płynnie dolicza czas między próbkami (maks. 0,3 s ponad wartość serwera), a połączenie `RenderStepped` istnieje tylko podczas aktywnego wheelie. Rekord liczony jest z atrybutu `WheelieActive` pojazdu, więc może minimalnie różnić się od czasu w panelu (przerwanie przez lot resetuje mnożnik). Układ mobilny wymaga ręcznej kontroli na urządzeniu.
 
 ## 5. Zapis i współbieżność
 
@@ -116,7 +118,7 @@ Przed wycofaniem synchronizacji poprzednia wersja przeszła 20 natywnych asercji
 Po osobnej zgodzie na wdrożenie do kopii testowej projektu:
 
 - Dostawy od aplikacji do sklepu i budynku: czy punkty generują się na dostępnym podłożu, wygoda podjazdu, minimapa, błędny sklep/adres, odrodzenie, anulowanie, streaming, usunięcie budynku.
-- Realna jazda na każdym modelu, 1 i 2 km, wheelie x1→x2 i jego HUD, burnout oraz brak wypłat podczas postoju/teleportacji.
+- Realna jazda na każdym modelu, wypłata co 10 m, 1 i 2 km, wheelie x1.00→x2.00 przez 20 s i panel WHEELIE (pojawienie, czas, dystans, ukrycie 1 s po końcu), burnout oraz brak wypłat podczas postoju/teleportacji.
 - Multiplayer: zmiany właściciela flag, wejście/wyjście członków, rozpad gangu, równoczesna wypłata i zakup.
 - DataStore w osobnym środowisku testowym: rejoin, rozłączenie w trakcie zakupu, zamknięcie serwera, awarie i utrata lease. W poprzednim Play API DataStore w Studio było wyłączone; system poprawnie blokował gospodarkę, więc prawdziwego zapisu kont nie przetestowano.
 - Po skonfigurowaniu Game Pass IDs: prawdziwe prompty, ceny, anulowanie, błąd, własność po rejoin, powtórne potwierdzenie oraz obie waluty radia.
@@ -138,7 +140,8 @@ Nowe:
 - `src/ServerScriptService/Shop/ItemEquipment.luau`
 - `src/ServerScriptService/Scooter/ScooterCosmetics.luau`
 - `src/StarterGui/CoinsHUD/init.meta.json` i `CoinsHUDClient.client.luau`
-- `src/StarterGui/RideMultiplier/init.meta.json` i `RideMultiplierClient.client.luau`
+- `src/StarterGui/RideMultiplier/init.meta.json` i `RideMultiplierClient.client.luau` (panel WHEELIE)
+- `src/ReplicatedStorage/Shared/UI/WheelieHUDConfig.luau`
 - `assets/items/gaz.rbxm`
 - `tests/run_economy_tests.py`, `tests/economy.spec.luau`, `tests/economy.studio.luau`
 - `docs/COINS_HUD.md`, `docs/ECONOMY_IMPLEMENTATION.md`

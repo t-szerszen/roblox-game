@@ -1,0 +1,30 @@
+--!strict
+
+-- Dimensions are measured on the authored G4; gameplay tuning stays in ScooterConfig.
+return table.freeze({
+	SourceName = "KuKirin G4",
+	PreviewName = "KuKirin G4 Rig",
+	CandidateName = "scooter_g4",
+	Revision = 1,
+	TargetGripHeight = 5.67,
+	MinimumScale = 0.4,
+	MaximumScale = 1,
+	PreviewOffset = Vector3.new(0, 0, -18),
+	ChassisMass = 12,
+	SteeringMass = 2,
+	WheelMass = 2,
+	ArmMass = 0.5,
+	ReferenceRiderMass = 40,
+	AxleSize = Vector3.one * 0.12,
+	HelperSize = Vector3.one * 0.25,
+	DeckThickness = 0.12,
+	InitialSpringStiffness = 1000,
+	InitialSpringDamping = 100,
+	InitialSpringMaxForce = 10000,
+	FrontFixed = { "ForkPlate", "ForkCrown", "SteerStem", "PivotBolt", "PivotBoltHex", "ShockTopTab" },
+	RearFixed = { "PivotBolt", "ShockMountTop" },
+	ShockUpper = { "ShockBody", "PreloadNut", "PreloadThread" },
+	ShockLower = { "ShockShaft", "ShockLowerEye", "SpringSeat", "ShockLowerTab", "ShockBrace" },
+	WheelFixed = { "Axle", "AxleEnd", "AxleNut", "Caliper", "CaliperBolt", "CaliperBadge", "BanjoBolt" },
+	BodyCables = { "RearBrakeLine", "RearBrakeLineJ" },
+})

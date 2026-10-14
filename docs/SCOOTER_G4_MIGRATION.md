@@ -1,0 +1,449 @@
+# KuKirin G4 — analiza i wdrożenie jazdy
+
+Aktualny stan Studio: G4 jest podłączona do kontrolera i dostępna do jazdy w Play,
+obok zachowanej G2 Pro. Użytkownik potwierdził rozwiązanie problemu sprężyn.
+Nowsza korekta wspólnej wiązki przewodów jest zastosowana w Studio Edit
+do szablonu i podglądu oraz zapisana w natywnym pliku rigu.
+Instrukcja i wyniki są w sekcji **Aktywacja jazdy**
+na końcu dokumentu. Wcześniejsze sekcje opisują kolejne etapy historycznie.
+
+Odczyt 2026-10-13 przez integrację Roblox Studio, place `127535941224851`,
+w trybie Edit. Sprawdzono aktualne źródła Studio, hierarchię, właściwości,
+połączenia aktywnego szablonu oraz widok nowego modelu. Nie uruchamiano Play,
+nie synchronizowano kodu i nie zmieniano modeli ani skryptów Studio.
+Poniższe zachowania wynikają z analizy implementacji; nie są nowym testem jazdy.
+
+## Aktualna mechanika
+
+Aktywny szablon to `ServerStorage.ScooterModels.scooter`, a nie model wystawiony
+w Workspace. Wszystkie pozycje katalogu korzystają obecnie z tego samego rigu;
+wybór produktu ustala parametry i wyposażenie. Nazwa nowego modelu sama nie
+przełącza szablonu ani nie nadaje parametrów produktu G4.
+
+- `ScooterServer`, `ScooterInput` i `ScooterPhysics`: serwerowa kontrola ruchu,
+  własność sieciowa serwera, walidacja właściciela i kierowcy, życia/stun,
+  argumentów i częstotliwości wejścia. Klient wysyła intencje sterowania.
+  `VectorForce` obsługuje napęd, hamowanie, toczenie i bieg wsteczny;
+  `AlignOrientation` utrzymuje orientację i równowagę.
+- W przyspiesza; S hamuje, następnie poniżej progu 2 km/h włącza wsteczny
+  z limitem 18 km/h. A/D steruje fizycznym zawiasem Servo kierownicy.
+  Aktualny serwer wyznacza obrót podwozia z zaakceptowanego polecenia skrętu;
+  nie czeka na osiągnięcie kąta przez zawias. Odczyt kąta jest nadal publikowany.
+  Maksymalny kąt kierownicy wynosi 48°, a limit przechyłu podwozia 28°.
+  Skręt słabnie wraz z prędkością. Bez burnout podwozie nie obraca się w miejscu.
+- E służy do wsiadania/zsiadania; postać jest związana natywnym `SeatWeld`
+  z niewidocznym `DriverSeat`. Skok podczas jazdy jest blokowany.
+- P przełącza SPORT/ECO; ECO ma limit napędu 25 km/h. SPORT korzysta
+  z parametrów wybranego produktu, np. bazowe G4 ma 90 km/h.
+  L wysyła żądanie przełączenia przedniego światła.
+- Shift/C wyzwala wheelie przy prędkości do przodu powyżej 10 km/h,
+  kontakcie tylnego koła i spełnieniu cooldownu. Początkowy cel to 5°;
+  W podnosi w kierunku punktu równowagi około 35–38°, puszczenie W opuszcza,
+  S opuszcza szybciej. Limit równowagi to 45°, bazowy próg upadku 68°;
+  wyposażenie może ustalić inny `WheelieMaxAngle`. Faktyczne wheelie
+  potwierdzają kontakt tyłu, brak kontaktu przodu i fizyczny kąt co najmniej 8°.
+  Upadek lub silna kolizja powoduje wyrzucenie/stun kierowcy.
+- W+S przy niskiej prędkości uruchamia burnout: silnik tylnego zawiasu,
+  dym i możliwość donutów. Efekty zależą od serwerowego stanu kontaktu/inputu.
+  Osobny system iskier sprawdza kąt i rzeczywisty kontakt z podłożem.
+- `ScooterArcadeSteps` jest włączony: zweryfikowane małe przeszkody,
+  do skonfigurowanego limitu 2,5 studa, obsługuje płynna ścieżka wysokości
+  z ruchem zawieszenia. To nie sama pasywna fizyka sprężyn.
+  `ScooterTerrain` pozostaje wariantem odzyskiwania/deweloperskim.
+
+Aktualny rig ma 65 części fizycznych, 7 `HingeConstraint`, 2
+`SpringConstraint`, 24 attachmenty i 59 `WeldConstraint`.
+`CentralShockRig=true`, `IndependentFrontSteering=false`: kolumna i przedni
+moduł skręcają razem; po dwa zawiasy wahaczy na każdą oś, dwa zawiasy kół,
+jeden zawias skrętu. Masa i geometria zawieszenia są kalibrowane dla szablonu.
+
+## Postać i animacje
+
+`ScooterBaseRidingPose` i `Shared/Scooter/ScooterBasePose` tworzą proceduralną
+pozę R15 po ewaluacji Animatora. Obsługują `Motor6D` oraz połączenia
+`AnimationConstraint`; zachowują długości kończyn i proporcje awatara.
+Stopy są rozwiązywane względem `FootRest`, dłonie względem
+`HandleBar.LeftHandGrip` i `RightHandGrip` na ruchomej kierownicy.
+R6 nie otrzymuje tej własnej pozy.
+
+Aktualny kod zawiera już reakcje tułowia na przyspieszanie i hamowanie,
+skręt tułowia i korektę zasięgu rąk, przechył w zakręcie, przeciwruch podczas
+wheelie, ugięcie przy rozpoczęciu wheelie oraz amortyzację lądowania.
+Serwer publikuje m.in. `RidingState`, `WheeliePhysical`, `FrontGrounded`
+i `RearGrounded`. Każdy klient oblicza pozy obserwowanych kierowców;
+cleanup przy zsiadaniu/śmierci/usunięciu przywraca stawy i ustawienia Animatora.
+Nie jest potrzebny osobny przesłany klip animacji, by zachować te zachowania.
+
+`ScooterSpringVisuals` wygładza obrót kół i animuje dekoracyjne sprężyny
+na lokalnych kopiach MeshPartów. Nowe koła złożone z wielu części i segmentowe
+sprężyny wymagają dopasowania tego istniejącego modułu.
+
+Starsze opisy o wyłącznie neutralnej pozie i przechyle 16° nie opisują w pełni
+obecnego Studio. Aktualne `ScooterConfig`, `ScooterServer` i `ScooterPhysics`
+różnią się od repozytorium; nie nadpisano ani nie importowano tych zmian.
+
+## Znaleziony model
+
+`Workspace.KuKirin G4` znajduje się około `(303.68, 7.76, 23.33)`.
+Obok jest `Workspace.KuKirin G4v2`, z takimi samymi policzonymi klasami
+obiektów i rozmiarami; nie badano pełnej identyczności obu modeli.
+Przedmiotem tej analizy jest dokładnie `KuKirin G4`.
+
+Model ma osiem grup: `Body`, `Stem`, `Cockpit`, `Cables`, `FrontSuspension`,
+`RearSuspension`, `FrontWheel`, `RearWheel`. Zawiera 1919 potomków,
+w tym 1731 części fizycznych: 1691 `Part`, 39 `UnionOperation`, 1 `WedgePart`.
+Wszystkie są Anchored, niekolizyjne i bez Massless. Nie ma `PrimaryPart`,
+attachmentów, constraintów, weldów ani skryptów. Obecne zwoje i amortyzatory
+są geometrią dekoracyjną: po dwa amortyzatory z przodu i z tyłu.
+
+Wymiary obwiedni to około `12.23 × 11.81 × 6.24` studa w osiach świata.
+Rozstaw osi wynosi około 9,38 studa, rozstaw środków chwytów 5,03 studa,
+a chwyty znajdują się około 8,84 studa nad powierzchnią GripTape.
+Obwiednia kompletnych kół ma średnicę około 2,55 studa, wraz z bieżnikiem.
+Aktywny szablon ma rozstaw osi około 7,70, chwyty oddalone o 3,74 studa
+i koła o średnicy 1,95 studa. Dopasowanie postaci wymaga osobnego pomiaru;
+nie ustalono ani nie zastosowano automatycznie nowej skali.
+
+## Co trzeba przygotować
+
+1. **Zespoły mechaniczne i weldy.** Oddzielić podwozie, kolumnę/kokpit,
+   wahacze z osiami oraz obracające się koła. Dekoracje przypisać do odpowiednich
+   zespołów. Nie spawać wahaczy ani kół na sztywno do podwozia. W grupach kół
+   są również zaciski i elementy osi: nie powinny obracać się z oponą i tarczą.
+   Przewody przechodzą przez ruchome zespoły i również wymagają przypisania.
+2. **Attachmenty i zawiasy.** Zmierzyć oś skrętu, współosiowe mocowania
+   czterech wahaczy oraz centra/osi obrotu obu kół. Zachować Servo skrętu,
+   pasywne zawiasy wahaczy z limitami i zawiasy kół, w tym napęd burnout tyłu.
+3. **Sprężyny fizyczne.** Dodać attachmenty górnych/dolnych mocowań i
+   `SpringConstraint`. Obecny aktywny wariant ma dwie sprężyny centralne;
+   nowy model ma cztery wizualne amortyzatory. Istnieje też starszy wariant
+   czterech sprężyn, ale nie jest gotowym adapterem tego modelu. Wybór między
+   dwiema sprężynami z czterema dekoracjami a czterema fizycznymi sprężynami
+   pozostaje do ustalenia w etapie zawieszenia. Parametry trzeba przeliczyć
+   dla nowych ramion, skali, mas i skoku; nie kopiować wartości w ciemno.
+4. **Kontrakt kierowcy i kolizji.** Przygotować `Root` jako PrimaryPart,
+   `DriverSeat`, `FootRest`, `RiderRootAttachment`, dwa grip attachmenty,
+   osie pomocnicze i uproszczone collidery kół/podestu. `ScooterRig.Prepare`
+   generuje część tych helperów dla zgodnego wejścia; nowy model jeszcze nim
+   nie jest. Siły napędu, stabilizację i emitery tworzą istniejące moduły runtime.
+5. **Adapter modelu i prezentacji.** Obecny `ScooterRig.Inspect` wymaga
+   konkretnych MeshPartów na najwyższym poziomie, np. `ScooterBody`,
+   `HandleBarStick`, `HandleBar`, `FrontWheel`, `BackWheel` i cztery wahacze.
+   G4 ma zamiast nich grupy Model, Part i UnionOperation, a tył nazywa się
+   `RearWheel`. Sama zmiana nazwy modelu i dodanie sprężyn nie wystarczy.
+   Trzeba również dopasować animowane koła/sprężyny, ekran, światła,
+   punkty efektów oraz istniejące grupy personalizacji.
+6. **Koszt modelu.** 1731 części na hulajnogę wobec 65 w aktualnym szablonie
+   wymaga przeglądu dekoracji, zwojów i przewodów przed wdrożeniem multiplayer.
+   To obserwacja liczby obiektów, nie wynik profilowania. Nie usunięto geometrii.
+
+Proponowana kolejność kolejnych etapów: pomiary i fit awatara; adapter i sztywny
+podział zespołów; osie i skręt; zawieszenie i collidery; dopiero potem podpięcie
+istniejącego kontrolera, wheelie/burnout i prezentacji. Źródło G4 i obecny
+szablon należy zachować, a pierwsze próby wykonywać na osobnej kopii.
+Ta analiza nie stanowi autoryzacji żadnej synchronizacji lub instalacji w Studio.
+
+## Przygotowany rig — 2026-10-13
+
+Po analizie użytkownik zlecił przygotowanie modelu i kodu oraz pozwolił dopasować
+skalę hulajnogi do awatara. Implementacja znajduje się na branchu
+`feat/kukirin-g4-rig`. Oryginalny G4, G4v2, mapa i aktywny szablon pozostały
+zachowane. Istniejących źródeł Studio nie zmieniono.
+
+- `Workspace.KuKirin G4 Rig`: osobna zakotwiczona, niekolizyjna kopia do przeglądu.
+- `ServerStorage.ScooterModels.scooter_g4`: przygotowany, odkotwiczony kandydat,
+  z aktywnymi colliderami. Nie zastępuje `scooter` i nie jest automatycznie spawniony.
+- `assets/scooter/kukirin-g4-source.rbxm`: natywny zapis oryginału z UnionOperation.
+- `assets/scooter/kukirin-g4-rig.rbxm`: natywny zapis kandydata wraz z połączeniami.
+- `assets/scooter/kukirin-g4-manifest.json`: parametry, sumy SHA-256 i wyniki QA.
+
+Źródło ma nadal 1731 części; rig ma 1743 części, 28 attachmentów, siedem zawiasów
+i **cztery fizyczne sprężyny**. Osie pochodzą z rzeczywistych śrub wahaczy,
+osi kół i SteeringHead. Górne/dolne punkty sprężyn pochodzą z ShockEye.
+Wahacze obu stron każdej osi są spawane do wspólnej osi pomocniczej.
+Opony, felgi, tarcze i bieżnik tworzą zespoły obrotowe; zaciski i nakrętki osi
+pozostają przy zawieszeniu. Kolumna, kokpit i przedni moduł skręcają razem.
+Geometria źródłowa jest zachowana, łącznie z segmentami sprężyn i przewodów.
+Przewody są przypisane do istniejących zespołów; elastyczne deformowanie
+przewodów na całej długości nie zostało dodane.
+
+Skala kopii wynosi `0.6422152444`, wyliczona z wysokości chwytów aktywnego szablonu
+nad podestem. Osiągnięto wysokość chwytów 5,674 studa, rozstaw osi 6,023 studa
+i promień kontaktowy koła 0,818 studa. Root ma masę 12, kolumna 2, każda opona 2,
+każdy wahacz 0,5; zawieszenie uwzględnia referencyjnego kierowcę o masie 40.
+Parametry wszystkich czterech sprężyn i limity wahaczy wylicza istniejący
+`ScooterSuspension`, z zachowaniem rzeczywistych przełożeń mechanicznych.
+
+`DevScooterG4Build` i `DevScooterG4Config` są jawnym narzędziem authoringu.
+`ScooterWorkflow.PreviewG4()` tworzy podgląd; `StageG4()` tworzy osobnego kandydata.
+Powtórzenie zachowuje wcześniejsze własne kopie w `ScooterRigDraftBackups`.
+Narzędzia nie działają przy starcie serwera i nie podmieniają aktywnego szablonu.
+Wykonanie tych komend z modułów gry wymaga wcześniejszej, osobno autoryzowanej
+synchronizacji odpowiednich źródeł. W tym zadaniu autorowanie i QA wykonano
+przez tymczasowe, nieparentowane moduły; do Studio trafiły wyłącznie modele.
+
+Adaptacja `ScooterRig`, `ScooterCollision` i `ScooterRigGeometry` akceptuje
+BasePart, zachowując dotychczasowe nazwy i rygor walidacji połączeń.
+`AuthoredSuspensionRig` pozwala kalibrować cztery amortyzatory z właściwą masą
+i wyłącza starsze automatyczne przesuwanie przedniego mocowania.
+Dotychczasowe warianty MeshPart i dwóch sprężyn pozostają obsługiwane.
+Kontroler napędu, autorytet serwera, remotes, ekonomia oraz bieżące źródła
+`ScooterConfig`, `ScooterServer` i `ScooterPhysics` w Studio nie zostały nadpisane.
+
+`ScooterCompoundVisuals`, wywoływany przez istniejący `ScooterSpringVisuals`,
+obsługuje koła z wielu części, segmentowe zwoje i teleskopowe tłoczyska.
+Stosuje istniejący limit odległości, jedną zbiorczą operację BulkMoveTo,
+reakcje na zmiany koloru/rozmiaru/przezroczystości i cleanup przy usunięciu
+lub streamingu. GUI etykiet kół przełącza między oryginałem a kopią, aby uniknąć
+podwójnych napisów. Wiązanie obiektów po replikacji jest scalane do jednego
+odroczonego przebiegu zamiast osobnego przebiegu dla każdej części.
+Personalizacja obejmuje jawnie otagowane części złożonych grup, zachowując
+kolejność odczytu kolorów starszych modeli. Wizualne ulepszenie hamulców
+rozpoznaje również otagowane tarcze G4.
+
+Root, DriverSeat i RiderRootAttachment korzystają z istniejącego mechanizmu.
+Dłonie mają cele na rzeczywistych gripach. FootRest opisuje powierzchnię stania
+i objętość baterii, dzięki czemu DeckCollider chroni również spód baterii.
+LeftFootTarget/RightFootTarget są markerami authoringu; istniejący solver
+wylicza dokładne pozycje stóp z powierzchni FootRest i wymiarów danej postaci.
+Ekran używa istniejącego DashboardGui na płaszczyźnie nad DisplayGlass,
+skierowanej ku górze. FrontLight i StopLight wskazują rzeczywiste soczewki;
+fabryczne dekoracyjne źródła światła w kopii są wyłączone dla kontroli runtime.
+
+## Weryfikacja przygotowania
+
+- Natywny `tests/scooter_g4.studio.luau`: **12208 asercji PASS** na odłączonych
+  modelach. Sprawdza zachowanie każdej części, jednorodną skalę, masy,
+  przywracający moment sprężyn na krańcach skoku, collidery, połączenia,
+  statyczne zaciski, powtarzalność klonowania, odrzucenie blokujących weldów,
+  widoczność GUI, reakcje malowania oraz cleanup, także po streamingu.
+- Osobna wygenerowana postać R15, dopasowana wyłącznie w teście do wysokości
+  8 studów: cele neutralnej pozy osiągalne z błędem poniżej 0,005 studa.
+  Nie zmieniono ustawień ani proporcji postaci graczy.
+- Natywny zapis i ponowny odczyt RBXM: PASS, wraz z walidacją odczytanego rigu.
+- CLI `--runtime-only`: 230 PASS; `--arcade-only`: 8332 PASS.
+- Osobny natywny test malowania: 17 PASS, osiem grup G4 oraz zachowanie
+  głównego koloru starego szablonu. Kontrakty UI CLI: 129 PASS.
+- Kompilacja Luau, Roblox-aware strict type analysis oraz lokalny Rojo build: PASS.
+- Pełny starszy runner nadal zatrzymuje się po części runtime na istniejącym
+  brakującym helperze `make` w `scooter_visuals.spec.luau`; nie deklarujemy jego PASS.
+
+Nie uruchamiano Play ani nie synchronizowano zmienionego kodu produkcyjnego
+do Studio. Natywne kontrole nie symulują pełnej jazdy i replikacji.
+Kolejny etap wymaga selektywnej, jawnie autoryzowanej synchronizacji adapterów
+oraz próby jazdy na kandydacie: skręt, wheelie, burnout, krawężniki, lądowania
+i obserwacja przez drugiego gracza. Koszt 1731 części oraz 1084 lokalnych kopii
+wizualnych przy bliskim kierowcy nadal wymaga profilowania przed wdrożeniem
+multiplayer. Podgląd viewportu przez MCP zakończył się timeoutem; nie deklarujemy
+wizualnego odbioru końcowej kopii na podstawie screenshotu.
+
+## Aktywacja jazdy — 2026-10-13
+
+Użytkownik zlecił wdrożenie gotowej do jazdy G4 w Play przy zachowaniu G2 Pro.
+Selektywnie zsynchronizowano 14 modułów/skryptów adaptera i konfiguracji;
+przed zapisem porównano zarówno Source, jak i bufor ScriptEditorService,
+a po zapisie sprawdzono ich zgodność. Zastane zmiany strojenia Config/Server
+oraz usunięcie duplikatu SmoothYawRate w Physics zaimportowano do Git i zachowano.
+Nie wykonywano pełnej synchronizacji Rojo. Mapa, oryginały G4/G4v2 i istniejący
+szablon `scooter` pozostały zachowane. Tymczasowe testy znikają po Stop.
+
+W Play, przy pierwszym SpawnLocation, `Workspace.ScooterModelTests` zawiera
+stanowiska **G4 — jazda testowa** i **G2 Pro — jazda testowa**. E na stanowisku
+przywołuje własną hulajnogę przy spawnie; E przy przywołanej hulajnodze wsiada.
+Przełączanie modeli wymaga wcześniejszego zsiadania i zwykłego cooldownu 3 s.
+Zwykły spawn nadal korzysta z wybranego produktu i domyślnego G2 Pro.
+Oryginalny zakotwiczony model w Workspace jest źródłem, a nie pojazdem do jazdy.
+
+`ModelTemplates["KuKirin G4"] = "scooter_g4"` kieruje posiadaną katalogową G4
+na nowy rig z jej zwykłymi statystykami (bazowo 90 km/h w SPORT).
+Jawna serwerowa metoda RequestStudioModelForPlayer jest dostępna tylko w Studio,
+sprawdza skonfigurowaną listę wariantów i używa istniejącej walidacji spawnu.
+Stanowiska testowe korzystają z posiadanego domyślnego G2 Pro i jego tuningu
+(bazowo 55 km/h), zachowując wybór produktu i ekwipunek. Nie przyznają G4
+w sklepie ani nie obchodzą własności produktów poza Studio.
+Klient nadal używa istniejących walidowanych remotes; własność fizyki ma serwer.
+
+Natywna próba przez zwykły server Script i LocalScript w jednoosobowym Play
+sprawdziła: postój z oboma kontaktami, wsiadanie, przyspieszanie do 55 km/h,
+rzeczywisty skręt w lewo/prawo podczas jazdy, wheelie około 37° z kontaktem
+tylnego koła i oderwanym przodem, hamowanie/wsteczny do 18 km/h, burnout,
+Servo kierownicy, ECO 25 km/h, światło, przejazd przez krawężnik 1 studa
+z aktywacją istniejącego ArcadeSteps oraz zsiadanie. Dane faz i statusy
+zapisano w `assets/scooter/kukirin-g4-play-validation.json`.
+Próba używała osobnej podłogi przy `(6000, 1000, 6000)`, poza Workspace.Map.
+Korzystanie z require w kontekście pluginu nie jest odpowiednikiem modułu
+uruchomionej gry; dlatego test metod serwera wykonuje zwykły Script.
+
+Na kliencie potwierdzono wyświetlanie i obrót złożonych kół, ukrycie ich
+oryginałów podczas jazdy oraz usunięcie kopii po przełączeniu na G2 Pro.
+Minimalny zaobserwowany błąd obu dłoni względem gripów wyniósł 0,000061 studa
+na rzeczywistej postaci w Play; jest to najlepsza zaobserwowana klatka,
+a nie gwarancja maksymalnego błędu podczas całego manewru. Serwer potwierdził
+przełączenie z powrotem na zachowany rig G2 Pro i usunięcie wcześniejszej G4.
+
+Kompilacja Luau i lokalny Rojo build przechodzą. Regresje CLI runtime: 230 PASS;
+ArcadeSteps: 8332 PASS. Pełna analiza typów zależności nadal zgłasza zastane
+błędy w Cosmetics, Ragdoll, UpgradeService i typowaniu atrybutów Server;
+nie deklarujemy jej pełnego PASS. Screenshot viewportu, test dwóch klientów
+i profilowanie kosztu szczegółowej geometrii pozostają osobnymi kontrolami.
+
+Przy odtwarzaniu projektu w nowym Studio należy zaimportować zachowany plik
+`assets/scooter/kukirin-g4-rig.rbxm` jako `ServerStorage.ScooterModels.scooter_g4`
+obok istniejącego `scooter`. Generator jest narzędziem jawnym; serwer nie tworzy
+ani nie zastępuje modeli authoringu przy uruchomieniu.
+
+## Poprawka sprężyn i obciążenia kierowcy — lokalnie, 2026-10-13
+
+Użytkownik zgłosił zapadanie się hulajnogi pod kierowcą i odrywanie wizualnych
+amortyzatorów; oczekuje zachowania wysokości po wsiadaniu oraz reakcji zawieszenia
+na przeszkody. Ustalił nowy flow: agent pisze kod, użytkownik testuje jazdę
+w Studio. Nie uruchamiano nowych prób Play ani nie synchronizowano tej poprawki.
+Odczyt istniejącej sesji był diagnostyką, bez modyfikowania obiektów gry.
+
+Grupy CoilVisuals nie mają PrimaryPart. Ich WorldPivot pozostaje przy spawnie,
+podczas gdy części przemieszczają się z zespołami mechanicznymi. W aktualnej sesji
+odległość pivotu od mocowań przekraczała 840 studów. `ScooterCompoundVisuals`
+nie używa już GetPivot tych grup: rekonstruuje pozycję spoczynkową z zawiasu,
+istniejącego AuthoredPivotCFrame i attachmentów. Dolne części przelicza ze
+współrzędnych ruchomego wahacza, więc związanie po ugięciu nie zapisuje ugięcia
+jako nowego stanu spoczynkowego. Obie końcówki wizualnej sprężyny korzystają
+z bieżących mocowań bez osobnego opóźnienia; przednia oś orientacji podąża
+za rzeczywistym skrętem kolumny. Nie potrzeba przebudowy ani importu modelu.
+
+`ScooterServer` ustawia części kierowcy G4 na Massless podczas jazdy, również
+akcesoria dodane już po wsiadaniu. Root hulajnogi pozostaje masywny, z priorytetem
+127 i serwerową własnością sieciową. Po zsiadaniu, śmierci lub usunięciu pojazdu
+przywracane są pierwotne Massless i CanCollide; ponowne dołączenie tej samej części
+nie nadpisuje zapisanych wartości. G2 Pro zachowuje dotychczasową masę kierowcy.
+Nie zablokowano wahaczy ani SpringConstraint i nie zwiększono sztucznie sztywności.
+
+Lokalnie: 57 asercji geometrii na rzeczywistym module Compound, 230 regresji
+runtime, kompilacja Luau i analiza typów modułu prezentacji PASS. Test geometrii
+obejmuje daleki przejazd, związanie po ugięciu i skręcie, dolne/górne mocowanie
+oraz cleanup. Doubles nie symulują fizyki Roblox. Poprzedni raport Play opisuje
+poprzednią wersję; wizualną i fizyczną akceptację poprawki wykonuje użytkownik.
+
+Do selektywnego przeniesienia są tylko `ScooterCompoundVisuals` i `ScooterServer`.
+Po aktualizacji użytkownik sprawdza wsiadanie/zsiadanie na płaskim terenie,
+sprężyny po oddaleniu się od spawnu, skręt i przejazd przez przeszkodę,
+następnie zachowanie G2 Pro. Pełna synchronizacja Rojo nie jest potrzebna.
+
+W kolejnym zgłoszeniu użytkownik potwierdził, że poprawka rozwiązała problem
+sprężyn. Jest to odbiór użytkownika, nie dodatkowy test Play wykonany przez agenta.
+
+## Przewody hamulcowe — lokalnie, 2026-10-13
+
+Odczyt kandydata w Edit wykazał, że wszystkie 52 części przedniego przewodu były
+spawane do VirtualFrontAxle, wszystkie 32 części tylnego do ScooterBody,
+przepust CableGrommet przy kierownicy do podwozia, a dolna opaska CableTie
+do kolumny. Przewody przechodzą pomiędzy zespołami mechanicznymi i nie mogą
+zachowywać się jak jeden sztywny element przypięty do jednej strony połączenia.
+
+`ScooterG4Cables.Configure`, wywoływany przez istniejący ScooterRig.Prepare,
+przygotowuje wyłącznie odłączoną kopię modelu. Naprawia właścicieli weldów,
+przypisując przepust do kolumny i dolną opaskę do przedniej osi. Na oryginalnym
+łańcuchu cylindrów wyznacza odległość wzdłuż przewodu i zapisuje punkty końców
+w lokalnych współrzędnych obu zespołów. Przedni przewód i SpiralWrap przechodzą
+od kolumny do osi; dolny odcinek po opasce porusza się już razem z osią.
+Tylny przewód przechodzi od kolumny do podwozia. Smoothstep zapewnia łagodne
+przejście, a współdzielone punkty końców utrzymują ciągłość segmentów.
+
+`ScooterCableVisuals`, obsługiwany przez istniejący ScooterSpringVisuals,
+tworzy 95 lokalnych części prezentacji, zachowując oryginalny przebieg,
+kolory, materiały i grubość. Aktualizuje długość/obrót cylindrów oraz pozycje
+łączeń jedną operacją BulkMoveTo. Nie porusza fizycznymi częściami spawanych
+zespołów. Prezentacja działa również przy zaparkowanej hulajnodze w istniejącym
+limicie odległości; poza nim przywraca części źródłowe. Usunięcie pojazdu lub
+streaming czyści kopie, połączenia i przywraca widoczność. G2 Pro jest pomijana.
+
+Builder i jego konfiguracja otrzymały też właściwe przypisanie opaski/przepustu
+dla przyszłych kopii authoringu. Obecnego szablonu RBXM nie trzeba przebudowywać:
+metadane i poprawione weldy powstają w kopii podczas przygotowania pojazdu.
+Nie modyfikowano oryginału, szablonu Studio ani mapy i nie wykonywano Play QA.
+
+Do selektywnej aktualizacji runtime:
+
+- nowy `ServerScriptService.Scooter.ScooterG4Cables`;
+- zmieniony `ServerScriptService.Scooter.ScooterRig`;
+- nowy `ReplicatedStorage.Shared.Scooter.ScooterCableVisuals`;
+- zmieniony `StarterPlayer.StarterPlayerScripts.ScooterSpringVisuals`.
+
+Zmiany DevScooterG4Build/DevScooterG4Config dotyczą tylko generatora. Po aktualizacji
+runtime należy rozpocząć nową sesję Play i przywołać nową G4. Użytkownik sprawdza
+ciągłość przewodów na postoju, skręt w obie strony, pracę przedniego zawieszenia
+na przeszkodzie oraz brak rozłączeń po zsiadaniu.
+
+Lokalne kontrole: 72 asercje rzeczywistych modułów konfiguracji/prezentacji
+przewodów, 57 regresji sprężyn, 230 regresji runtime, 8332 ArcadeSteps PASS.
+Sprawdzono zachowanie geometrii w spoczynku, poprawione weldy, mocowania przy
+skręcie/ugięciu, ciągłość wszystkich odcinków, opaskę, przejazd poza spawn,
+cleanup i pominięcie G2. Analiza typów zmienionych modułów i Rojo build PASS.
+Testy lokalne używają doubles i nie zastępują wizualnego odbioru w Studio.
+
+## Wspólna górna wiązka — zastosowana w Studio, 2026-10-13
+
+Użytkownik zgłosił, że poprzednia poprawka nadal zostawia dwa osobne widoczne
+przebiegi, i jawnie zlecił zmianę w Studio według drugiego zdjęcia. Sama obsługa
+ruchu zachowywała wcześniejszy kształt i nie łączyła obu górnych odcinków.
+
+Rewizja 2 `ScooterG4Cables` prowadzi górny odcinek tylnej linii po przebiegu
+przedniej, pod wspólną osłoną spiralną. Ukrywa 12 nadmiarowych górnych części
+tylnej linii, zachowując rozgałęzienie do podwozia poniżej osłony. Przednia
+linia i osłona pozostają na kolumnie do wspólnego połączenia; uginanie zaczyna
+się dopiero poniżej dolnej krawędzi osłony. Dzięki temu osobna pętla nie jest
+rysowana obok spiralnego odcinka. Pierwotne współrzędne i rozmiary zmienionych
+części są zachowane w atrybutach G4CableOriginalFrame/G4CableOriginalSize.
+
+Zastosowano korektę do `ServerStorage.ScooterModels.scooter_g4` i
+`Workspace.KuKirin G4 Rig`. Wyłącznie weldy zmienianych przewodów były czasowo
+wyłączone podczas ustawiania geometrii; następnie przywrócono ich stan.
+Weryfikacja potwierdziła zachowanie Root i poprawność mechanicznych połączeń.
+Nie modyfikowano oryginalnego KuKirin G4, G2 Pro ani mapy. Kopie obu modeli
+sprzed operacji są w `ServerStorage.ScooterRigDraftBackups`, z nazwami
+zawierającymi `_BeforeCableHarnessJoin_`.
+
+Sprawdzono zgodność Source i bufora edytora zmienianego modułu. W trakcie pracy
+źródło Studio zostało już zaktualizowane do tej samej wersji co repozytorium;
+pierwszy zapis zatrzymał guard chroniący zmiany współpracownika. Po potwierdzeniu
+pełnej zgodności kontynuowano wyłącznie korektę modeli i weryfikację kodu.
+Pozostałych modułów nie synchronizowano.
+
+Aktualny `assets/scooter/kukirin-g4-rig.rbxm` jest natywnym eksportem poprawionego
+szablonu, wraz z metadanymi wiązki i rewizją 2; uaktualniono rozmiar i SHA-256
+w manifeście. Natywny zapis/odczyt RBXM zachowuje poprawną geometrię i rewizję.
+Lokalnie: 75 asercji przewodów, 57 sprężyn, 230 runtime, kompilacja,
+analiza typów modułu i Rojo build PASS. Pełnego historycznego testu 12208 asercji
+nie powtarzano; jego kontrakt dopuszcza teraz jawną korektę tylko tylnego przewodu
+oraz sprawdza zachowane współrzędne sprzed połączenia. Przechwycenie viewportu
+przez MCP nie zwróciło obrazu; nie deklarujemy odbioru ze screenshotu.
+Nie uruchamiano Play. Użytkownik testuje świeżo przywołaną G4 podczas skrętu
+i pracy zawieszenia; istniejące obiekty poprzedniej sesji należy zastąpić nowym spawnem.
+
+## Wariant bez odgałęzienia do decku — zastosowany w Studio, 2026-10-13
+
+Użytkownik zaakceptował próbę ukrycia bocznego przewodu skręcającego do decku,
+z możliwością powrotu do wersji z commitu `2ff0cf1`. Wyłączono widoczność całej
+tylnej gałęzi: 32 części RearBrakeLine/RearBrakeLineJ. Pozostaje jeden widoczny
+przewód przedni z osłoną spiralną i mocowaniem przy zawieszeniu. Geometria,
+położenia, weldy i fizyka nie zostały zmienione; nie usuwano części.
+
+`ScooterG4Cables.SetDeckBranchVisible` zapisuje poprzednią Transparency każdego
+fragmentu w G4DeckBranchPreviousTransparency. Przywrócenie zachowuje 12 części
+górnej pętli, które były już ukryte przed tą próbą. Configure ukrywa gałąź również
+w nowych spawnach i przygotowanych kopiach rewizji 2.
+
+W Studio zapisano wariant w `ServerStorage.ScooterModels.scooter_g4` oraz
+`Workspace.KuKirin G4 Rig`. Kopie sprzed zmiany są w ScooterRigDraftBackups,
+z nazwami zawierającymi `_BeforeDeckBranchHide_`. Potwierdzono ukrycie dokładnie
+32 części i zachowanie wszystkich pozostałych fragmentów, ich położeń i rozmiarów.
+Natywny eksport/odczyt RBXM zachował wariant; uaktualniono asset i manifest.
+
+Zatrzymano aktywny Play wyłącznie na czas trwałego zapisu wariantu, po czym
+włączono Play ponownie do testu użytkownika. Agent nie sterował pojazdem ani
+nie wykonywał prób jazdy. Należy przywołać nową G4 ze stanowiska testowego.
+
+Do pełnego powrotu do poprzedniego wariantu można przywrócić modele z kopii
+`_BeforeDeckBranchHide_` oraz kod/asset z commitu `2ff0cf1`, aby nowe spawny
+zachowały widoczne odgałęzienie. Samo SetDeckBranchVisible(model, true) przywraca
+widoczność w istniejącym obiekcie; aktualny Configure nadal wybiera ukryty wariant
+podczas przygotowania nowego pojazdu.

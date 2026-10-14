@@ -1,0 +1,63 @@
+{
+  "date": "2026-10-13",
+  "placeId": 127535941224851,
+  "source": "Workspace.KuKirin G4",
+  "preview": "Workspace.KuKirin G4 Rig",
+  "candidate": "ServerStorage.ScooterModels.scooter_g4",
+  "activeTemplatePreserved": "ServerStorage.ScooterModels.scooter",
+  "existingStudioScriptsModified": 0,
+  "hinges": 7,
+  "physicalSprings": 4,
+  "wheelRadius": 0.8182201385498047,
+  "previewNonColliding": true,
+  "sourceParts": 1731,
+  "stagedParts": 1743,
+  "gripHeight": 5.67434224486351,
+  "visualCopies": 1084,
+  "avatarTargetError": 5.960464477539063e-08,
+  "stagedAttachments": 28,
+  "wheelbase": 6.023015975952148,
+  "scale": 0.642215244384538,
+  "previewAnchored": true,
+  "verification": {
+    "nativeAssertions": 12208,
+    "runtimeAssertions": 230,
+    "arcadeAssertions": 8332,
+    "luauCompilation": "PASS",
+    "robloxTypeAnalysis": "PASS",
+    "rojoBuild": "PASS",
+    "nativeSerializationRoundTrip": "PASS",
+    "playtest": "Not run; production scripts are not synchronized",
+    "legacyFullSuite": "Existing undefined make helper in scooter_visuals.spec.luau",
+    "nativePaintAssertions": 17,
+    "uiAssertions": 129
+  },
+  "archives": {
+    "source": {
+      "file": "assets/scooter/kukirin-g4-source.rbxm",
+      "bytes": 83877,
+      "sha256": "cd2c9be7a8f2754f26e418c2456546733f02497443cac8522d5a47432cf2925b"
+    },
+    "rig": {
+      "file": "assets/scooter/kukirin-g4-rig.rbxm",
+      "bytes": 151490,
+      "sha256": "2e0eb3b687c3eb81fbb1f8997e9f75603110ec6c249efac8bc249ebb3a59963d"
+    }
+  },
+  "cableHarness": {
+    "revision": 2,
+    "joined": true,
+    "hiddenUpperRearParts": 12,
+    "nativeSerializationRoundTrip": "PASS",
+    "appliedTo": [
+      "ServerStorage.ScooterModels.scooter_g4",
+      "Workspace.KuKirin G4 Rig"
+    ],
+    "originalAndG2Preserved": true,
+    "playtest": "User performs Play acceptance; no agent Play run for this correction",
+    "priorVerificationScope": "The original verification numbers above describe initial preparation; current cable revision has separate local and Edit checks.",
+    "deckBranchHidden": true,
+    "hiddenRearParts": 32,
+    "deckBranchBackupPattern": "ServerStorage.ScooterRigDraftBackups.*_BeforeDeckBranchHide_*"
+  }
+}

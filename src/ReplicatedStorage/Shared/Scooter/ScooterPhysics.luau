@@ -149,13 +149,6 @@ function ScooterPhysics.SmoothYawRate(current: number, target: number, deltaTime
 	return current + math.clamp(change, -limit, limit)
 end
 
-function ScooterPhysics.SmoothYawRate(current: number, target: number, deltaTime: number): number
-	local dt = math.clamp(deltaTime, 0, 0.1)
-	local change = (target - current) * (1 - math.exp(-ScooterConfig.YawResponse * dt))
-	local limit = ScooterConfig.MaxYawAcceleration * dt
-	return current + math.clamp(change, -limit, limit)
-end
-
 function ScooterPhysics.AdvanceForward(
 	forward: Vector3,
 	effectiveSteering: number,

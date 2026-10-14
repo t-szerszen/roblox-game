@@ -307,6 +307,18 @@ local function trackScooter(scooter: Model)
 	update("Wheelie", "WheelieActive")
 end
 
+-- Presentation only: values are measured by RewardMath on the server. The last values stay
+-- after the wheelie ends so the HUD can show the final result before hiding.
+local function publishWheelie(player: Player, motion: RewardMath.Motion?)
+	local active=motion~=nil and motion.wheelieTime>0
+	-- Values first: the client reads them when the active flag flips on.
+	if motion and active then
+		player:SetAttribute("RideWheelieSeconds",math.floor(motion.wheelieTime*100+0.5)/100)
+		player:SetAttribute("RideWheelieMeters",math.floor(motion.wheelieDistance/EconomyConfig.StudsPerKilometer*10000+0.5)/10)
+	end
+	player:SetAttribute("RideWheelieActive",active)
+end
+
 local function updateDistance(player: Player, elapsed: number)
 	local character=player.Character
 	local root=if character then character:FindFirstChild("HumanoidRootPart") else nil
@@ -339,6 +351,8 @@ local function updateDistance(player: Player, elapsed: number)
 		end
 	end
 	if not state or not PlayerDataService.Ready(player) then
+		-- Wheelie end goes out before the x1 reset so the HUD can hold the final multiplier.
+		publishWheelie(player,nil)
 		motions[player]=nil;player:SetAttribute("RideRewardActive",false);player:SetAttribute("RideRewardMultiplier",1)
 		return
 	end
@@ -346,10 +360,11 @@ local function updateDistance(player: Player, elapsed: number)
 	local record=motions[player]
 	if not record or record.model~=state.model then
 		record={model=state.model,motion=RewardMath.NewMotion(state.root.Position)};motions[player]=record
-		player:SetAttribute("RideRewardMultiplier",1);return
+		publishWheelie(player,nil);player:SetAttribute("RideRewardMultiplier",1);return
 	end
 	local studs,multiplier,average=RewardMath.Sample(record.motion,state.root.Position,state.root.AssemblyLinearVelocity,
 		state.maxSpeedKmh*ScooterConfig.StudsPerKmH,state.grounded,state.wheelie,state.burnout,elapsed)
+	publishWheelie(player,record.motion)
 	player:SetAttribute("RideRewardMultiplier",math.floor(multiplier*100+0.5)/100)
 	if state.burnout and elapsed<=EconomyConfig.MaxSampleSeconds then PlayerDataService.RecordTimedReward(player,"Burnout",elapsed) end
 	if studs<=0 then return end

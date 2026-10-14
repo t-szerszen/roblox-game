@@ -21,6 +21,40 @@ local function cloneModule(parent: Instance, name: string, destination: Folder):
 	return clone
 end
 
+function ScooterWorkflow.PreviewG4(sourceModel: Model?): Model
+	assert(RunService:IsStudio() and not RunService:IsRunning(), "Run ScooterWorkflow in Studio Edit mode")
+	local modules = assert(ServerScriptService:FindFirstChild("Scooter"), "Missing scooter modules")
+	local reload = Instance.new("Folder")
+	local ok, result = pcall(function(): Model
+		for _, name in { "ScooterCollision", "ScooterSuspension", "ScooterRigGeometry", "ScooterRig",
+			"DevScooterG4Config", "DevScooterG4Build" } do cloneModule(modules, name, reload) end
+		return (require(reload:FindFirstChild("DevScooterG4Build") :: ModuleScript)
+			:: typeof(require(script.Parent.DevScooterG4Build))).Preview(sourceModel)
+	end)
+	reload:Destroy()
+	if not ok then error(tostring(result), 2) end
+	return result :: Model
+end
+
+function ScooterWorkflow.StageG4(draft: Model?): Model
+	assert(RunService:IsStudio() and not RunService:IsRunning(), "Run ScooterWorkflow in Studio Edit mode")
+	local modules = assert(ServerScriptService:FindFirstChild("Scooter"), "Missing scooter modules")
+	local reload = Instance.new("Folder")
+	local ok, result = pcall(function(): Model
+		for _, name in { "ScooterCollision", "ScooterSuspension", "ScooterRigGeometry", "ScooterRig",
+			"DevScooterG4Config", "DevScooterG4Build" } do cloneModule(modules, name, reload) end
+		local settings = require(reload:FindFirstChild("DevScooterG4Config") :: ModuleScript)
+			:: typeof(require(script.Parent.DevScooterG4Config))
+		local selected = draft or workspace:FindFirstChild(settings.PreviewName)
+		assert(selected and selected:IsA("Model"), "Missing G4 rig preview")
+		return (require(reload:FindFirstChild("DevScooterG4Build") :: ModuleScript)
+			:: typeof(require(script.Parent.DevScooterG4Build))).Stage(selected)
+	end)
+	reload:Destroy()
+	if not ok then error(tostring(result), 2) end
+	return result :: Model
+end
+
 function ScooterWorkflow.PreviewNewModel(sourceModel: Instance?): Model
 	assert(RunService:IsStudio() and not RunService:IsRunning(), "Run ScooterWorkflow in Studio Edit mode")
 	local source = assert(ServerScriptService:FindFirstChild("Scooter"), "Sync Rojo first")

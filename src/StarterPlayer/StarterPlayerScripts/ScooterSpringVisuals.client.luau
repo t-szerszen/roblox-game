@@ -4,6 +4,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Config = require(ReplicatedStorage.Shared.Scooter.ScooterConfig)
 local Scope = require(ReplicatedStorage.Shared.UI.Scope)
+local Compound = require(ReplicatedStorage.Shared.Scooter.ScooterCompoundVisuals)
+local Cables = require(ReplicatedStorage.Shared.Scooter.ScooterCableVisuals)
 
 type Coil = { original: MeshPart, copy: MeshPart, spring: SpringConstraint, size: Vector3, length: number,
 	transparency: number, first: Vector3, second: Vector3 }
@@ -13,7 +15,7 @@ local scope = Scope.new()
 local visuals = Instance.new("Folder")
 visuals.Name, visuals.Parent = "_ScooterRideVisuals", workspace
 scope:Give(visuals)
-local models: { [Model]: { scope: Scope.Scope, coils: { Coil }, wheels: { Wheel } } } = {}
+local models: { [Model]: { scope: Scope.Scope, coils: { Coil }, wheels: { Wheel }, compound: Compound.Controller?, cables: Cables.Controller? } } = {}
 local folderScope: Scope.Scope? = nil
 local watched: Instance? = nil
 
@@ -39,6 +41,17 @@ local function watch(instance: Instance)
 		if not models[model] or not cleanup._alive then return end
 		local root = model.PrimaryPart
 		if not root then return end
+		local entry = models[model]
+		if entry.cables and not entry.cables.IsAlive() then entry.cables = nil end
+		if not entry.cables then
+			local cables = Cables.Create(model, visuals)
+			if cables then entry.cables = cables; cleanup:Give(cables.Destroy) end
+		end
+		if entry.compound and not entry.compound.IsAlive() then entry.compound = nil end
+		if not entry.compound then
+			local compound = Compound.Create(model, visuals)
+			if compound then entry.compound = compound; cleanup:Give(compound.Destroy) end
+		end
 		for _, endName in { "Front", "Back" } do
 			local original = model:FindFirstChild(endName .. "Wheel")
 			local axle = model:FindFirstChild("Virtual" .. endName .. "Axle")
@@ -86,6 +99,15 @@ local function watch(instance: Instance)
 			cleanup:Give(copy)
 		end
 	end
+	local bindingScheduled = false
+	local function scheduleBind()
+		if bindingScheduled then return end
+		bindingScheduled = true
+		task.defer(function()
+			bindingScheduled = false
+			bind()
+		end)
+	end
 	cleanup:Give(function()
 		models[model] = nil
 		for _, coil in coils do
@@ -100,8 +122,9 @@ local function watch(instance: Instance)
 		if model.Parent ~= watched then cleanup:Clean() end
 	end))
 	cleanup:Give(model.DescendantAdded:Connect(function(instance)
-		if instance:IsA("MeshPart") or instance:IsA("SpringConstraint") then task.defer(bind) end
+		if instance:IsA("BasePart") or instance:IsA("SpringConstraint") or instance:IsA("Model") then scheduleBind() end
 	end))
+	cleanup:Give(model:GetPropertyChangedSignal("PrimaryPart"):Connect(scheduleBind))
 	bind()
 end
 
@@ -134,8 +157,10 @@ RunService:BindToRenderStep(renderName, Enum.RenderPriority.Last.Value, function
 		local root = model.PrimaryPart
 		if not root then continue end
 		local camera = workspace.CurrentCamera
-		local mounted = model:GetAttribute("RiderMounted") == true and camera ~= nil
-			and (root.Position - camera.CFrame.Position).Magnitude <= Config.RideVisuals.MaxDistance
+		local nearby = camera ~= nil and (root.Position - camera.CFrame.Position).Magnitude <= Config.RideVisuals.MaxDistance
+		local mounted = model:GetAttribute("RiderMounted") == true and nearby
+		if entry.cables then entry.cables.Update(nearby) end
+		if entry.compound then entry.compound.Update(dt, mounted) end
 		for _, wheel in entry.wheels do
 			if not wheel.original.Parent or not wheel.copy.Parent or not wheel.anchor.Parent then continue end
 			wheel.original.LocalTransparencyModifier = if mounted then 1 else wheel.transparency
